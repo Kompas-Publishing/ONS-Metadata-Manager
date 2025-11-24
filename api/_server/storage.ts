@@ -14,7 +14,7 @@ import {
   type InsertUserDefinedTag,
   type Group,
   type InsertGroup,
-} from "@shared/schema";
+} from "../_shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
 import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
