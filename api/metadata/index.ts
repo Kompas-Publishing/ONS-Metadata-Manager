@@ -49,15 +49,17 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
         }
 
         // Auto-generate ID
-        const { id: nextId } = await storage.consumeNextId();
+        const nextId = await storage.consumeNextId();
 
-        const createdFile = await storage.createMetadataFile({
-          ...data,
-          id: nextId,
-          breakTime: breakTimesArray[0] || null,
-          breakTimes: breakTimesArray,
-          createdBy: userId,
-        });
+        const createdFile = await storage.createMetadataFile(
+          {
+            ...data,
+            breakTime: breakTimesArray[0] || null,
+            breakTimes: breakTimesArray,
+          },
+          nextId,
+          permissions!
+        );
 
         res.json(createdFile);
       } catch (error: any) {

@@ -10,7 +10,7 @@ export interface AuthenticatedRequest extends VercelRequest {
   permissions?: UserPermissions;
 }
 
-export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void;
+export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void | VercelResponse> | void | VercelResponse;
 
 export function corsMiddleware(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -87,7 +87,7 @@ export function requirePermission(permission: "read" | "write" | "edit" | "delet
         return res.status(statusCode).json({ message: reason });
       }
 
-      req.permissions = permissions;
+      req.permissions = permissions || undefined;
       return handler(req, res);
     };
   };
@@ -106,7 +106,7 @@ export function requireAdmin(handler: ApiHandler): ApiHandler {
     }
 
     const permissions = await getUserPermissions(user.id);
-    req.permissions = permissions;
+    req.permissions = permissions || undefined;
 
     return handler(req, res);
   };

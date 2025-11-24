@@ -66,7 +66,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
           data.breakTimes = breakTimesArray;
         }
 
-        const updatedFile = await storage.updateMetadataFile(id, data);
+        const updatedFile = await storage.updateMetadataFile(id, data, permissions!);
         res.json(updatedFile);
       } catch (error: any) {
         console.error("Error updating metadata file:", error);
@@ -87,7 +87,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
           return res.status(404).json({ message: "File not found" });
         }
 
-        await storage.deleteMetadataFile(id);
+        await storage.deleteMetadataFile(id, permissions!);
         res.json({ message: "File deleted successfully" });
       } catch (error: any) {
         console.error("Error deleting metadata file:", error);
