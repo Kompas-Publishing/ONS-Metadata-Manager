@@ -1,14 +1,25 @@
 {
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist/public",
+  "installCommand": "npm install",
+  "framework": null,
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/.*",
+      "dest": "/api/$0"
     },
     {
-      "source": "/:path*",
-      "destination": "/:path*"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "functions": {
