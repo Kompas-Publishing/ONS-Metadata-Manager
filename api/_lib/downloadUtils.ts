@@ -1,4 +1,3 @@
-import { create } from "xmlbuilder2";
 import * as XLSX from "xlsx";
 
 export function transformFileForDownload(file: any): any {
@@ -161,12 +160,24 @@ export function buildItemXml(file: any, itemElement: any) {
   itemElement.ele('createdAt').txt(file.createdAt || '').up();
 }
 
-export function buildMetadataXml(file: any): string {
+export async function buildMetadataXml(file: any): Promise<string> {
+  const { create } = await import("xmlbuilder2");
   const doc = create({ version: '1.0' });
   const metadata = doc.ele('metadata');
   const item = metadata.ele('item');
   buildItemXml(file, item);
   return doc.end({ prettyPrint: true });
+}
+
+export async function buildSeriesXml(files: any[], rootElementName: string = 'series'): Promise<string> {
+  const { create } = await import("xmlbuilder2");
+  const root = create({ version: '1.0' }).ele(rootElementName);
+  files.forEach(file => {
+    const item = root.ele('item');
+    buildItemXml(file, item);
+    item.up();
+  });
+  return root.end({ prettyPrint: true });
 }
 
 function transformFileToXlsxRow(file: any, maxBreakTimes: number = 0): any[] {

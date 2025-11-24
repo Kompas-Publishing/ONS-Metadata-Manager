@@ -26,7 +26,7 @@ export default apiHandler(
       const format = (req.query.format as string) || "json";
 
       if (format === "xml") {
-        const xml = buildMetadataXml(transformedFile);
+        const xml = await buildMetadataXml(transformedFile);
 
         res.setHeader("Content-Type", "application/xml");
         res.setHeader(

@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { storage } from "../../../../_server/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../../_lib/apiHandler.js";
-import { transformFileForDownload, buildItemXml, buildMetadataXlsx } from "../../../../_lib/downloadUtils.js";
-import { create } from "xmlbuilder2";
+import { transformFileForDownload, buildSeriesXml, buildMetadataXlsx } from "../../../../_lib/downloadUtils.js";
 import * as XLSX from "xlsx";
 
 export default apiHandler(
@@ -31,13 +30,7 @@ export default apiHandler(
       const transformedFiles = files.map(transformFileForDownload);
 
       if (format === "xml") {
-        const root = create({ version: '1.0' }).ele('series');
-        transformedFiles.forEach(file => {
-          const item = root.ele('item');
-          buildItemXml(file, item);
-          item.up();
-        });
-        const xml = root.end({ prettyPrint: true });
+        const xml = await buildSeriesXml(transformedFiles, 'series');
 
         const filename = title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
         res.setHeader("Content-Type", "application/xml");
