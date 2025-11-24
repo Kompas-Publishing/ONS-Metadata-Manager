@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { apiHandler } from "../_lib/apiHandler";
+import { apiHandler } from "../_lib/apiHandler.js";
 import { serialize } from "cookie";
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
