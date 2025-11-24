@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
-import { storage } from "../../server/storage.js";
+import { storage } from "../_server/storage.js";
 import { apiHandler } from "../_lib/apiHandler.js";
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
