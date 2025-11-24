@@ -1,0 +1,179 @@
+import { useLocation, Link } from "wouter";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  LayoutDashboard,
+  FilePlus,
+  Layers,
+  List,
+  FileText,
+  LogOut,
+  Shield,
+} from "lucide-react";
+
+const allMenuItems = [
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: LayoutDashboard,
+    testId: "nav-dashboard",
+    adminOnly: false,
+    requiresWrite: false,
+  },
+  {
+    title: "Create File",
+    url: "/create",
+    icon: FilePlus,
+    testId: "nav-create",
+    adminOnly: false,
+    requiresWrite: true,
+  },
+  {
+    title: "Batch Create",
+    url: "/batch",
+    icon: Layers,
+    testId: "nav-batch",
+    adminOnly: false,
+    requiresWrite: true,
+  },
+  {
+    title: "Browse Series",
+    url: "/browse",
+    icon: List,
+    testId: "nav-browse",
+    adminOnly: false,
+    requiresWrite: false,
+  },
+  {
+    title: "All Files",
+    url: "/all-files",
+    icon: FileText,
+    testId: "nav-all-files",
+    adminOnly: false,
+    requiresWrite: false,
+  },
+  {
+    title: "Admin Panel",
+    url: "/admin",
+    icon: Shield,
+    testId: "link-admin",
+    adminOnly: true,
+    requiresWrite: false,
+  },
+];
+
+export function AppSidebar() {
+  const [location, setLocation] = useLocation();
+  const { user, logout, isLoading } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  const getUserInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email[0].toUpperCase();
+    }
+    return "U";
+  };
+
+  const canWrite = user?.canWrite === 1;
+  const isAdmin = user?.isAdmin === 1;
+  
+  const menuItems = allMenuItems.filter((item) => {
+    // Filter out admin-only items for non-admins
+    if (item.adminOnly && !isAdmin) {
+      return false;
+    }
+    
+    // Don't apply requiresWrite filter during auth loading to prevent flicker
+    if (isLoading) {
+      return true;
+    }
+    
+    // Filter out write-required items for users without write permission
+    // Admins bypass this check
+    if (item.requiresWrite && !canWrite && !isAdmin) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-base font-semibold px-4 py-4">
+            Metadata Manager
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === item.url}
+                    data-testid={item.testId}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <div className="p-4 border-t">
+          <div className="flex items-center gap-3 mb-3">
+            <Avatar className="w-10 h-10">
+              <AvatarImage src={user?.profileImageUrl || undefined} />
+              <AvatarFallback>{getUserInitials()}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {user?.firstName && user?.lastName
+                  ? `${user.firstName} ${user.lastName}`
+                  : user?.email || "User"}
+              </p>
+              {user?.email && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {user.email}
+                </p>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Log Out
+          </Button>
+        </div>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}

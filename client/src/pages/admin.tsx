@@ -1,0 +1,914 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Shield,
+  UserCog,
+  Eye,
+  Lock,
+  Users,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  Archive,
+  Trash2,
+  Plus,
+  FileText,
+  Edit,
+  X,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
+import type { User, Group } from "@shared/schema";
+import { useEffect, useState } from "react";
+
+export default function Admin() {
+  const { user: currentUser, isLoading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState<string | null>(null);
+  const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+
+  useEffect(() => {
+    document.title = "Admin Panel - Metadata Manager";
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && (!currentUser || currentUser.isAdmin !== 1)) {
+      setLocation("/");
+    }
+  }, [currentUser, authLoading, setLocation]);
+
+  const { data, isLoading } = useQuery<{ users: User[] }>({
+    queryKey: ['/api/admin/users'],
+    enabled: !authLoading && currentUser?.isAdmin === 1,
+  });
+
+  const { data: groupsData } = useQuery<{ groups: Group[] }>({
+    queryKey: ['/api/admin/groups'],
+    enabled: !authLoading && currentUser?.isAdmin === 1,
+  });
+
+  // User status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/status`, { status });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "User status updated" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // User permissions mutation
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ userId, permissions }: { userId: string; permissions: { canRead: number; canWrite: number } }) => {
+      // Sync canEdit with canWrite for backward compatibility
+      const fullPermissions = { ...permissions, canEdit: permissions.canWrite };
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, fullPermissions);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "Permissions updated" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update permissions",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // User visibility mutation
+  const updateVisibilityMutation = useMutation({
+    mutationFn: async ({ userId, fileVisibility }: { userId: string; fileVisibility: string }) => {
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/visibility`, { fileVisibility });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "Visibility updated" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update visibility",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // User groups assignment mutation (multi-select)
+  const updateGroupsMutation = useMutation({
+    mutationFn: async ({ userId, groupIds }: { userId: string; groupIds: string[] }) => {
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/groups`, { groupIds });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "Groups updated" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update groups",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle admin mutation
+  const toggleAdminMutation = useMutation({
+    mutationFn: async ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) => {
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}`, { isAdmin });
+      return await res.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: "Success",
+        description: variables.isAdmin
+          ? "User granted admin privileges"
+          : "User admin privileges revoked",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user admin status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest('DELETE', `/api/admin/users/${userId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "User deleted" });
+      setDeleteUserConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create group mutation
+  const createGroupMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
+      const res = await apiRequest('POST', '/api/admin/groups', { name, description });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/groups'] });
+      toast({ title: "Success", description: "Group created" });
+      setCreateGroupOpen(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete group mutation
+  const deleteGroupMutation = useMutation({
+    mutationFn: async (groupId: string) => {
+      const res = await apiRequest('DELETE', `/api/admin/groups/${groupId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/groups'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: "Success", description: "Group deleted" });
+      setDeleteGroupConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete group",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleUserExpanded = (userId: string) => {
+    const newExpanded = new Set(expandedUsers);
+    if (newExpanded.has(userId)) {
+      newExpanded.delete(userId);
+    } else {
+      newExpanded.add(userId);
+    }
+    setExpandedUsers(newExpanded);
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "active":
+        return "default";
+      case "pending":
+        return "outline";
+      case "archived":
+        return "secondary";
+      default:
+        return "secondary";
+    }
+  };
+
+  const getGroupName = (groupId: string | null) => {
+    if (!groupId || !groupsData?.groups) return "None";
+    const group = groupsData.groups.find(g => g.id === groupId);
+    return group?.name || "Unknown";
+  };
+
+  const getUserCountForGroup = (groupId: string) => {
+    if (!data?.users) return 0;
+    return data.users.filter(u => u.groupIds?.includes(groupId)).length;
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Admin Panel</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage user permissions and admin access
+          </p>
+        </div>
+
+        <Card className="p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const users = data?.users || [];
+  const groups = groupsData?.groups || [];
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Shield className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-3xl font-semibold text-foreground">Admin Panel</h1>
+        </div>
+        <p className="text-muted-foreground">
+          Manage users, permissions, and groups
+        </p>
+      </div>
+
+      {/* User Management Section */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-foreground">User Management</h2>
+        {users.length === 0 ? (
+          <Card className="p-12 text-center">
+            <UserCog className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No users found</p>
+          </Card>
+        ) : (
+          <Card className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Permissions</TableHead>
+                  <TableHead>Visibility</TableHead>
+                  <TableHead>Group</TableHead>
+                  <TableHead>Admin</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => {
+                  const isCurrentUser = currentUser?.id === user.id;
+                  const isAdmin = user.isAdmin === 1;
+                  const isExpanded = expandedUsers.has(user.id);
+
+                  return (
+                    <Collapsible
+                      key={user.id}
+                      open={isExpanded}
+                      onOpenChange={() => toggleUserExpanded(user.id)}
+                      asChild
+                    >
+                      <>
+                        <TableRow data-testid={`row-user-${user.id}`}>
+                          <TableCell>
+                            <CollapsibleTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-expand-${user.id}`}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </CollapsibleTrigger>
+                          </TableCell>
+                          <TableCell className="font-medium" data-testid={`text-email-${user.id}`}>
+                            {user.email || "N/A"}
+                          </TableCell>
+                          <TableCell data-testid={`text-name-${user.id}`}>
+                            {user.firstName && user.lastName
+                              ? `${user.firstName} ${user.lastName}`
+                              : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={getStatusBadgeVariant(user.status)}
+                              data-testid={`badge-status-${user.id}`}
+                            >
+                              {user.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {user.canRead === 1 && (
+                                <Badge variant="secondary" data-testid={`badge-read-${user.id}`}>
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Read
+                                </Badge>
+                              )}
+                              {user.canWrite === 1 && (
+                                <Badge variant="secondary" data-testid={`badge-write-${user.id}`}>
+                                  <FileText className="w-3 h-3 mr-1" />
+                                  Write
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell data-testid={`text-visibility-${user.id}`}>
+                            {user.fileVisibility}
+                          </TableCell>
+                          <TableCell data-testid={`text-group-${user.id}`}>
+                            {user.groupIds && user.groupIds.length > 0 
+                              ? user.groupIds.map(gid => getGroupName(gid)).join(", ")
+                              : "None"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={isAdmin ? "default" : "secondary"}
+                              data-testid={`badge-admin-${user.id}`}
+                            >
+                              {isAdmin ? "Admin" : "User"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={8} className="p-0">
+                            <CollapsibleContent>
+                              <div className="p-6 border-t bg-muted/20">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* Status Management */}
+                                  <div className="space-y-4">
+                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                      Status Management
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                      {user.status === "pending" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            updateStatusMutation.mutate({
+                                              userId: user.id,
+                                              status: "active",
+                                            })
+                                          }
+                                          disabled={updateStatusMutation.isPending}
+                                          data-testid={`button-approve-${user.id}`}
+                                        >
+                                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                                          Approve
+                                        </Button>
+                                      )}
+                                      {user.status === "active" && !isCurrentUser && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            updateStatusMutation.mutate({
+                                              userId: user.id,
+                                              status: "archived",
+                                            })
+                                          }
+                                          disabled={updateStatusMutation.isPending}
+                                          data-testid={`button-archive-${user.id}`}
+                                        >
+                                          <Archive className="w-4 h-4 mr-2" />
+                                          Archive
+                                        </Button>
+                                      )}
+                                      {user.status === "archived" && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            updateStatusMutation.mutate({
+                                              userId: user.id,
+                                              status: "active",
+                                            })
+                                          }
+                                          disabled={updateStatusMutation.isPending}
+                                          data-testid={`button-unarchive-${user.id}`}
+                                        >
+                                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                                          Unarchive
+                                        </Button>
+                                      )}
+                                      {!isCurrentUser && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setDeleteUserConfirm(user.id)}
+                                          disabled={deleteUserMutation.isPending}
+                                          data-testid={`button-delete-${user.id}`}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Admin Status */}
+                                  <div className="space-y-4">
+                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                      Admin Status
+                                    </h3>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        toggleAdminMutation.mutate({
+                                          userId: user.id,
+                                          isAdmin: !isAdmin,
+                                        })
+                                      }
+                                      disabled={isCurrentUser || toggleAdminMutation.isPending}
+                                      data-testid={`button-toggle-admin-${user.id}`}
+                                    >
+                                      {isAdmin ? "Remove Admin" : "Make Admin"}
+                                    </Button>
+                                  </div>
+
+                                  {/* Permissions */}
+                                  <div className="space-y-4">
+                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                      Permissions
+                                    </h3>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <Label
+                                          htmlFor={`canRead-${user.id}`}
+                                          className="text-sm"
+                                        >
+                                          Can Read
+                                        </Label>
+                                        <Switch
+                                          id={`canRead-${user.id}`}
+                                          checked={user.canRead === 1}
+                                          onCheckedChange={(checked) =>
+                                            updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canRead: checked ? 1 : 0,
+                                                canWrite: user.canWrite,
+                                              },
+                                            })
+                                          }
+                                          disabled={updatePermissionsMutation.isPending}
+                                          data-testid={`switch-read-${user.id}`}
+                                        />
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <Label
+                                          htmlFor={`canWrite-${user.id}`}
+                                          className="text-sm"
+                                        >
+                                          Can Write
+                                        </Label>
+                                        <Switch
+                                          id={`canWrite-${user.id}`}
+                                          checked={user.canWrite === 1}
+                                          onCheckedChange={(checked) =>
+                                            updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canRead: user.canRead,
+                                                canWrite: checked ? 1 : 0,
+                                              },
+                                            })
+                                          }
+                                          disabled={updatePermissionsMutation.isPending}
+                                          data-testid={`switch-write-${user.id}`}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Visibility Settings */}
+                                  <div className="space-y-4">
+                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                      Visibility Settings
+                                    </h3>
+                                    <div className="space-y-2">
+                                      <div>
+                                        <Label htmlFor={`visibility-${user.id}`} className="text-sm">
+                                          File Visibility
+                                        </Label>
+                                        <Select
+                                          value={user.fileVisibility}
+                                          onValueChange={(value) => {
+                                            // Validate before allowing group visibility
+                                            if (value === 'group' && (!user.groupIds || user.groupIds.length === 0)) {
+                                              toast({
+                                                title: "Cannot Set Group Visibility",
+                                                description: "Please assign the user to at least one group first",
+                                                variant: "destructive",
+                                              });
+                                              return;
+                                            }
+                                            
+                                            updateVisibilityMutation.mutate({
+                                              userId: user.id,
+                                              fileVisibility: value,
+                                            });
+                                          }}
+                                          disabled={updateVisibilityMutation.isPending}
+                                        >
+                                          <SelectTrigger
+                                            id={`visibility-${user.id}`}
+                                            data-testid={`select-visibility-${user.id}`}
+                                          >
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="own">Own Files Only</SelectItem>
+                                            <SelectItem value="all">All Files</SelectItem>
+                                            <SelectItem value="group">Group Files</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Group Assignment - Always visible, multi-select */}
+                                  <div className="space-y-4">
+                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                      Group Assignment
+                                    </h3>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <Label htmlFor={`groups-${user.id}`} className="text-sm">
+                                          Groups
+                                        </Label>
+                                        {user.fileVisibility === 'group' && (!user.groupIds || user.groupIds.length === 0) && (
+                                          <Badge variant="destructive" className="text-xs">
+                                            Required for group visibility
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 mb-2">
+                                        {(user.groupIds || []).map((groupId) => {
+                                          const group = groups.find(g => g.id === groupId);
+                                          return group ? (
+                                            <Badge key={groupId} variant="secondary" data-testid={`badge-group-${groupId}-${user.id}`}>
+                                              {group.name}
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const newGroupIds = (user.groupIds || []).filter(id => id !== groupId);
+                                                  updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
+                                                }}
+                                                className="ml-1 hover:text-destructive"
+                                                data-testid={`button-remove-group-${groupId}-${user.id}`}
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </Badge>
+                                          ) : null;
+                                        })}
+                                        {(!user.groupIds || user.groupIds.length === 0) && (
+                                          <span className="text-sm text-muted-foreground">No groups assigned</span>
+                                        )}
+                                      </div>
+                                      <Select
+                                        value=""
+                                        onValueChange={(groupId) => {
+                                          if (groupId && !user.groupIds?.includes(groupId)) {
+                                            const newGroupIds = [...(user.groupIds || []), groupId];
+                                            updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
+                                          }
+                                        }}
+                                        disabled={updateGroupsMutation.isPending}
+                                      >
+                                        <SelectTrigger
+                                          id={`groups-${user.id}`}
+                                          data-testid={`select-add-group-${user.id}`}
+                                        >
+                                          <SelectValue placeholder="Add to group..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {groups
+                                            .filter(group => !user.groupIds?.includes(group.id))
+                                            .map((group) => (
+                                              <SelectItem key={group.id} value={group.id}>
+                                                {group.name}
+                                              </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </CollapsibleContent>
+                          </TableCell>
+                        </TableRow>
+                      </>
+                    </Collapsible>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+
+      {/* Group Management Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-foreground">Group Management</h2>
+          <Button
+            onClick={() => setCreateGroupOpen(true)}
+            data-testid="button-create-group"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Group
+          </Button>
+        </div>
+        {groups.length === 0 ? (
+          <Card className="p-12 text-center">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">No groups found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Create groups to organize users and manage file visibility
+            </p>
+          </Card>
+        ) : (
+          <Card className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>User Count</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groups.map((group) => {
+                  const userCount = getUserCountForGroup(group.id);
+                  return (
+                    <TableRow key={group.id} data-testid={`row-group-${group.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-group-name-${group.id}`}>
+                        {group.name}
+                      </TableCell>
+                      <TableCell
+                        className="text-muted-foreground"
+                        data-testid={`text-group-description-${group.id}`}
+                      >
+                        {group.description || "No description"}
+                      </TableCell>
+                      <TableCell data-testid={`text-group-users-${group.id}`}>
+                        <Badge variant="secondary">{userCount} users</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {group.createdAt
+                          ? format(new Date(group.createdAt), "MMM d, yyyy")
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteGroupConfirm(group.id)}
+                          disabled={deleteGroupMutation.isPending}
+                          data-testid={`button-delete-group-${group.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+
+      {/* Create Group Dialog */}
+      <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>
+        <DialogContent data-testid="dialog-create-group">
+          <DialogHeader>
+            <DialogTitle>Create New Group</DialogTitle>
+            <DialogDescription>
+              Create a group to organize users and manage file visibility
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="group-name">Group Name</Label>
+              <Input
+                id="group-name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="Enter group name"
+                data-testid="input-group-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="group-description">Description (Optional)</Label>
+              <Textarea
+                id="group-description"
+                value={newGroupDescription}
+                onChange={(e) => setNewGroupDescription(e.target.value)}
+                placeholder="Enter group description"
+                data-testid="input-group-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateGroupOpen(false)}
+              data-testid="button-cancel-group"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                createGroupMutation.mutate({
+                  name: newGroupName,
+                  description: newGroupDescription || undefined,
+                })
+              }
+              disabled={!newGroupName.trim() || createGroupMutation.isPending}
+              data-testid="button-submit-group"
+            >
+              Create Group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation */}
+      <AlertDialog
+        open={deleteUserConfirm !== null}
+        onOpenChange={() => setDeleteUserConfirm(null)}
+      >
+        <AlertDialogContent data-testid="dialog-delete-user">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this user? This action cannot be undone.
+              All files created by this user will remain but will no longer be associated
+              with their account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-user">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteUserConfirm && deleteUserMutation.mutate(deleteUserConfirm)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-user"
+            >
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Group Confirmation */}
+      <AlertDialog
+        open={deleteGroupConfirm !== null}
+        onOpenChange={() => setDeleteGroupConfirm(null)}
+      >
+        <AlertDialogContent data-testid="dialog-delete-group">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this group? Users in this group will be
+              unassigned and their visibility settings may need to be updated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-group">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteGroupConfirm && deleteGroupMutation.mutate(deleteGroupConfirm)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-group"
+            >
+              Delete Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

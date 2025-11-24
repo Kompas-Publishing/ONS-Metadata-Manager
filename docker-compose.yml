@@ -1,0 +1,25 @@
+# Docker Compose configuration for external database (e.g., Neon, AWS RDS)
+# This is the default and recommended configuration.
+# 
+# Usage: docker-compose up -d
+# Note: For included PostgreSQL, use docker-compose-with-postgres.yml
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metadata-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:5000/api/auth/google/callback}

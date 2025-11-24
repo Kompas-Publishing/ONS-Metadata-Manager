@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.local
+dist
+build
+.cache
+.vite
+tmp
+logs
+*.log
+.DS_Store
+attached_assets
