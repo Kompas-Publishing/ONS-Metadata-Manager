@@ -14,13 +14,15 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "GET") {
     return requirePermission("read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
+        console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.permissions);
         const file = await storage.getMetadataFile(id, req.permissions!);
+        console.log(`[GET metadata/${id}] File found:`, !!file);
         if (!file) {
           return res.status(404).json({ message: "File not found" });
         }
         res.json(file);
       } catch (error) {
-        console.error("Error fetching metadata file:", error);
+        console.error(`[GET metadata/${id}] Error:`, error);
         res.status(500).json({ message: "Failed to fetch metadata file" });
       }
     })(req, res);
