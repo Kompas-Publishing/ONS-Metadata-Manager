@@ -25,8 +25,31 @@ export default apiHandler(
         }
 
         for (const update of updates) {
-          if (update.id && update.data) {
-            await storage.updateUser(update.id, update.data);
+          if (!update.id || !update.data) continue;
+
+          const { id } = update;
+          const data = update.data;
+
+          // Apply updates using specific storage methods
+          if (data.status !== undefined) {
+            await storage.updateUserStatus(id, data.status);
+          }
+          if (data.isAdmin !== undefined) {
+            await storage.updateUserAdminStatus(id, !!data.isAdmin);
+          }
+          if (data.canRead !== undefined || data.canWrite !== undefined || data.canEdit !== undefined) {
+            const permissions = {
+              canRead: data.canRead !== undefined ? (data.canRead ? 1 : 0) : 0,
+              canWrite: data.canWrite !== undefined ? (data.canWrite ? 1 : 0) : 0,
+              canEdit: data.canEdit !== undefined ? (data.canEdit ? 1 : 0) : 0,
+            };
+            await storage.updateUserPermissions(id, permissions);
+          }
+          if (data.fileVisibility !== undefined) {
+            await storage.updateUserVisibility(id, data.fileVisibility);
+          }
+          if (data.groupIds !== undefined) {
+            await storage.updateUserGroups(id, data.groupIds);
           }
         }
 

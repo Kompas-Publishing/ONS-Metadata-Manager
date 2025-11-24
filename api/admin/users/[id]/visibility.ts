@@ -22,7 +22,7 @@ export default apiHandler(
           .json({ message: "Invalid file visibility. Must be own, group, or all" });
       }
 
-      await storage.updateUser(id, { fileVisibility });
+      await storage.updateUserVisibility(id, fileVisibility);
       res.json({ message: "User file visibility updated successfully" });
     } catch (error) {
       console.error("Error updating user file visibility:", error);

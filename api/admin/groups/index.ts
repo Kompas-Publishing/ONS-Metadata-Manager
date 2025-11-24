@@ -6,7 +6,7 @@ export default apiHandler(
   requireAdmin(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method === "GET") {
       try {
-        const groups = await storage.listAllGroups();
+        const groups = await storage.getAllGroups();
         res.json({ groups });
       } catch (error) {
         console.error("Error listing groups:", error);
@@ -23,7 +23,7 @@ export default apiHandler(
           return res.status(400).json({ message: "Group name is required" });
         }
 
-        const group = await storage.createGroup(name);
+        const group = await storage.createGroup({ name });
         res.json(group);
       } catch (error) {
         console.error("Error creating group:", error);

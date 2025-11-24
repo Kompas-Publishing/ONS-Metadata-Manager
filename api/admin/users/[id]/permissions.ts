@@ -16,12 +16,13 @@ export default apiHandler(
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
-      const updates: any = {};
-      if (canRead !== undefined) updates.canRead = canRead ? 1 : 0;
-      if (canWrite !== undefined) updates.canWrite = canWrite ? 1 : 0;
-      if (canEdit !== undefined) updates.canEdit = canEdit ? 1 : 0;
+      const updates = {
+        canRead: canRead !== undefined ? (canRead ? 1 : 0) : 0,
+        canWrite: canWrite !== undefined ? (canWrite ? 1 : 0) : 0,
+        canEdit: canEdit !== undefined ? (canEdit ? 1 : 0) : 0,
+      };
 
-      await storage.updateUser(id, updates);
+      await storage.updateUserPermissions(id, updates);
       res.json({ message: "User permissions updated successfully" });
     } catch (error) {
       console.error("Error updating user permissions:", error);

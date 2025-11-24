@@ -290,7 +290,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined> {
+  async updateMetadataFile(id: string, file: Partial<InsertMetadataFile>, permissions: UserPermissions): Promise<MetadataFile | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
     

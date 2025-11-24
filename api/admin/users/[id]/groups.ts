@@ -20,7 +20,7 @@ export default apiHandler(
         return res.status(400).json({ message: "groupIds must be an array" });
       }
 
-      await storage.updateUser(id, { groupIds });
+      await storage.updateUserGroups(id, groupIds);
       res.json({ message: "User groups updated successfully" });
     } catch (error) {
       console.error("Error updating user groups:", error);
