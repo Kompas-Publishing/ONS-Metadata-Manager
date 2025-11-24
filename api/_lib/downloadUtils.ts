@@ -160,24 +160,131 @@ export function buildItemXml(file: any, itemElement: any) {
   itemElement.ele('createdAt').txt(file.createdAt || '').up();
 }
 
-export async function buildMetadataXml(file: any): Promise<string> {
-  const { create } = await import("xmlbuilder2");
-  const doc = create({ version: '1.0' });
-  const metadata = doc.ele('metadata');
-  const item = metadata.ele('item');
-  buildItemXml(file, item);
-  return doc.end({ prettyPrint: true });
+function escapeXml(unsafe: any): string {
+  if (unsafe === null || unsafe === undefined) return '';
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
-export async function buildSeriesXml(files: any[], rootElementName: string = 'series'): Promise<string> {
-  const { create } = await import("xmlbuilder2");
-  const root = create({ version: '1.0' }).ele(rootElementName);
+function buildItemXmlString(file: any): string {
+  const actors = Array.isArray(file.actors) ? file.actors : [];
+  const genre = Array.isArray(file.genre) ? file.genre : [];
+  const tags = Array.isArray(file.tags) ? file.tags : [];
+  const breakTimes = Array.isArray(file.breakTimes) ? file.breakTimes : [];
+
+  let xml = '  <item>\n';
+
+  // Identification section
+  xml += '    <!-- Identification -->\n';
+  xml += `    <id>${escapeXml(file.id)}</id>\n`;
+  xml += `    <channel>${escapeXml(file.channel)}</channel>\n`;
+  xml += `    <category>${escapeXml(file.category)}</category>\n`;
+  xml += `    <contentType>${escapeXml(file.contentType)}</contentType>\n`;
+  xml += `    <seasonType>${escapeXml(file.seasonType)}</seasonType>\n`;
+  xml += `    <productionCountry>${escapeXml(file.productionCountry)}</productionCountry>\n`;
+  xml += `    <yearOfProduction>${escapeXml(file.yearOfProduction)}</yearOfProduction>\n`;
+  xml += `    <programRating>${escapeXml(file.programRating)}</programRating>\n`;
+
+  // Titles section
+  xml += '    <!-- Titles -->\n';
+  xml += `    <title>${escapeXml(file.title)}</title>\n`;
+  xml += `    <seriesTitle>${escapeXml(file.seriesTitle)}</seriesTitle>\n`;
+  xml += `    <episodeTitle>${escapeXml(file.episodeTitle)}</episodeTitle>\n`;
+
+  // Description section
+  xml += '    <!-- Description -->\n';
+  xml += `    <description>${escapeXml(file.description)}</description>\n`;
+  xml += `    <episodeDescription>${escapeXml(file.episodeDescription)}</episodeDescription>\n`;
+
+  // Season/Episode section
+  xml += '    <!-- Season/Episode -->\n';
+  xml += `    <season>${escapeXml(file.season)}</season>\n`;
+  xml += `    <episode>${escapeXml(file.episode)}</episode>\n`;
+
+  // Time/Runtime section
+  xml += '    <!-- Time/Runtime -->\n';
+  xml += `    <duration>${escapeXml(file.duration)}</duration>\n`;
+  xml += `    <breakTime>${escapeXml(file.breakTime)}</breakTime>\n`;
+
+  if (breakTimes.length > 0) {
+    xml += '    <breakTimes>\n';
+    breakTimes.forEach((time: string) => {
+      xml += `      <breakTime>${escapeXml(time)}</breakTime>\n`;
+    });
+    xml += '    </breakTimes>\n';
+  }
+
+  xml += `    <endCredits>${escapeXml(file.endCredits)}</endCredits>\n`;
+  xml += `    <dateStart>${escapeXml(file.dateStart)}</dateStart>\n`;
+  xml += `    <dateEnd>${escapeXml(file.dateEnd)}</dateEnd>\n`;
+
+  // People section
+  xml += '    <!-- People -->\n';
+  if (actors.length > 0) {
+    xml += '    <actors>\n';
+    actors.forEach((actor: string) => {
+      xml += `      <actor>${escapeXml(actor)}</actor>\n`;
+    });
+    xml += '    </actors>\n';
+  }
+
+  // Genre section
+  xml += '    <!-- Genre -->\n';
+  if (genre.length > 0) {
+    xml += '    <genre>\n';
+    genre.forEach((g: string) => {
+      xml += `      <item>${escapeXml(g)}</item>\n`;
+    });
+    xml += '    </genre>\n';
+  }
+
+  // Tags section
+  xml += '    <!-- Tags -->\n';
+  if (tags.length > 0) {
+    xml += '    <tags>\n';
+    tags.forEach((tag: string) => {
+      xml += `      <tag>${escapeXml(tag)}</tag>\n`;
+    });
+    xml += '    </tags>\n';
+  }
+
+  // Technical section
+  xml += '    <!-- Technical -->\n';
+  xml += `    <audioId>${escapeXml(file.audioId)}</audioId>\n`;
+  xml += `    <originalFilename>${escapeXml(file.originalFilename)}</originalFilename>\n`;
+  xml += `    <catchUp>${escapeXml(file.catchUp)}</catchUp>\n`;
+  xml += `    <segmented>${escapeXml(file.segmented)}</segmented>\n`;
+  xml += `    <subtitles>${escapeXml(file.subtitles)}</subtitles>\n`;
+  xml += `    <subtitlesId>${escapeXml(file.subtitlesId)}</subtitlesId>\n`;
+
+  // Timestamps section
+  xml += '    <!-- Timestamps -->\n';
+  xml += `    <createdAt>${escapeXml(file.createdAt)}</createdAt>\n`;
+
+  xml += '  </item>\n';
+  return xml;
+}
+
+export function buildMetadataXml(file: any): string {
+  let xml = '<?xml version="1.0"?>\n';
+  xml += '<metadata>\n';
+  xml += buildItemXmlString(file);
+  xml += '</metadata>';
+  return xml;
+}
+
+export function buildSeriesXml(files: any[], rootElementName: string = 'series'): string {
+  let xml = '<?xml version="1.0"?>\n';
+  xml += `<${rootElementName}>\n`;
   files.forEach(file => {
-    const item = root.ele('item');
-    buildItemXml(file, item);
-    item.up();
+    xml += buildItemXmlString(file);
   });
-  return root.end({ prettyPrint: true });
+  xml += `</${rootElementName}>`;
+  return xml;
 }
 
 function transformFileToXlsxRow(file: any, maxBreakTimes: number = 0): any[] {

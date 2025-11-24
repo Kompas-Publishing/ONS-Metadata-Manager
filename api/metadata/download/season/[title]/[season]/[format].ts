@@ -39,7 +39,7 @@ export default apiHandler(
       const transformedFiles = files.map(transformFileForDownload);
 
       if (format === "xml") {
-        const xml = await buildSeriesXml(transformedFiles, 'season');
+        const xml = buildSeriesXml(transformedFiles, 'season');
 
         const filename = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
         res.setHeader("Content-Type", "application/xml");

@@ -26,14 +26,16 @@ export default apiHandler(
       const format = (req.query.format as string) || "json";
 
       if (format === "xml") {
-        const xml = await buildMetadataXml(transformedFile);
+        console.log("[XML Download] Building XML for file:", id);
+        const xml = buildMetadataXml(transformedFile);
+        console.log("[XML Download] XML built, length:", xml.length);
 
-        res.setHeader("Content-Type", "application/xml");
+        res.setHeader("Content-Type", "application/xml; charset=utf-8");
         res.setHeader(
           "Content-Disposition",
           `attachment; filename="${transformedFile.id}.xml"`,
         );
-        res.send(xml);
+        return res.send(xml);
       } else if (format === "xlsx") {
         const wb = buildMetadataXlsx([file]);
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
