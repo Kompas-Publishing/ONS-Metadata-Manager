@@ -85,7 +85,11 @@ export default function EditFile() {
   });
 
   const handleSubmit = (data: InsertMetadataFile) => {
-    updateMutation.mutate(data);
+    updateMutation.mutate({ ...data, draft: 0 });
+  };
+
+  const handleSaveDraft = (data: InsertMetadataFile) => {
+    updateMutation.mutate({ ...data, draft: 1 });
   };
 
   if (authLoading || (user && user.canWrite !== 1)) {
@@ -174,6 +178,7 @@ export default function EditFile() {
             draft: file.draft ?? 0,
           }}
           onSubmit={handleSubmit}
+          onSaveDraft={handleSaveDraft}
           isPending={updateMutation.isPending}
           submitLabel="Update File"
         />

@@ -1064,33 +1064,6 @@ export function MetadataForm({
             </div>
           </div>
 
-          <div className="border-t pt-8">
-            <h3 className="text-xl font-semibold mb-6">Status</h3>
-            <FormField
-              control={form.control}
-              name="draft"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value === 1}
-                      onCheckedChange={(checked) =>
-                        field.onChange(checked ? 1 : 0)
-                      }
-                      data-testid="checkbox-draft"
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Mark as Draft</FormLabel>
-                    <FormDescription>
-                      Draft files are shown with an orange indicator
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </div>
-
           {!readOnly && (
             <div className="mt-8 flex gap-4">
               <Button

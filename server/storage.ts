@@ -473,9 +473,10 @@ export class DatabaseStorage implements IStorage {
           dateEnd: batch.dateEnd,
           subtitles: batch.subtitles,
           segmented: batch.segmented,
+          draft: batch.draft ?? 0,
           createdBy: permissions.user.id,
         };
-        
+
         if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
           fileData.groupId = permissions.groupIds[0];
         }

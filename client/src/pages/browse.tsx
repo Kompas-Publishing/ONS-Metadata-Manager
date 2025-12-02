@@ -235,7 +235,7 @@ export default function Browse() {
                     .map((episode) => (
                       <div
                         key={episode.id}
-                        className={`p-4 border rounded-lg hover-elevate ${episode.draft === 1 ? 'bg-orange-50/50 border-orange-200' : ''}`}
+                        className={`p-4 border rounded-lg hover-elevate ${episode.draft === 1 ? '!bg-orange-100/80 !border-orange-400' : ''}`}
                         data-testid={`episode-${episode.id}`}
                       >
                         <div className="flex items-center justify-between gap-4">
