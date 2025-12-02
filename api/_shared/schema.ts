@@ -92,6 +92,7 @@ export const metadataFiles = pgTable("metadata_files", {
   dateEnd: timestamp("date_end"), // Availability end date
   subtitles: integer("subtitles"), // Subtitle availability (0 or 1 as boolean)
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
+  draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
   createdBy: varchar("created_by").references(() => users.id),
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
@@ -130,6 +131,7 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   subtitlesId: z.string().optional(),
+  draft: z.number().int().min(0).max(1).optional(),
 }).omit({
   id: true,
   createdBy: true,
@@ -168,6 +170,7 @@ export const batchCreateSchema = z.object({
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   segmented: z.number().int().min(0).max(1).optional(),
+  draft: z.number().int().min(0).max(1).optional(),
 });
 
 export type BatchCreate = z.infer<typeof batchCreateSchema>;

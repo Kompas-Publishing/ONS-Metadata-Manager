@@ -14,10 +14,10 @@ import {
   type InsertUserDefinedTag,
   type Group,
   type InsertGroup,
-} from "../_shared/schema.js";
-import { db } from "./db.js";
+} from "@shared/schema";
+import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -65,6 +65,16 @@ function formatMetadataId(num: number): string {
   const segment2 = String(Math.floor(num / 1000) % 1000).padStart(3, '0');
   const segment1 = String(Math.floor(num / 1000000) % 1000).padStart(3, '0');
   return `${segment1}-${segment2}-${segment3}`;
+}
+
+function parseMetadataId(id: string): number {
+  // Parse format: xxx-xxx-xxx back to number
+  const parts = id.split('-');
+  if (parts.length !== 3) return 0;
+  const segment1 = parseInt(parts[0]) * 1000000;
+  const segment2 = parseInt(parts[1]) * 1000;
+  const segment3 = parseInt(parts[2]);
+  return segment1 + segment2 + segment3;
 }
 
 function normalizeMetadataFile(file: MetadataFile): MetadataFile {
@@ -138,11 +148,23 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(settings)
       .where(eq(settings.key, "next_id"));
-    
+
     let nextId = 77362;
     if (setting) {
       nextId = parseInt(setting.value);
     } else {
+      // Initialize from highest existing ID in database
+      const existingFiles = await db
+        .select({ id: metadataFiles.id })
+        .from(metadataFiles);
+
+      if (existingFiles.length > 0) {
+        const highestId = existingFiles
+          .map(f => parseMetadataId(f.id))
+          .reduce((max, current) => Math.max(max, current), 0);
+        nextId = Math.max(nextId, highestId + 1);
+      }
+
       await db.insert(settings).values({
         key: "next_id",
         value: nextId.toString(),
@@ -451,9 +473,10 @@ export class DatabaseStorage implements IStorage {
           dateEnd: batch.dateEnd,
           subtitles: batch.subtitles,
           segmented: batch.segmented,
+          draft: batch.draft ?? 0,
           createdBy: permissions.user.id,
         };
-        
+
         if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
           fileData.groupId = permissions.groupIds[0];
         }
