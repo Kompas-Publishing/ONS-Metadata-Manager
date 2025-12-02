@@ -117,6 +117,7 @@ export default function BatchCreate() {
       catchUp: data.catchUp ? 1 : 0,
       segmented: data.segmented ? 1 : 0,
       subtitles: data.subtitles ? 1 : 0,
+      draft: 1, // Batch created files are always drafts
     };
     batchMutation.mutate(convertedData);
   };

@@ -20,10 +20,13 @@ export default function CreateFile() {
     mutationFn: async (data: InsertMetadataFile) => {
       return await apiRequest("POST", "/api/metadata", data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      const isDraft = variables.draft === 1;
       toast({
         title: "Success",
-        description: "Metadata file created successfully",
+        description: isDraft
+          ? "Draft saved successfully"
+          : "Metadata file created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
@@ -50,7 +53,11 @@ export default function CreateFile() {
   });
 
   const handleSubmit = (data: InsertMetadataFile) => {
-    createMutation.mutate(data);
+    createMutation.mutate({ ...data, draft: 0 });
+  };
+
+  const handleSaveDraft = (data: InsertMetadataFile) => {
+    createMutation.mutate({ ...data, draft: 1 });
   };
 
   return (
@@ -65,6 +72,7 @@ export default function CreateFile() {
       <Card className="p-6">
         <MetadataForm
           onSubmit={handleSubmit}
+          onSaveDraft={handleSaveDraft}
           isPending={createMutation.isPending}
           submitLabel="Create File"
           generatedId={nextId}

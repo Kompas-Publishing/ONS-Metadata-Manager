@@ -171,6 +171,7 @@ export default function EditFile() {
             subtitlesId: file.subtitlesId ?? "",
             audioId: file.audioId ?? "",
             originalFilename: file.originalFilename ?? "",
+            draft: file.draft ?? 0,
           }}
           onSubmit={handleSubmit}
           isPending={updateMutation.isPending}

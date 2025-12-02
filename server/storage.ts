@@ -67,6 +67,16 @@ function formatMetadataId(num: number): string {
   return `${segment1}-${segment2}-${segment3}`;
 }
 
+function parseMetadataId(id: string): number {
+  // Parse format: xxx-xxx-xxx back to number
+  const parts = id.split('-');
+  if (parts.length !== 3) return 0;
+  const segment1 = parseInt(parts[0]) * 1000000;
+  const segment2 = parseInt(parts[1]) * 1000;
+  const segment3 = parseInt(parts[2]);
+  return segment1 + segment2 + segment3;
+}
+
 function normalizeMetadataFile(file: MetadataFile): MetadataFile {
   // Normalize breakTimes and ensure breakTime is synced
   const breakTimes = file.breakTimes || (file.breakTime ? [file.breakTime] : []);
@@ -138,11 +148,23 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(settings)
       .where(eq(settings.key, "next_id"));
-    
+
     let nextId = 77362;
     if (setting) {
       nextId = parseInt(setting.value);
     } else {
+      // Initialize from highest existing ID in database
+      const existingFiles = await db
+        .select({ id: metadataFiles.id })
+        .from(metadataFiles);
+
+      if (existingFiles.length > 0) {
+        const highestId = existingFiles
+          .map(f => parseMetadataId(f.id))
+          .reduce((max, current) => Math.max(max, current), 0);
+        nextId = Math.max(nextId, highestId + 1);
+      }
+
       await db.insert(settings).values({
         key: "next_id",
         value: nextId.toString(),

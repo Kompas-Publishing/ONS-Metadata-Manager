@@ -235,7 +235,7 @@ export default function Browse() {
                     .map((episode) => (
                       <div
                         key={episode.id}
-                        className="p-4 border rounded-lg hover-elevate"
+                        className={`p-4 border rounded-lg hover-elevate ${episode.draft === 1 ? 'bg-orange-50/50 border-orange-200' : ''}`}
                         data-testid={`episode-${episode.id}`}
                       >
                         <div className="flex items-center justify-between gap-4">
@@ -263,6 +263,11 @@ export default function Browse() {
                                 </p>
                               )}
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {episode.draft === 1 && (
+                                  <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
+                                    Draft
+                                  </Badge>
+                                )}
                                 {episode.channel && (
                                   <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
                                     <Tv className="w-3 h-3" />
