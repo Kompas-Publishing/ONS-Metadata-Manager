@@ -136,7 +136,7 @@ export default function Dashboard() {
             {recentFiles.map((file) => (
               <div
                 key={file.id}
-                className="flex items-start justify-between p-4 border rounded-lg hover-elevate gap-4"
+                className={`flex items-start justify-between p-4 border rounded-lg hover-elevate gap-4 ${(file.draft === 1 || file.draft === '1' || file.draft === true) ? '!bg-orange-100/80 !border-orange-400' : ''}`}
                 data-testid={`file-${file.id}`}
               >
                 <div className="flex-1 min-w-0 space-y-2">
@@ -168,6 +168,11 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
+                    {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
+                      <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`file-draft-${file.id}`}>
+                        Draft
+                      </Badge>
+                    )}
                     {file.channel && (
                       <Badge variant="outline" className="gap-1" data-testid={`file-channel-${file.id}`}>
                         <Tv className="w-3 h-3" />
