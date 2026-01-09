@@ -20,7 +20,9 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (table) => [
+    index("IDX_session_expire").on(table.expire),
+  ],
 );
 
 // Groups table for group-based file visibility
@@ -97,7 +99,16 @@ export const metadataFiles = pgTable("metadata_files", {
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_metadata_title").on(table.title),
+  index("IDX_metadata_season").on(table.season),
+  index("IDX_metadata_episode").on(table.episode),
+  index("IDX_metadata_created_by").on(table.createdBy),
+  index("IDX_metadata_group_id").on(table.groupId),
+  index("IDX_metadata_created_at").on(table.createdAt),
+  index("IDX_metadata_draft").on(table.draft),
+  index("IDX_metadata_title_season").on(table.title, table.season),
+]);
 
 export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   title: z.string().min(1, "Title is required"),
@@ -201,3 +212,21 @@ export const insertUserDefinedTagSchema = createInsertSchema(userDefinedTags, {
 
 export type InsertUserDefinedTag = z.infer<typeof insertUserDefinedTagSchema>;
 export type UserDefinedTag = typeof userDefinedTags.$inferSelect;
+
+export interface SeriesSummary {
+  title: string;
+  category: string | null;
+  seriesTitle: string | null;
+  seasonCount: number;
+  episodeCount: number;
+  seasons: number[];
+}
+
+export interface PaginatedMetadataResult {
+  files: MetadataFile[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+

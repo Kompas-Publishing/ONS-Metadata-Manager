@@ -14,10 +14,12 @@ import {
   type InsertUserDefinedTag,
   type Group,
   type InsertGroup,
-} from "@shared/schema";
-import { db } from "./db";
+  type SeriesSummary,
+  type PaginatedMetadataResult,
+} from "../_shared/schema.js";
+import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -31,6 +33,8 @@ export interface IStorage {
   getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined>;
   getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
   getAllMetadataFiles(permissions: UserPermissions): Promise<MetadataFile[]>;
+  getPaginatedMetadataFiles(page: number, limit: number, search: string | undefined, channel: string | undefined, rating: string | undefined, permissions: UserPermissions): Promise<PaginatedMetadataResult>;
+  getSeriesSummaries(permissions: UserPermissions): Promise<SeriesSummary[]>;
   getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
   updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
@@ -251,6 +255,111 @@ export class DatabaseStorage implements IStorage {
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(metadataFiles.createdAt));
     return files.map(normalizeMetadataFile);
+  }
+
+  async getPaginatedMetadataFiles(
+    page: number, 
+    limit: number, 
+    search: string | undefined, 
+    channel: string | undefined, 
+    rating: string | undefined, 
+    permissions: UserPermissions
+  ): Promise<PaginatedMetadataResult> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [];
+
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    if (search) {
+      const searchLower = `%${search.toLowerCase()}%`;
+      whereConditions.push(or(
+        sql`lower(${metadataFiles.title}) LIKE ${searchLower}`,
+        sql`lower(${metadataFiles.description}) LIKE ${searchLower}`,
+        sql`lower(${metadataFiles.seriesTitle}) LIKE ${searchLower}`,
+        sql`lower(${metadataFiles.episodeTitle}) LIKE ${searchLower}`
+      ));
+    }
+
+    if (channel && channel !== 'all') {
+      whereConditions.push(eq(metadataFiles.channel, channel));
+    }
+
+    if (rating && rating !== 'all') {
+      whereConditions.push(eq(metadataFiles.programRating, rating));
+    }
+
+    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(metadataFiles)
+      .where(whereClause);
+    
+    const total = countResult?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+
+    const files = await db
+      .select()
+      .from(metadataFiles)
+      .where(whereClause)
+      .orderBy(desc(metadataFiles.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      files: files.map(normalizeMetadataFile),
+      total,
+      page,
+      limit,
+      totalPages
+    };
+  }
+
+  async getSeriesSummaries(permissions: UserPermissions): Promise<SeriesSummary[]> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [];
+
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const summaries = await db
+      .select({
+        title: metadataFiles.title,
+        category: metadataFiles.category,
+        seriesTitle: metadataFiles.seriesTitle,
+        seasonCount: sql<number>`count(distinct ${metadataFiles.season})::int`,
+        episodeCount: sql<number>`count(*)::int`,
+        seasons: sql<number[]>`array_agg(distinct ${metadataFiles.season})`,
+      })
+      .from(metadataFiles)
+      .where(whereClause)
+      .groupBy(metadataFiles.title, metadataFiles.category, metadataFiles.seriesTitle)
+      .orderBy(metadataFiles.title);
+
+    return summaries.map(s => ({
+      ...s,
+      seasons: (s.seasons || []).sort((a, b) => a - b)
+    }));
   }
 
   async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]> {

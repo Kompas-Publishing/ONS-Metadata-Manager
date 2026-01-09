@@ -543,6 +543,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/metadata/series-summaries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "read",
+      );
+
+      if (!allowed) {
+        const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+        return res.status(statusCode).json({ message: reason });
+      }
+
+      const summaries = await storage.getSeriesSummaries(permissions!);
+      res.json(summaries);
+    } catch (error) {
+      console.error("Error fetching series summaries:", error);
+      res.status(500).json({ message: "Failed to fetch series summaries" });
+    }
+  });
+
+  app.get("/api/metadata/paginated", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "read",
+      );
+
+      if (!allowed) {
+        const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+        return res.status(statusCode).json({ message: reason });
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const search = req.query.search as string | undefined;
+      const channel = req.query.channel as string | undefined;
+      const rating = req.query.rating as string | undefined;
+
+      const result = await storage.getPaginatedMetadataFiles(page, limit, search, channel, rating, permissions!);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching paginated files:", error);
+      res.status(500).json({ message: "Failed to fetch paginated files" });
+    }
+  });
+
+  app.get("/api/metadata/series/:title", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "read",
+      );
+
+      if (!allowed) {
+        const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+        return res.status(statusCode).json({ message: reason });
+      }
+
+      const title = decodeURIComponent(req.params.title);
+      const files = await storage.getMetadataBySeriesTitle(title, permissions!);
+      res.json(files);
+    } catch (error) {
+      console.error("Error fetching series metadata:", error);
+      res.status(500).json({ message: "Failed to fetch series metadata" });
+    }
+  });
+
   app.get(
     "/api/metadata/season/:title/:season",
     isAuthenticated,
