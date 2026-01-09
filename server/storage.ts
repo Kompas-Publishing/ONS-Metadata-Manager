@@ -16,10 +16,10 @@ import {
   type InsertGroup,
   type SeriesSummary,
   type PaginatedMetadataResult,
-} from "../_shared/schema.js";
-import { db } from "./db.js";
+} from "@shared/schema";
+import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
