@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../server/storage";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
@@ -15,11 +15,13 @@ export default apiHandler(
       const channel = req.query.channel as string | undefined;
       const rating = req.query.rating as string | undefined;
 
+      console.log(`[Paginated] Loading page ${page}, limit ${limit}, search=${search}, channel=${channel}, rating=${rating}`);
+
       const result = await storage.getPaginatedMetadataFiles(page, limit, search, channel, rating, req.permissions!);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching paginated files:", error);
-      res.status(500).json({ message: "Failed to fetch paginated files" });
+      res.status(500).json({ message: "Failed to fetch paginated files", error: error.message });
     }
   })
 );

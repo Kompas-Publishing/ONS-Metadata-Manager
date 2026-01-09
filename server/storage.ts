@@ -16,7 +16,7 @@ import {
   type InsertGroup,
   type SeriesSummary,
   type PaginatedMetadataResult,
-} from "@shared/schema";
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
 import { UserPermissions, getFileVisibilityConditions } from "./permissions";
@@ -266,7 +266,7 @@ export class DatabaseStorage implements IStorage {
     permissions: UserPermissions
   ): Promise<PaginatedMetadataResult> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [];
+    const whereConditions: any[] = [];
 
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
@@ -279,13 +279,13 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    if (search) {
-      const searchLower = `%${search.toLowerCase()}%`;
+    if (search && search.trim()) {
+      const searchLower = `%${search.toLowerCase().trim()}%`;
       whereConditions.push(or(
         sql`lower(${metadataFiles.title}) LIKE ${searchLower}`,
-        sql`lower(${metadataFiles.description}) LIKE ${searchLower}`,
-        sql`lower(${metadataFiles.seriesTitle}) LIKE ${searchLower}`,
-        sql`lower(${metadataFiles.episodeTitle}) LIKE ${searchLower}`
+        sql`lower(COALESCE(${metadataFiles.description}, '')) LIKE ${searchLower}`,
+        sql`lower(COALESCE(${metadataFiles.seriesTitle}, '')) LIKE ${searchLower}`,
+        sql`lower(COALESCE(${metadataFiles.episodeTitle}, '')) LIKE ${searchLower}`
       ));
     }
 
@@ -297,7 +297,8 @@ export class DatabaseStorage implements IStorage {
       whereConditions.push(eq(metadataFiles.programRating, rating));
     }
 
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    const filteredConditions = whereConditions.filter(Boolean);
+    const whereClause = filteredConditions.length > 0 ? and(...filteredConditions) : undefined;
 
     const [countResult] = await db
       .select({ count: sql<number>`count(*)::int` })

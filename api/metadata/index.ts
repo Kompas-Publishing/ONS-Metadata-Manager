@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../server/storage";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { insertMetadataFileSchema } from "../_shared/schema.js";
+import { insertMetadataFileSchema } from "../../shared/schema";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   // GET /api/metadata - Get all metadata files
