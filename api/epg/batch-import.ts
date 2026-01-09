@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../server/storage";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler";
+import { storage } from "../../server/storage.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import { z } from "zod";
-import { insertMetadataFileSchema } from "../../shared/schema";
+import { insertMetadataFileSchema } from "../../shared/schema.js";
 
 // Schema for the incoming batch items - slightly looser than the insert schema to allow partial updates?
 // Actually, we want to receive fully formed objects from the client logic
