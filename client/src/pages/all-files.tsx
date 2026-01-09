@@ -61,6 +61,18 @@ export default function AllFiles() {
       debouncedChannel && debouncedChannel !== 'all' ? debouncedChannel : undefined, 
       ratingFilter && ratingFilter !== 'all' ? ratingFilter : undefined
     ].filter(Boolean),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "50",
+      });
+      if (debouncedSearch) params.append("search", debouncedSearch);
+      if (debouncedChannel && debouncedChannel !== 'all') params.append("channel", debouncedChannel);
+      if (ratingFilter && ratingFilter !== 'all') params.append("rating", ratingFilter);
+      
+      const res = await apiRequest("GET", `/api/metadata/paginated?${params.toString()}`);
+      return res.json();
+    },
     enabled: !authLoading,
   });
 
