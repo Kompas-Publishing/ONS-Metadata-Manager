@@ -21,6 +21,7 @@ import {
   FileText,
   LogOut,
   Shield,
+  Radio,
 } from "lucide-react";
 
 const allMenuItems = [
@@ -45,6 +46,14 @@ const allMenuItems = [
     url: "/batch",
     icon: Layers,
     testId: "nav-batch",
+    adminOnly: false,
+    requiresWrite: true,
+  },
+  {
+    title: "Import EPG",
+    url: "/import-epg",
+    icon: Radio,
+    testId: "nav-import-epg",
     adminOnly: false,
     requiresWrite: true,
   },

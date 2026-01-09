@@ -20,6 +20,7 @@ import EditFile from "@/pages/edit-file";
 import ViewFile from "@/pages/view-file";
 import EditSeason from "@/pages/edit-season";
 import Admin from "@/pages/admin";
+import ImportEpg from "@/pages/import-epg";
 
 function Router() {
   return (
@@ -48,6 +49,14 @@ function Router() {
         <AuthenticatedRoute>
           <ProtectedLayout>
             <BatchCreate />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/import-epg">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <ImportEpg />
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>
