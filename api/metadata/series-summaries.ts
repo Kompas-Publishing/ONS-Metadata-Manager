@@ -9,7 +9,8 @@ export default apiHandler(
     }
 
     try {
-      const summaries = await storage.getSeriesSummaries(req.permissions!);
+      const category = req.query.category as string | undefined;
+      const summaries = await storage.getSeriesSummaries(category, req.permissions!);
       res.json(summaries);
     } catch (error) {
       console.error("Error fetching series summaries:", error);

@@ -89,6 +89,11 @@ export default function ImportEpg() {
         const genreStr = getText("genre");
         const genres = genreStr ? genreStr.split("/").map(g => g.trim()) : [];
         
+        // Skip Animation
+        if (genres.some(g => g.toLowerCase().includes("animation") || g.toLowerCase().includes("animatie"))) {
+          continue;
+        }
+        
         // Determine category
         let category: "Series" | "Movie" | "Documentary" = "Movie"; // Default
         if (isSeries) category = "Series";

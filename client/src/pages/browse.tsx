@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile, SeriesSummary } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,6 +27,9 @@ interface SeriesGroup {
 }
 
 export default function Browse() {
+  const [match, params] = useRoute("/browse/:category?");
+  const categoryParam = match ? params?.category : undefined;
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeries, setSelectedSeries] = useState<SeriesSummary | null>(null);
   const [, setLocation] = useLocation();
@@ -37,7 +40,16 @@ export default function Browse() {
 
   // Fetch summaries
   const { data: seriesSummaries, isLoading: isLoadingSummaries } = useQuery<SeriesSummary[]>({
-    queryKey: ["/api/metadata/series-summaries"],
+    queryKey: ["/api/metadata/series-summaries", categoryParam].filter(Boolean),
+    queryFn: async () => {
+        let url = "/api/metadata/series-summaries";
+        if (categoryParam) {
+            url += `?category=${encodeURIComponent(categoryParam)}`;
+        }
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to fetch series summaries");
+        return res.json();
+    }
   });
 
   // Fetch details on demand
@@ -68,7 +80,9 @@ export default function Browse() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Browse Series</h1>
+        <h1 className="text-3xl font-semibold text-foreground">
+            Browse {categoryParam ? categoryParam : "Series"}
+        </h1>
         <p className="text-muted-foreground mt-2">
           Browse and filter your metadata files by series and season
         </p>
@@ -268,14 +282,18 @@ export default function Browse() {
                                       {episode.episodeTitle}
                                     </p>
                                   )}
-                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
-                                      <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
-                                        Draft
-                                      </Badge>
-                                    )}
-                                    {episode.channel && (
-                                      <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
+                                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                                  {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
+                                                                    <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
+                                                                      Draft
+                                                                    </Badge>
+                                                                  )}
+                                                                  {(episode.isEpgGenerated === 1) && (
+                                                                    <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50" data-testid={`episode-epg-${episode.id}`}>
+                                                                      EPG
+                                                                    </Badge>
+                                                                  )}
+                                                                  {episode.channel && (                                      <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
                                         <Tv className="w-3 h-3" />
                                         {episode.channel}
                                       </Badge>
@@ -285,14 +303,19 @@ export default function Browse() {
                                         {episode.programRating}
                                       </Badge>
                                     )}
-                                    {episode.dateStart && episode.dateEnd && (
-                                      <Badge variant="outline" className="gap-1" data-testid={`episode-availability-${episode.id}`}>
-                                        <Calendar className="w-3 h-3" />
-                                        {format(new Date(episode.dateStart), "MMM d")} - {format(new Date(episode.dateEnd), "MMM d, yyyy")}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
+                                                                    {episode.dateStart && episode.dateEnd && (
+                                                                      <Badge variant="outline" className="gap-1" data-testid={`episode-availability-${episode.id}`}>
+                                                                        <Calendar className="w-3 h-3" />
+                                                                        {format(new Date(episode.dateStart), "MMM d")} - {format(new Date(episode.dateEnd), "MMM d, yyyy")}
+                                                                      </Badge>
+                                                                    )}
+                                                                    {episode.lastAired && (
+                                                                      <Badge variant="outline" className="gap-1 text-xs border-blue-200 bg-blue-50/50" data-testid={`episode-last-aired-${episode.id}`}>
+                                                                        <Calendar className="w-3 h-3 text-blue-500" />
+                                                                        Aired: {format(new Date(episode.lastAired), "MMM d, yyyy")}
+                                                                      </Badge>
+                                                                    )}
+                                                                  </div>                                </div>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {(canRead || canWrite) && (

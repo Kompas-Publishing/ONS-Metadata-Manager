@@ -315,6 +315,11 @@ export default function AllFiles() {
                             Draft
                           </Badge>
                         )}
+                        {(file.isEpgGenerated === 1) && (
+                          <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50" data-testid={`file-epg-${file.id}`}>
+                            EPG
+                          </Badge>
+                        )}
                         {file.category && (
                           <Badge variant="secondary" data-testid={`file-category-${file.id}`}>
                             {file.category}
@@ -335,6 +340,12 @@ export default function AllFiles() {
                           <Badge variant="outline" className="gap-1" data-testid={`file-availability-${file.id}`}>
                             <Calendar className="w-3 h-3" />
                             {format(new Date(file.dateStart), "MMM d")} - {format(new Date(file.dateEnd), "MMM d, yyyy")}
+                          </Badge>
+                        )}
+                        {file.lastAired && (
+                          <Badge variant="outline" className="gap-1 text-xs border-blue-200 bg-blue-50/50" data-testid={`file-last-aired-${file.id}`}>
+                            <Calendar className="w-3 h-3 text-blue-500" />
+                            Aired: {format(new Date(file.lastAired), "MMM d, yyyy")}
                           </Badge>
                         )}
                       </div>

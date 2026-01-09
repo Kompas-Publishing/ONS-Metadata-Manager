@@ -34,7 +34,7 @@ export interface IStorage {
   getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
   getAllMetadataFiles(permissions: UserPermissions): Promise<MetadataFile[]>;
   getPaginatedMetadataFiles(page: number, limit: number, search: string | undefined, channel: string | undefined, rating: string | undefined, permissions: UserPermissions): Promise<PaginatedMetadataResult>;
-  getSeriesSummaries(permissions: UserPermissions): Promise<SeriesSummary[]>;
+  getSeriesSummaries(category: string | undefined, permissions: UserPermissions): Promise<SeriesSummary[]>;
   getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
   updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
@@ -326,7 +326,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getSeriesSummaries(permissions: UserPermissions): Promise<SeriesSummary[]> {
+  async getSeriesSummaries(category: string | undefined, permissions: UserPermissions): Promise<SeriesSummary[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
 
@@ -339,6 +339,10 @@ export class DatabaseStorage implements IStorage {
       } else {
         whereConditions.push(sql`1 = 0`);
       }
+    }
+
+    if (category) {
+      whereConditions.push(eq(metadataFiles.category, category));
     }
 
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;

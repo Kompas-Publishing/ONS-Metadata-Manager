@@ -68,6 +68,14 @@ function Router() {
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>
+
+      <Route path="/browse/:category">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <Browse />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
       
       <Route path="/all-files">
         <AuthenticatedRoute>
