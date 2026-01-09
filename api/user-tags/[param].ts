@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../server/storage";
+import { storage } from "../../server/storage.js";
 import { apiHandler, requireAuth, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(

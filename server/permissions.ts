@@ -1,5 +1,5 @@
-import { storage } from "./storage";
-import type { User } from "../shared/schema";
+import { storage } from "./storage.js";
+import type { User } from "../shared/schema.js";
 
 export interface UserPermissions {
   user: User;

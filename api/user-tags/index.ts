@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../server/storage";
+import { storage } from "../../server/storage.js";
 import { apiHandler, requireAuth, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { insertUserDefinedTagSchema } from "../../shared/schema";
+import { insertUserDefinedTagSchema } from "../../shared/schema.js";
 
 export default apiHandler(
   requireAuth(async (req: AuthenticatedRequest, res: VercelResponse) => {
