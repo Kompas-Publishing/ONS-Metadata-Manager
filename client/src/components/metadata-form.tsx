@@ -60,6 +60,7 @@ const PREDEFINED_TAGS = [
 
 interface MetadataFormProps {
   defaultValues?: Partial<InsertMetadataFile>;
+  lastAired?: string | null;
   onSubmit: (data: InsertMetadataFile) => void;
   onSaveDraft?: (data: InsertMetadataFile) => void;
   isPending: boolean;
@@ -70,6 +71,7 @@ interface MetadataFormProps {
 
 export function MetadataForm({
   defaultValues,
+  lastAired,
   onSubmit,
   onSaveDraft,
   isPending,
@@ -765,6 +767,15 @@ export function MetadataForm({
                   </FormItem>
                 )}
               />
+
+              {readOnly && lastAired && (
+                <div className="space-y-2">
+                  <FormLabel>Last Aired</FormLabel>
+                  <p className="p-2 h-10 flex items-center border border-input rounded-md text-sm text-muted-foreground bg-muted">
+                    {format(new Date(lastAired), "PPP 'at' p")}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

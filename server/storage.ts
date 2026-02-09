@@ -375,14 +375,14 @@ export class DatabaseStorage implements IStorage {
       .select({
         title: seriesIdentifier,
         category: metadataFiles.category,
-        seriesTitle: metadataFiles.seriesTitle,
+        seriesTitle: sql<string>`min(${metadataFiles.seriesTitle})`,
         seasonCount: sql<number>`count(distinct ${metadataFiles.season})::int`,
         episodeCount: sql<number>`count(*)::int`,
         seasons: sql<number[]>`array_agg(distinct ${metadataFiles.season})`,
       })
       .from(metadataFiles)
       .where(whereClause)
-      .groupBy(seriesIdentifier, metadataFiles.category, metadataFiles.seriesTitle)
+      .groupBy(seriesIdentifier, metadataFiles.category)
       .orderBy(seriesIdentifier)
       .limit(limit)
       .offset(offset);

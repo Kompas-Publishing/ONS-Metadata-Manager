@@ -30,7 +30,7 @@ interface SeriesGroup {
 
 export default function Browse() {
   const [match, params] = useRoute("/browse/:category?");
-  const categoryParam = match ? params?.category : undefined;
+  const categoryParam = (match && params?.category) || 'Series';
   
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -150,7 +150,7 @@ export default function Browse() {
                       <p className="text-sm text-muted-foreground mb-2">{series.seriesTitle}</p>
                     )}
                     <div className="space-y-1">
-                      {series.category !== 'Movie' && (
+                      {series.category !== 'Movie' && series.category !== 'Documentary' && (
                         <>
                           <p className="text-sm text-muted-foreground">
                             {series.seasonCount} {series.seasonCount === 1 ? "Season" : "Seasons"}

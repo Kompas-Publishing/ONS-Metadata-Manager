@@ -138,6 +138,7 @@ export default function ViewFile() {
 
       <Card className="p-6">
         <MetadataForm
+          lastAired={(file as any).lastAired}
           defaultValues={{
             title: file.title,
             season: file.season || undefined,
