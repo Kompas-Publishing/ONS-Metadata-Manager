@@ -99,6 +99,8 @@ export const metadataFiles = pgTable("metadata_files", {
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  isEpgGenerated: integer("is_epg_generated").default(0),
+  lastAired: timestamp("last_aired"),
 }, (table) => [
   index("IDX_metadata_title").on(table.title),
   index("IDX_metadata_season").on(table.season),

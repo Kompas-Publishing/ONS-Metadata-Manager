@@ -351,11 +351,12 @@ export class DatabaseStorage implements IStorage {
       whereConditions.push(eq(metadataFiles.category, category));
     }
     
-    const seriesIdentifier = sql<string>`COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})`;
+    const canonicalSeriesTitle = sql<string>`trim(regexp_replace(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title}), '\\s+S\\d+E\\d+$|\\s+S\\d+$', '', 'g'))`;
+    const seriesIdentifier = canonicalSeriesTitle;
 
     if (search && search.trim()) {
       const searchLower = `%${search.toLowerCase().trim()}%`;
-      whereConditions.push(sql`lower(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})) LIKE ${searchLower}`);
+      whereConditions.push(sql`lower(${seriesIdentifier}) LIKE ${searchLower}`);
     }
 
     const filteredConditions = whereConditions.filter(Boolean);
@@ -706,8 +707,9 @@ export class DatabaseStorage implements IStorage {
 
   async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
-    const seriesIdentifier = sql<string>`COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})`;
-    const whereConditions = [eq(seriesIdentifier, seriesTitle)];
+    
+    const canonicalSeriesTitle = sql<string>`trim(regexp_replace(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title}), '\\s+S\\d+E\\d+$|\\s+S\\d+$', '', 'g'))`;
+    const whereConditions = [eq(canonicalSeriesTitle, seriesTitle)];
     
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
