@@ -10,8 +10,12 @@ export default apiHandler(
 
     try {
       const category = req.query.category as string | undefined;
-      const summaries = await storage.getSeriesSummaries(category, req.permissions!);
-      res.json(summaries);
+      const page = parseInt(req.query.page as string || '1');
+      const limit = parseInt(req.query.limit as string || '24');
+      const search = req.query.search as string | undefined;
+
+      const result = await storage.getSeriesSummaries(category, req.permissions!, page, limit, search);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching series summaries:", error);
       res.status(500).json({ message: "Failed to fetch series summaries" });

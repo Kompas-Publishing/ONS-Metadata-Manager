@@ -326,9 +326,15 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getSeriesSummaries(category: string | undefined, permissions: UserPermissions): Promise<SeriesSummary[]> {
+  async getSeriesSummaries(
+    category: string | undefined, 
+    permissions: UserPermissions, 
+    page: number, 
+    limit: number, 
+    search: string | undefined
+  ): Promise<PaginatedSeriesSummaryResult> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [];
+    const whereConditions: (SQL<unknown> | undefined)[] = [];
 
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
@@ -344,12 +350,30 @@ export class DatabaseStorage implements IStorage {
     if (category) {
       whereConditions.push(eq(metadataFiles.category, category));
     }
+    
+    const seriesIdentifier = sql<string>`COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})`;
 
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    if (search && search.trim()) {
+      const searchLower = `%${search.toLowerCase().trim()}%`;
+      whereConditions.push(sql`lower(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})) LIKE ${searchLower}`);
+    }
+
+    const filteredConditions = whereConditions.filter(Boolean);
+    const whereClause = filteredConditions.length > 0 ? and(...filteredConditions) : undefined;
+
+    const totalQuery = db
+      .select({ count: sql<number>`count(distinct ${seriesIdentifier})::int` })
+      .from(metadataFiles)
+      .where(whereClause);
+
+    const [totalResult] = await totalQuery;
+    const total = totalResult?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
 
     const summaries = await db
       .select({
-        title: metadataFiles.title,
+        title: seriesIdentifier,
         category: metadataFiles.category,
         seriesTitle: metadataFiles.seriesTitle,
         seasonCount: sql<number>`count(distinct ${metadataFiles.season})::int`,
@@ -358,13 +382,18 @@ export class DatabaseStorage implements IStorage {
       })
       .from(metadataFiles)
       .where(whereClause)
-      .groupBy(metadataFiles.title, metadataFiles.category, metadataFiles.seriesTitle)
-      .orderBy(metadataFiles.title);
+      .groupBy(seriesIdentifier, metadataFiles.category, metadataFiles.seriesTitle)
+      .orderBy(seriesIdentifier)
+      .limit(limit)
+      .offset(offset);
 
-    return summaries.map(s => ({
-      ...s,
-      seasons: (s.seasons || []).sort((a, b) => a - b)
-    }));
+    return {
+      summaries: summaries.map(s => ({ ...s, seasons: (s.seasons || []).sort((a, b) => a - b) })),
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]> {
@@ -677,7 +706,8 @@ export class DatabaseStorage implements IStorage {
 
   async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [eq(metadataFiles.title, seriesTitle)];
+    const seriesIdentifier = sql<string>`COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title})`;
+    const whereConditions = [eq(seriesIdentifier, seriesTitle)];
     
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));

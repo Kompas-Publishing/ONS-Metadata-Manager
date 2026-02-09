@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye } from "lucide-react";
+import { Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, ChevronLeft } from "lucide-react";
 import { Link, useLocation, useRoute } from "wouter";
 import { format } from "date-fns";
-import type { MetadataFile, SeriesSummary } from "@shared/schema";
+import type { MetadataFile, SeriesSummary, PaginatedSeriesSummaryResult } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useDebounce } from "@/hooks/use-debounce";
+import { apiRequest } from "@/lib/queryClient";
 
 const handleDownload = (url: string) => {
   const link = document.createElement('a');
@@ -30,37 +32,51 @@ export default function Browse() {
   const [match, params] = useRoute("/browse/:category?");
   const categoryParam = match ? params?.category : undefined;
   
+  const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [selectedSeries, setSelectedSeries] = useState<SeriesSummary | null>(null);
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   
   const canWrite = user?.canWrite === 1;
   const canRead = user?.canRead === 1;
 
-  // Fetch summaries
-  const { data: seriesSummaries, isLoading: isLoadingSummaries } = useQuery<SeriesSummary[]>({
-    queryKey: ["/api/metadata/series-summaries", categoryParam].filter(Boolean),
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, categoryParam]);
+
+  const { data: paginatedData, isLoading: isLoadingSummaries } = useQuery<PaginatedSeriesSummaryResult>({
+    queryKey: ["/api/metadata/series-summaries", categoryParam, page, debouncedSearch].filter(Boolean),
     queryFn: async () => {
-        let url = "/api/metadata/series-summaries";
-        if (categoryParam) {
-            url += `?category=${encodeURIComponent(categoryParam)}`;
-        }
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to fetch series summaries");
-        return res.json();
-    }
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "12",
+      });
+      if (categoryParam) {
+        params.append("category", categoryParam);
+      }
+      if (debouncedSearch) {
+        params.append("search", debouncedSearch);
+      }
+      const res = await apiRequest("GET", `/api/metadata/series-summaries?${params.toString()}`);
+      return res.json();
+    },
+    enabled: !authLoading,
   });
+
+  const seriesSummaries = paginatedData?.summaries || [];
+  const totalPages = paginatedData?.totalPages || 1;
 
   // Fetch details on demand
   const { data: selectedSeriesFiles, isLoading: isLoadingDetails } = useQuery<MetadataFile[]>({
     queryKey: [`/api/metadata/series/${encodeURIComponent(selectedSeries?.title || '')}`],
     enabled: !!selectedSeries,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/metadata/series/${encodeURIComponent(selectedSeries!.title)}`);
+      return res.json();
+    }
   });
-
-  const filteredSeries = (seriesSummaries || []).filter((series) =>
-    series.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   // Group the fetched details by season for display
   const selectedSeriesGroup: SeriesGroup | null = selectedSeries && selectedSeriesFiles ? {
@@ -103,9 +119,9 @@ export default function Browse() {
 
       {!selectedSeries ? (
         <div>
-          {isLoadingSummaries ? (
+          {isLoadingSummaries && !paginatedData ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+              {[...Array(12)].map((_, i) => (
                 <Card key={i} className="p-6">
                   <Skeleton className="h-6 w-3/4 mb-4" />
                   <Skeleton className="h-4 w-1/2 mb-2" />
@@ -113,37 +129,70 @@ export default function Browse() {
                 </Card>
               ))}
             </div>
-          ) : filteredSeries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSeries.map((series) => (
-                <Card
-                  key={series.title}
-                  className="p-6 hover-elevate cursor-pointer"
-                  onClick={() => setSelectedSeries(series)}
-                  data-testid={`series-card-${series.title}`}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Film className="w-6 h-6 text-primary" />
+          ) : seriesSummaries.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {seriesSummaries.map((series) => (
+                  <Card
+                    key={series.title}
+                    className="p-6 hover-elevate cursor-pointer"
+                    onClick={() => setSelectedSeries(series)}
+                    data-testid={`series-card-${series.title}`}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Film className="w-6 h-6 text-primary" />
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2 text-foreground">{series.title}</h3>
-                  {series.seriesTitle && (
-                    <p className="text-sm text-muted-foreground mb-2">{series.seriesTitle}</p>
-                  )}
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      {series.seasonCount} {series.seasonCount === 1 ? "Season" : "Seasons"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {series.episodeCount} {series.episodeCount === 1 ? "Episode" : "Episodes"}
-                    </p>
-                    <Badge variant="secondary" className="mt-2">{series.category || "Series"}</Badge>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                    <h3 className="text-lg font-semibold mb-2 text-foreground">{series.title}</h3>
+                    {series.seriesTitle && (
+                      <p className="text-sm text-muted-foreground mb-2">{series.seriesTitle}</p>
+                    )}
+                    <div className="space-y-1">
+                      {series.category !== 'Movie' && (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            {series.seasonCount} {series.seasonCount === 1 ? "Season" : "Seasons"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {series.episodeCount} {series.episodeCount === 1 ? "Episode" : "Episodes"}
+                          </p>
+                        </>
+                      )}
+                      <Badge variant="secondary" className="mt-2">{series.category || "Series"}</Badge>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-6 border-t mt-6">
+                <div className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </>
           ) : (
             <Card className="p-12 text-center">
               <Film className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -282,40 +331,41 @@ export default function Browse() {
                                       {episode.episodeTitle}
                                     </p>
                                   )}
-                                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                                  {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
-                                                                    <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
-                                                                      Draft
-                                                                    </Badge>
-                                                                  )}
-                                                                  {(episode.isEpgGenerated === 1) && (
-                                                                    <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50" data-testid={`episode-epg-${episode.id}`}>
-                                                                      EPG
-                                                                    </Badge>
-                                                                  )}
-                                                                  {episode.channel && (                                      <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
-                                        <Tv className="w-3 h-3" />
-                                        {episode.channel}
-                                      </Badge>
-                                    )}
-                                    {episode.programRating && (
-                                      <Badge variant="secondary" data-testid={`episode-rating-${episode.id}`}>
-                                        {episode.programRating}
-                                      </Badge>
-                                    )}
-                                                                    {episode.dateStart && episode.dateEnd && (
-                                                                      <Badge variant="outline" className="gap-1" data-testid={`episode-availability-${episode.id}`}>
-                                                                        <Calendar className="w-3 h-3" />
-                                                                        {format(new Date(episode.dateStart), "MMM d")} - {format(new Date(episode.dateEnd), "MMM d, yyyy")}
-                                                                      </Badge>
-                                                                    )}
-                                                                    {episode.lastAired && (
-                                                                      <Badge variant="outline" className="gap-1 text-xs border-blue-200 bg-blue-50/50" data-testid={`episode-last-aired-${episode.id}`}>
-                                                                        <Calendar className="w-3 h-3 text-blue-500" />
-                                                                        Aired: {format(new Date(episode.lastAired), "MMM d, yyyy")}
-                                                                      </Badge>
-                                                                    )}
-                                                                  </div>                                </div>
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                                                                    {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
+                                                                                                      <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
+                                                                                                        Draft
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                    {(episode.isEpgGenerated === 1) && (
+                                                                                                      <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50" data-testid={`episode-epg-${episode.id}`}>
+                                                                                                        EPG
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                    {episode.channel && (
+                                                                                                      <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
+                                                                                                        <Tv className="w-3 h-3" />
+                                                                                                        {episode.channel}
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                    {episode.programRating && (
+                                                                                                      <Badge variant="secondary" data-testid={`episode-rating-${episode.id}`}>
+                                                                                                        {episode.programRating}
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                    {episode.dateStart && episode.dateEnd && (
+                                                                                                      <Badge variant="outline" className="gap-1" data-testid={`episode-availability-${episode.id}`}>
+                                                                                                        <Calendar className="w-3 h-3" />
+                                                                                                        {format(new Date(episode.dateStart), "MMM d")} - {format(new Date(episode.dateEnd), "MMM d, yyyy")}
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                    {episode.lastAired && (
+                                                                                                      <Badge variant="outline" className="gap-1 text-xs border-blue-200 bg-blue-50/50" data-testid={`episode-last-aired-${episode.id}`}>
+                                                                                                        <Calendar className="w-3 h-3 text-blue-500" />
+                                                                                                        Aired: {format(new Date(episode.lastAired), "MMM d, yyyy")}
+                                                                                                      </Badge>
+                                                                                                    )}
+                                                                                                  </div>                                </div>
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {(canRead || canWrite) && (

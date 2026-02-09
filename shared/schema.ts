@@ -230,3 +230,11 @@ export interface PaginatedMetadataResult {
   totalPages: number;
 }
 
+export interface PaginatedSeriesSummaryResult {
+  summaries: SeriesSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
