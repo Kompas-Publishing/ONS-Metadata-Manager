@@ -1,8 +1,10 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import {
   insertMetadataFileSchema,
   type InsertMetadataFile,
+  type License,
 } from "@shared/schema";
 import {
   Form,
@@ -31,7 +33,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, X, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, X, Check, ChevronsUpDown, FileKey } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -81,6 +83,10 @@ export function MetadataForm({
   const [breakTimeInput, setBreakTimeInput] = useState("");
   const [customTagInput, setCustomTagInput] = useState("");
 
+  const { data: licenses } = useQuery<License[]>({
+    queryKey: ["/api/licenses"],
+  });
+
   // Compute breakTimes initialization properly
   const initialBreakTimes =
     defaultValues?.breakTimes ||
@@ -119,6 +125,7 @@ export function MetadataForm({
       segmented: undefined,
       subtitles: undefined,
       draft: 0,
+      licenseId: undefined,
       ...defaultValues,
     },
   });
@@ -160,6 +167,7 @@ export function MetadataForm({
   const handleSubmit = (data: InsertMetadataFile) => {
     const convertedData = {
       ...data,
+      licenseId: data.licenseId === "none" ? null : data.licenseId,
       breakTime:
         data.breakTimes && data.breakTimes.length > 0 ? data.breakTimes[0] : "",
       breakTimes: data.breakTimes || [],
@@ -187,6 +195,47 @@ export function MetadataForm({
               </p>
             </div>
           )}
+
+          <div className="border-t pt-8">
+            <h3 className="text-xl font-semibold mb-6 flex items-center gap-2">
+              <FileKey className="w-5 h-5 text-muted-foreground" />
+              Contract & License
+            </h3>
+            <div className="grid grid-cols-1 gap-6 max-w-md">
+              <FormField
+                control={form.control}
+                name="licenseId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>License Association</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                      disabled={readOnly}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a license (optional)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none" onClick={() => field.onChange(null)}>None</SelectItem>
+                        {licenses?.map((license) => (
+                          <SelectItem key={license.id} value={license.id}>
+                            {license.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Link this file to a content license/contract
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
           <div className="border-t pt-8">
             <h3 className="text-xl font-semibold mb-6">Basic Information</h3>

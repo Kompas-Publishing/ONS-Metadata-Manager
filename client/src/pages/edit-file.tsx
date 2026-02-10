@@ -176,6 +176,7 @@ export default function EditFile() {
             audioId: file.audioId ?? "",
             originalFilename: file.originalFilename ?? "",
             draft: file.draft ?? 0,
+            licenseId: file.licenseId || undefined,
           }}
           onSubmit={handleSubmit}
           onSaveDraft={handleSaveDraft}
