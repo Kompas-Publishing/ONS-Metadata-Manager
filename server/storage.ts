@@ -694,9 +694,8 @@ export class DatabaseStorage implements IStorage {
       .from(metadataFiles)
       .where(recentWhereConditions.length > 0 ? and(...recentWhereConditions) : gte(metadataFiles.createdAt, oneDayAgo));
 
-    const seriesIdentifier = sql<string>`trim(regexp_replace(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title}), '\\s+S\\d+E\\d+$|\\s+S\\d+$', '', 'g'))`;
     const uniqueSeries = await db
-      .select({ count: sql<number>`count(distinct ${seriesIdentifier})::int` })
+      .select({ count: sql<number>`count(distinct title)::int` })
       .from(metadataFiles)
       .where(whereClause);
 

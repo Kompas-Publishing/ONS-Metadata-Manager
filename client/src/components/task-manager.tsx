@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { ProgramTask } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface TaskManagerProps {
   metadataFileId?: string;
@@ -18,6 +19,7 @@ interface TaskManagerProps {
 export function TaskManager({ metadataFileId, seriesTitle, season }: TaskManagerProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   const canWrite = user?.canWrite === 1;
 
   const queryKey = ["tasks", { metadataFileId, seriesTitle, season }];
@@ -38,13 +40,6 @@ export function TaskManager({ metadataFileId, seriesTitle, season }: TaskManager
 
   const [newTask, setNewTask] = useState("");
 
-  const mutationOptions = {
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
-      setNewTask("");
-    },
-  };
-
   const addTaskMutation = useMutation({
     mutationFn: (description: string) =>
       apiRequest("POST", "/api/tasks", {
@@ -53,18 +48,54 @@ export function TaskManager({ metadataFileId, seriesTitle, season }: TaskManager
         seriesTitle,
         season,
       }),
-    ...mutationOptions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      setNewTask("");
+      toast({
+        title: "Success",
+        description: "Task added successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add task",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       apiRequest("PUT", `/api/tasks/${id}`, { status }),
-    ...mutationOptions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update task",
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/tasks/${id}`),
-    ...mutationOptions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      toast({
+        title: "Success",
+        description: "Task deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete task",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleAddTask = () => {
