@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Loader2, FileText, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Loader2, FileText, Calendar as CalendarIcon, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import type { License } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,17 @@ export default function Licenses() {
   const { data: licenses, isLoading } = useQuery<License[]>({
     queryKey: ["/api/licenses"],
   });
+
+  const formatFee = (license: License) => {
+    if (!license.licenseFeeAmount) return "-";
+    const amount = parseFloat(license.licenseFeeAmount);
+    if (isNaN(amount)) return license.licenseFeeAmount;
+    
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: license.licenseFeeCurrency || 'EUR',
+    }).format(amount);
+  };
 
   if (isLoading) {
     return (
@@ -88,7 +99,14 @@ export default function Licenses() {
                         </div>
                       </TableCell>
                       <TableCell>{license.distributor || "-"}</TableCell>
-                      <TableCell>{license.licenseFee || "-"}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {formatFee(license)}
+                          {license.licenseFeePaid === 1 && (
+                            <CheckCircle2 className="w-3 h-3 text-green-600" />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {license.licenseEnd ? (
                           <div className="flex items-center gap-2">

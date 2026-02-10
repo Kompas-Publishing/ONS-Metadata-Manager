@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertLicenseSchema, type InsertLicense } from "@shared/schema";
+import { insertLicenseSchema, type InsertLicense, type License } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +27,17 @@ const CURRENCIES = [
 
 const RATINGS = ["AL", "6", "9", "12", "16", "18"];
 
-export default function CreateLicense() {
+export default function EditLicense() {
+  const [, params] = useRoute("/licenses/:id/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const id = params?.id;
+
+  const { data: license, isLoading } = useQuery<License>({
+    queryKey: [`/api/licenses/${id}`],
+    enabled: !!id,
+  });
 
   const form = useForm<InsertLicense>({
     resolver: zodResolver(insertLicenseSchema),
@@ -50,42 +56,72 @@ export default function CreateLicense() {
     },
   });
 
-  const onSubmit = async (data: InsertLicense) => {
-    setIsSubmitting(true);
-    try {
-      await apiRequest("POST", "/api/licenses", data);
-      
+  useEffect(() => {
+    if (license) {
+      form.reset({
+        name: license.name,
+        distributor: license.distributor || "",
+        contentTitle: license.contentTitle || "",
+        licenseFeeCurrency: license.licenseFeeCurrency || "EUR",
+        licenseFeeAmount: license.licenseFeeAmount || "",
+        licenseFeePaid: license.licenseFeePaid || 0,
+        licenseStart: license.licenseStart ? new Date(license.licenseStart) : undefined,
+        licenseEnd: license.licenseEnd ? new Date(license.licenseEnd) : undefined,
+        allowedRuns: license.allowedRuns || "",
+        contentRating: license.contentRating || "",
+        description: license.description || "",
+        imdbLink: license.imdbLink || "",
+        notes: license.notes || "",
+      });
+    }
+  }, [license, form]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: InsertLicense) => {
+      await apiRequest("PATCH", `/api/licenses/${id}`, data);
+    },
+    onSuccess: () => {
       toast({
         title: "Success",
-        description: "License created successfully.",
+        description: "License updated successfully.",
       });
-
+      queryClient.invalidateQueries({ queryKey: [`/api/licenses/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
-      setLocation("/licenses");
-    } catch (error: any) {
+      setLocation(`/licenses/${id}`);
+    },
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create license",
+        description: error.message || "Failed to update license",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
-        <p className="text-muted-foreground mt-2">
-          Add a new content license with detailed contract information
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => setLocation(`/licenses/${id}`)}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edit License</h1>
+          <p className="text-muted-foreground mt-1">Update license and contract information</p>
+        </div>
       </div>
 
       <Card>
         <CardContent className="pt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -345,12 +381,12 @@ export default function CreateLicense() {
               />
 
               <div className="flex justify-end gap-4 border-t pt-6">
-                <Button variant="outline" type="button" onClick={() => setLocation("/licenses")}>
+                <Button variant="outline" type="button" onClick={() => setLocation(`/licenses/${id}`)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Create License
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Save Changes
                 </Button>
               </div>
             </form>

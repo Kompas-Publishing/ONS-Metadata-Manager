@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Trash2, Calendar, FileText, Link as LinkIcon, ExternalLink, Copy, Edit } from "lucide-react";
+import { Loader2, ArrowLeft, Trash2, Calendar, FileText, Link as LinkIcon, ExternalLink, Copy, Edit, Banknote, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import type { License } from "@shared/schema";
 import {
@@ -60,6 +60,17 @@ export default function ViewLicense() {
       title: "Copied",
       description: "Link copied to clipboard",
     });
+  };
+
+  const formatFee = () => {
+    if (!license?.licenseFeeAmount) return "Not specified";
+    const amount = parseFloat(license.licenseFeeAmount);
+    if (isNaN(amount)) return license.licenseFeeAmount;
+    
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency: license.licenseFeeCurrency || 'EUR',
+    }).format(amount);
   };
 
   if (isLoading) {
@@ -143,19 +154,28 @@ export default function ViewLicense() {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Rechten (Distributor)</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Distributor (Rechten)</p>
                 <p className="text-lg font-semibold">{license.distributor || "-"}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Licentievergoeding (Fee)</p>
-                <p className="text-lg font-semibold">{license.licenseFee || "-"}</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">License Fee (Licentievergoeding)</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-lg font-semibold">{formatFee()}</p>
+                  {license.licenseFeePaid === 1 ? (
+                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
+                      <ShieldCheck className="w-3 h-3 mr-1" /> Paid (Betaald)
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">Unpaid</Badge>
+                  )}
+                </div>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Aantal runs (Allowed Runs)</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Allowed Runs (Aantal runs)</p>
                 <p className="text-lg font-semibold">{license.allowedRuns || "-"}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Kijkwijzer (Rating)</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Content Rating (Kijkwijzer)</p>
                 <div>
                   {license.contentRating ? (
                     <Badge variant="outline" className="text-base px-3">{license.contentRating}</Badge>
@@ -169,7 +189,7 @@ export default function ViewLicense() {
             <Separator />
 
             <div className="space-y-3">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Omschrijving (Description)</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Description (Omschrijving)</p>
               <p className="text-base whitespace-pre-wrap leading-relaxed">
                 {license.description || "No description provided."}
               </p>
@@ -197,13 +217,13 @@ export default function ViewLicense() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Startdatum</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">License Start (Startdatum)</p>
                 <p className="text-base font-medium">
                   {license.licenseStart ? format(new Date(license.licenseStart), "PPPP") : "Not set"}
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Einddatum</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">License End (Einddatum)</p>
                 <p className="text-base font-medium">
                   {license.licenseEnd ? format(new Date(license.licenseEnd), "PPPP") : "Not set"}
                 </p>

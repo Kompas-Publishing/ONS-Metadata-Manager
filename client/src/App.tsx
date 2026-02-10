@@ -23,6 +23,7 @@ import Admin from "@/pages/admin";
 import Licenses from "@/pages/licenses";
 import CreateLicense from "@/pages/create-license";
 import ViewLicense from "@/pages/view-license";
+import EditLicense from "@/pages/edit-license";
 
 function Router() {
   return (
@@ -115,6 +116,14 @@ function Router() {
         <AuthenticatedRoute>
           <ProtectedLayout>
             <ViewLicense />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/licenses/:id/edit">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <EditLicense />
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>
