@@ -62,8 +62,15 @@ export type User = typeof users.$inferSelect;
 export const licenses = pgTable("licenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  contractDate: timestamp("contract_date"),
   distributor: text("distributor"),
+  contentTitle: text("content_title"),
+  licenseFee: text("license_fee"),
+  licenseStart: timestamp("license_start"),
+  licenseEnd: timestamp("license_end"),
+  allowedRuns: text("allowed_runs"),
+  contentRating: text("content_rating"),
+  description: text("description"),
+  imdbLink: text("imdb_link"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -71,8 +78,15 @@ export const licenses = pgTable("licenses", {
 
 export const insertLicenseSchema = createInsertSchema(licenses, {
   name: z.string().min(1, "Name is required"),
-  contractDate: z.coerce.date().optional(),
   distributor: z.string().optional(),
+  contentTitle: z.string().optional(),
+  licenseFee: z.string().optional(),
+  licenseStart: z.coerce.date().optional(),
+  licenseEnd: z.coerce.date().optional(),
+  allowedRuns: z.string().optional(),
+  contentRating: z.string().optional(),
+  description: z.string().optional(),
+  imdbLink: z.string().optional(),
   notes: z.string().optional(),
 }).omit({
   id: true,
