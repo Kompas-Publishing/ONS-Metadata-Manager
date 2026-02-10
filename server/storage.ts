@@ -666,6 +666,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }> {
+    console.log("[Storage] getStats called. User:", permissions.user.id, "IsAdmin:", permissions.isAdmin, "Visibility:", permissions.fileVisibility);
+    
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
@@ -686,6 +688,8 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`count(*)::int` })
       .from(metadataFiles)
       .where(whereClause);
+    
+    console.log("[Storage] getStats totalFiles result:", totalFiles[0]?.count);
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentWhereConditions = [...whereConditions, gte(metadataFiles.createdAt, oneDayAgo)];
@@ -694,8 +698,9 @@ export class DatabaseStorage implements IStorage {
       .from(metadataFiles)
       .where(recentWhereConditions.length > 0 ? and(...recentWhereConditions) : gte(metadataFiles.createdAt, oneDayAgo));
 
+    // Fallback simple count to prevent crashing
     const uniqueSeries = await db
-      .select({ count: sql<number>`count(distinct title)::int` })
+      .select({ count: sql<number>`count(title)::int` }) 
       .from(metadataFiles)
       .where(whereClause);
 
@@ -961,11 +966,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTask(task: InsertProgramTask): Promise<ProgramTask> {
-    const [created] = await db
-      .insert(programTasks)
-      .values(task)
-      .returning();
-    return created;
+    console.log("[Storage] Creating task:", JSON.stringify(task));
+    try {
+      const [created] = await db
+        .insert(programTasks)
+        .values(task)
+        .returning();
+      console.log("[Storage] Task created:", created?.id);
+      return created;
+    } catch (e) {
+      console.error("[Storage] Failed to create task:", e);
+      throw e;
+    }
   }
 
   async updateTaskStatus(taskId: number, status: string): Promise<ProgramTask | undefined> {

@@ -29,14 +29,19 @@ export default apiHandler(
         return res.status(400).json({ message: "Description is required" });
       }
 
-      const task = await storage.createTask({
-        description,
-        metadataFileId,
-        seriesTitle,
-        season,
-        createdBy: req.user.id,
-      });
-      return res.status(201).json(task);
+      try {
+        const task = await storage.createTask({
+          description,
+          metadataFileId,
+          seriesTitle,
+          season,
+          createdBy: req.user.id,
+        });
+        return res.status(201).json(task);
+      } catch (error) {
+        console.error("[API] Error creating task:", error);
+        return res.status(500).json({ message: "Failed to create task" });
+      }
     }
 
     res.setHeader("Allow", ["GET", "POST"]);
