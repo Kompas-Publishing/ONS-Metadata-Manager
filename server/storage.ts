@@ -16,6 +16,9 @@ import {
   type InsertGroup,
   type SeriesSummary,
   type PaginatedMetadataResult,
+  programTasks,
+  type ProgramTask,
+  type InsertProgramTask,
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -33,8 +36,8 @@ export interface IStorage {
   getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined>;
   getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
   getAllMetadataFiles(permissions: UserPermissions): Promise<MetadataFile[]>;
-  getPaginatedMetadataFiles(page: number, limit: number, search: string | undefined, channel: string | undefined, rating: string | undefined, permissions: UserPermissions): Promise<PaginatedMetadataResult>;
-  getSeriesSummaries(category: string | undefined, permissions: UserPermissions): Promise<SeriesSummary[]>;
+  getPaginatedMetadataFiles(page: number, limit: number, search: string | undefined, channel: string | undefined, rating: string | undefined, task: string | undefined, permissions: UserPermissions): Promise<PaginatedMetadataResult>;
+  getSeriesSummaries(category: string | undefined, permissions: UserPermissions, page: number, limit: number, search: string | undefined): Promise<PaginatedSeriesSummaryResult>;
   getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
   updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
@@ -62,6 +65,13 @@ export interface IStorage {
   createGroup(group: InsertGroup): Promise<Group>;
   getAllGroups(): Promise<Group[]>;
   deleteGroup(groupId: string): Promise<boolean>;
+
+  getTasksForFile(metadataFileId: string): Promise<ProgramTask[]>;
+  getTasksForSeason(seriesTitle: string, season: number): Promise<ProgramTask[]>;
+  createTask(task: InsertProgramTask): Promise<ProgramTask>;
+  updateTaskStatus(taskId: number, status: string): Promise<ProgramTask | undefined>;
+  deleteTask(taskId: number): Promise<boolean>;
+  getDistinctTaskDescriptions(): Promise<string[]>;
 }
 
 function formatMetadataId(num: number): string {
@@ -258,11 +268,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPaginatedMetadataFiles(
-    page: number, 
-    limit: number, 
-    search: string | undefined, 
-    channel: string | undefined, 
-    rating: string | undefined, 
+    page: number,
+    limit: number,
+    search: string | undefined,
+    channel: string | undefined,
+    rating: string | undefined,
+    task: string | undefined,
     permissions: UserPermissions
   ): Promise<PaginatedMetadataResult> {
     const visibility = getFileVisibilityConditions(permissions);
@@ -273,7 +284,6 @@ export class DatabaseStorage implements IStorage {
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
       } else {
         whereConditions.push(sql`1 = 0`);
       }
@@ -281,48 +291,61 @@ export class DatabaseStorage implements IStorage {
 
     if (search && search.trim()) {
       const searchLower = `%${search.toLowerCase().trim()}%`;
-      whereConditions.push(or(
-        sql`lower(${metadataFiles.title}) LIKE ${searchLower}`,
-        sql`lower(COALESCE(${metadataFiles.description}, '')) LIKE ${searchLower}`,
-        sql`lower(COALESCE(${metadataFiles.seriesTitle}, '')) LIKE ${searchLower}`,
-        sql`lower(COALESCE(${metadataFiles.episodeTitle}, '')) LIKE ${searchLower}`
-      ));
+      whereConditions.push(
+        or(
+          sql`lower(${metadataFiles.title}) LIKE ${searchLower}`,
+          sql`lower(COALESCE(${metadataFiles.description}, '')) LIKE ${searchLower}`,
+          sql`lower(COALESCE(${metadataFiles.seriesTitle}, '')) LIKE ${searchLower}`,
+          sql`lower(COALESCE(${metadataFiles.episodeTitle}, '')) LIKE ${searchLower}`
+        )
+      );
     }
 
-    if (channel && channel !== 'all') {
+    if (channel && channel !== "all") {
       whereConditions.push(eq(metadataFiles.channel, channel));
     }
 
-    if (rating && rating !== 'all') {
+    if (rating && rating !== "all") {
       whereConditions.push(eq(metadataFiles.programRating, rating));
+    }
+
+    let query = db.select().from(metadataFiles).$dynamic();
+    let countQuery = db.select({ count: sql<number>`count(*)::int` }).from(metadataFiles).$dynamic();
+
+    if (task && task !== "all") {
+      query = query.leftJoin(programTasks, eq(metadataFiles.id, programTasks.metadataFileId));
+      countQuery = countQuery.leftJoin(programTasks, eq(metadataFiles.id, programTasks.metadataFileId));
+      whereConditions.push(eq(programTasks.description, task));
+      whereConditions.push(eq(programTasks.status, "pending"));
     }
 
     const filteredConditions = whereConditions.filter(Boolean);
     const whereClause = filteredConditions.length > 0 ? and(...filteredConditions) : undefined;
 
-    const [countResult] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(metadataFiles)
-      .where(whereClause);
-    
+    if (whereClause) {
+      query = query.where(whereClause);
+      countQuery = countQuery.where(whereClause);
+    }
+
+    const [countResult] = await countQuery;
     const total = countResult?.count || 0;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
 
-    const files = await db
-      .select()
-      .from(metadataFiles)
-      .where(whereClause)
+    const files = await query
       .orderBy(desc(metadataFiles.createdAt))
       .limit(limit)
       .offset(offset);
 
+    // If we joined, the result is { metadataFiles, programTasks }. We only want metadataFiles.
+    const resultFiles = files.map(f => (f as any).metadata_files || f) as MetadataFile[];
+
     return {
-      files: files.map(normalizeMetadataFile),
+      files: resultFiles.map(normalizeMetadataFile),
       total,
       page,
       limit,
-      totalPages
+      totalPages,
     };
   }
 
@@ -671,8 +694,9 @@ export class DatabaseStorage implements IStorage {
       .from(metadataFiles)
       .where(recentWhereConditions.length > 0 ? and(...recentWhereConditions) : gte(metadataFiles.createdAt, oneDayAgo));
 
+    const seriesIdentifier = sql<string>`trim(regexp_replace(COALESCE(${metadataFiles.seriesTitle}, ${metadataFiles.title}), '\\s+S\\d+E\\d+$|\\s+S\\d+$', '', 'g'))`;
     const uniqueSeries = await db
-      .select({ count: sql<number>`count(distinct title)::int` })
+      .select({ count: sql<number>`count(distinct ${seriesIdentifier})::int` })
       .from(metadataFiles)
       .where(whereClause);
 
@@ -914,6 +938,61 @@ export class DatabaseStorage implements IStorage {
       .where(eq(groups.id, groupId))
       .returning();
     return result.length > 0;
+  }
+
+  async getTasksForFile(metadataFileId: string): Promise<ProgramTask[]> {
+    return await db
+      .select()
+      .from(programTasks)
+      .where(eq(programTasks.metadataFileId, metadataFileId))
+      .orderBy(desc(programTasks.createdAt));
+  }
+
+  async getTasksForSeason(seriesTitle: string, season: number): Promise<ProgramTask[]> {
+    return await db
+      .select()
+      .from(programTasks)
+      .where(
+        and(
+          eq(programTasks.seriesTitle, seriesTitle),
+          eq(programTasks.season, season)
+        )
+      )
+      .orderBy(desc(programTasks.createdAt));
+  }
+
+  async createTask(task: InsertProgramTask): Promise<ProgramTask> {
+    const [created] = await db
+      .insert(programTasks)
+      .values(task)
+      .returning();
+    return created;
+  }
+
+  async updateTaskStatus(taskId: number, status: string): Promise<ProgramTask | undefined> {
+    const [updated] = await db
+      .update(programTasks)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(programTasks.id, taskId))
+      .returning();
+    return updated;
+  }
+
+  async deleteTask(taskId: number): Promise<boolean> {
+    const result = await db
+      .delete(programTasks)
+      .where(eq(programTasks.id, taskId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getDistinctTaskDescriptions(): Promise<string[]> {
+    const results = await db
+      .select({ description: programTasks.description })
+      .from(programTasks)
+      .groupBy(programTasks.description)
+      .orderBy(programTasks.description);
+    return results.map(r => r.description);
   }
 }
 

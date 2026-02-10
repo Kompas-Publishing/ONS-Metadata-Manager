@@ -12,6 +12,7 @@ import type { MetadataFile, SeriesSummary, PaginatedSeriesSummaryResult } from "
 import { useAuth } from "@/hooks/use-auth";
 import { useDebounce } from "@/hooks/use-debounce";
 import { apiRequest } from "@/lib/queryClient";
+import { TaskManager } from "@/components/task-manager";
 
 const handleDownload = (url: string) => {
   const link = document.createElement('a');
@@ -207,7 +208,8 @@ export default function Browse() {
             onClick={() => setSelectedSeries(null)}
             data-testid="button-back-to-series"
           >
-            Back to All Series
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Back to All {categoryParam}
           </Button>
 
           {isLoadingDetails || !selectedSeriesGroup ? (
@@ -260,7 +262,7 @@ export default function Browse() {
                   <Card key={seasonNum} className="p-6">
                     <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
                       <h3 className="text-xl font-semibold">
-                        Season {seasonNum === "0" ? "Unknown" : seasonNum}
+                        {selectedSeriesGroup.category === 'Series' ? `Season ${seasonNum === "0" ? "Unknown" : seasonNum}` : selectedSeriesGroup.title}
                       </h3>
                       <div className="flex gap-2 flex-wrap">
                         <Button
@@ -386,6 +388,12 @@ export default function Browse() {
                             </div>
                           </div>
                         ))}
+                    </div>
+                    <div className="mt-4">
+                      <TaskManager 
+                        seriesTitle={selectedSeriesGroup.title} 
+                        season={parseInt(seasonNum)} 
+                      />
                     </div>
                   </Card>
                 ))}

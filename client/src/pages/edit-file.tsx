@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { MetadataForm } from "@/components/metadata-form";
+import { TaskManager } from "@/components/task-manager";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,6 +184,8 @@ export default function EditFile() {
           submitLabel="Update File"
         />
       </Card>
+
+      <TaskManager metadataFileId={file.id} />
 
       {adjacent && (adjacent.prev || adjacent.next) && (
         <Card className="p-6">

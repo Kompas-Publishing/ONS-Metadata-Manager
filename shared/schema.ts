@@ -215,6 +215,25 @@ export const insertUserDefinedTagSchema = createInsertSchema(userDefinedTags, {
 export type InsertUserDefinedTag = z.infer<typeof insertUserDefinedTagSchema>;
 export type UserDefinedTag = typeof userDefinedTags.$inferSelect;
 
+// Program tasks table
+export const programTasks = pgTable("program_tasks", {
+  id: serial("id").primaryKey(),
+  description: varchar("description", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, completed
+  metadataFileId: varchar("metadata_file_id").references(() => metadataFiles.id, { onDelete: 'cascade' }),
+  seriesTitle: text("series_title"),
+  season: integer("season"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  metadataFileIdIdx: index("IDX_program_tasks_metadata_file_id").on(table.metadataFileId),
+  seriesSeasonIdx: index("IDX_program_tasks_series_season").on(table.seriesTitle, table.season),
+}));
+
+export type ProgramTask = typeof programTasks.$inferSelect;
+export type InsertProgramTask = typeof programTasks.$inferInsert;
+
 export interface SeriesSummary {
   title: string;
   category: string | null;

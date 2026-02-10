@@ -39,6 +39,7 @@ export default function AllFiles() {
   const [channelFilter, setChannelFilter] = useState<string>(""); // Text input for channel
   const debouncedChannel = useDebounce(channelFilter, 300);
   const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [taskFilter, setTaskFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -47,10 +48,19 @@ export default function AllFiles() {
   const canWrite = user?.canWrite === 1;
   const canRead = user?.canRead === 1;
 
+  const { data: taskOptions = [] } = useQuery<string[]>({
+    queryKey: ["/api/tasks?distinct=true"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/tasks?distinct=true");
+      return res.json();
+    },
+    enabled: !authLoading,
+  });
+
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, debouncedChannel, ratingFilter]);
+  }, [debouncedSearch, debouncedChannel, ratingFilter, taskFilter]);
 
   const { data: paginatedData, isLoading, error } = useQuery<PaginatedMetadataResult>({
     queryKey: [
@@ -59,7 +69,8 @@ export default function AllFiles() {
       50, 
       debouncedSearch || undefined, 
       debouncedChannel && debouncedChannel !== 'all' ? debouncedChannel : undefined, 
-      ratingFilter && ratingFilter !== 'all' ? ratingFilter : undefined
+      ratingFilter && ratingFilter !== 'all' ? ratingFilter : undefined,
+      taskFilter && taskFilter !== 'all' ? taskFilter : undefined
     ].filter(Boolean),
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -69,6 +80,7 @@ export default function AllFiles() {
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (debouncedChannel && debouncedChannel !== 'all') params.append("channel", debouncedChannel);
       if (ratingFilter && ratingFilter !== 'all') params.append("rating", ratingFilter);
+      if (taskFilter && taskFilter !== 'all') params.append("task", taskFilter);
       
       const res = await apiRequest("GET", `/api/metadata/paginated?${params.toString()}`);
       return res.json();
@@ -116,11 +128,12 @@ export default function AllFiles() {
 
   const ratingOptions = ["AL", "6", "9", "12", "16", "18"];
 
-  const hasActiveFilters = (channelFilter && channelFilter !== "all") || ratingFilter !== "all";
+  const hasActiveFilters = (channelFilter && channelFilter !== "all") || ratingFilter !== "all" || taskFilter !== "all";
 
   const clearFilters = () => {
     setChannelFilter("");
     setRatingFilter("all");
+    setTaskFilter("all");
     setSearchQuery("");
   };
 
@@ -219,16 +232,16 @@ export default function AllFiles() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-foreground">Rating:</label>
-            <Select value={ratingFilter} onValueChange={setRatingFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-rating-filter">
-                <SelectValue placeholder="All Ratings" />
+            <label className="text-sm font-medium text-foreground">Task:</label>
+            <Select value={taskFilter} onValueChange={setTaskFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-task-filter">
+                <SelectValue placeholder="All Tasks" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Ratings</SelectItem>
-                {ratingOptions.map((rating) => (
-                  <SelectItem key={rating} value={rating}>
-                    {rating}
+                <SelectItem value="all">All Tasks</SelectItem>
+                {taskOptions.map((task) => (
+                  <SelectItem key={task} value={task}>
+                    {task}
                   </SelectItem>
                 ))}
               </SelectContent>

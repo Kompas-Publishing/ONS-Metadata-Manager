@@ -14,10 +14,11 @@ export default apiHandler(
       const search = req.query.search as string | undefined;
       const channel = req.query.channel as string | undefined;
       const rating = req.query.rating as string | undefined;
+      const task = req.query.task as string | undefined;
 
-      console.log(`[Paginated] Loading page ${page}, limit ${limit}, search=${search}, channel=${channel}, rating=${rating}`);
+      console.log(`[Paginated] Loading page ${page}, limit ${limit}, search=${search}, channel=${channel}, rating=${rating}, task=${task}`);
 
-      const result = await storage.getPaginatedMetadataFiles(page, limit, search, channel, rating, req.permissions!);
+      const result = await storage.getPaginatedMetadataFiles(page, limit, search, channel, rating, task, req.permissions!);
       res.json(result);
     } catch (error: any) {
       console.error("Error fetching paginated files:", error);
