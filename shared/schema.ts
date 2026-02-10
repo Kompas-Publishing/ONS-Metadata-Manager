@@ -58,6 +58,31 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// License table
+export const licenses = pgTable("licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contractDate: timestamp("contract_date"),
+  distributor: text("distributor"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLicenseSchema = createInsertSchema(licenses, {
+  name: z.string().min(1, "Name is required"),
+  contractDate: z.coerce.date().optional(),
+  distributor: z.string().optional(),
+  notes: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLicense = z.infer<typeof insertLicenseSchema>;
+export type License = typeof licenses.$inferSelect;
+
 // Metadata files table
 export const metadataFiles = pgTable("metadata_files", {
   id: varchar("id").primaryKey(), // e.g., "77362"
@@ -93,6 +118,7 @@ export const metadataFiles = pgTable("metadata_files", {
   subtitles: integer("subtitles"), // Subtitle availability (0 or 1 as boolean)
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
+  licenseId: varchar("license_id").references(() => licenses.id), // Link to license
   createdBy: varchar("created_by").references(() => users.id),
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
@@ -132,6 +158,7 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   subtitles: z.number().int().min(0).max(1).optional(),
   subtitlesId: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
+  licenseId: z.string().optional(),
 }).omit({
   id: true,
   createdBy: true,
@@ -141,6 +168,17 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
 
 export type InsertMetadataFile = z.infer<typeof insertMetadataFileSchema>;
 export type MetadataFile = typeof metadataFiles.$inferSelect;
+
+// License Batch Generate Schema
+export const licenseBatchGenerateSchema = z.object({
+  licenseId: z.string(),
+  seriesTitle: z.string().min(1, "Series Title is required"),
+  seasonStart: z.number().int().positive(),
+  seasonEnd: z.number().int().positive(),
+  episodesPerSeason: z.number().int().positive(),
+});
+
+export type LicenseBatchGenerate = z.infer<typeof licenseBatchGenerateSchema>;
 
 // Batch creation schema
 export const batchCreateSchema = z.object({

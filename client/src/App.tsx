@@ -20,6 +20,9 @@ import EditFile from "@/pages/edit-file";
 import ViewFile from "@/pages/view-file";
 import EditSeason from "@/pages/edit-season";
 import Admin from "@/pages/admin";
+import Licenses from "@/pages/licenses";
+import CreateLicense from "@/pages/create-license";
+import ViewLicense from "@/pages/view-license";
 
 function Router() {
   return (
@@ -88,6 +91,30 @@ function Router() {
         <AuthenticatedRoute>
           <ProtectedLayout>
             <EditSeason />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/licenses">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <Licenses />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+      
+      <Route path="/create-license">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <CreateLicense />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/licenses/:id">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <ViewLicense />
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>

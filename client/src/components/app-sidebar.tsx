@@ -21,6 +21,7 @@ import {
   FileText,
   LogOut,
   Shield,
+  FileKey,
 } from "lucide-react";
 
 const allMenuItems = [
@@ -31,6 +32,14 @@ const allMenuItems = [
     testId: "nav-dashboard",
     adminOnly: false,
     requiresWrite: false,
+  },
+  {
+    title: "License Manager",
+    url: "/licenses",
+    icon: FileKey,
+    testId: "nav-licenses",
+    adminOnly: false, // Or true if you want to restrict it
+    requiresWrite: true,
   },
   {
     title: "Create File",

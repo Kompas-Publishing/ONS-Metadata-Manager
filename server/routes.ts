@@ -8,6 +8,8 @@ import {
   insertMetadataFileSchema,
   batchCreateSchema,
   insertUserDefinedTagSchema,
+  insertLicenseSchema,
+  licenseBatchGenerateSchema,
   type InsertMetadataFile,
 } from "@shared/schema";
 import { create } from "xmlbuilder2";
@@ -1694,6 +1696,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+
+  // License Management Routes
+  app.get("/api/licenses", isAuthenticated, async (req: any, res) => {
+    try {
+      const licenses = await storage.listLicenses();
+      res.json(licenses);
+    } catch (error) {
+      console.error("Error fetching licenses:", error);
+      res.status(500).json({ message: "Failed to fetch licenses" });
+    }
+  });
+
+  app.post("/api/licenses", isAuthenticated, async (req: any, res) => {
+    try {
+      const validation = insertLicenseSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const license = await storage.createLicense(validation.data);
+      res.json(license);
+    } catch (error) {
+      console.error("Error creating license:", error);
+      res.status(500).json({ message: "Failed to create license" });
+    }
+  });
+
+  app.get("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const license = await storage.getLicense(req.params.id);
+      if (!license) {
+        return res.status(404).json({ message: "License not found" });
+      }
+      res.json(license);
+    } catch (error) {
+      console.error("Error fetching license:", error);
+      res.status(500).json({ message: "Failed to fetch license" });
+    }
+  });
+
+  app.patch("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const validation = insertLicenseSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const updated = await storage.updateLicense(req.params.id, validation.data);
+      if (!updated) {
+        return res.status(404).json({ message: "License not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating license:", error);
+      res.status(500).json({ message: "Failed to update license" });
+    }
+  });
+
+  app.delete("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const success = await storage.deleteLicense(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: "License not found" });
+      }
+      res.json({ message: "License deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting license:", error);
+      res.status(500).json({ message: "Failed to delete license" });
+    }
+  });
+
+  app.post("/api/licenses/batch-generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const validation = licenseBatchGenerateSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const files = await storage.generateLicenseDrafts(validation.data, userId);
+      res.json({ message: "Drafts generated successfully", count: files.length, files });
+    } catch (error) {
+      console.error("Error generating license drafts:", error);
+      res.status(500).json({ message: "Failed to generate drafts" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

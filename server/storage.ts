@@ -4,6 +4,7 @@ import {
   settings,
   userDefinedTags,
   groups,
+  licenses,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -14,6 +15,9 @@ import {
   type InsertUserDefinedTag,
   type Group,
   type InsertGroup,
+  type InsertLicense,
+  type License,
+  type LicenseBatchGenerate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -58,6 +62,14 @@ export interface IStorage {
   createGroup(group: InsertGroup): Promise<Group>;
   getAllGroups(): Promise<Group[]>;
   deleteGroup(groupId: string): Promise<boolean>;
+
+  // License Management
+  createLicense(license: InsertLicense): Promise<License>;
+  getLicense(id: string): Promise<License | undefined>;
+  listLicenses(): Promise<License[]>;
+  updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
+  deleteLicense(id: string): Promise<boolean>;
+  generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]>;
 }
 
 function formatMetadataId(num: number): string {
@@ -768,6 +780,86 @@ export class DatabaseStorage implements IStorage {
       .where(eq(groups.id, groupId))
       .returning();
     return result.length > 0;
+  }
+
+  async createLicense(license: InsertLicense): Promise<License> {
+    const [created] = await db.insert(licenses).values(license).returning();
+    return created;
+  }
+
+  async getLicense(id: string): Promise<License | undefined> {
+    const [license] = await db.select().from(licenses).where(eq(licenses.id, id));
+    return license;
+  }
+
+  async listLicenses(): Promise<License[]> {
+    return await db.select().from(licenses).orderBy(desc(licenses.createdAt));
+  }
+
+  async updateLicense(id: string, data: Partial<InsertLicense>): Promise<License | undefined> {
+    const [updated] = await db
+      .update(licenses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(licenses.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLicense(id: string): Promise<boolean> {
+    const result = await db.delete(licenses).where(eq(licenses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]> {
+    return await db.transaction(async (tx) => {
+      const [setting] = await tx
+        .select()
+        .from(settings)
+        .where(eq(settings.key, "next_id"));
+  
+      let currentId = 77362;
+      if (setting) {
+        currentId = parseInt(setting.value);
+      } else {
+        await tx.insert(settings).values({
+          key: "next_id",
+          value: currentId.toString(),
+        });
+      }
+  
+      const files: any[] = [];
+      const { licenseId, seriesTitle, seasonStart, seasonEnd, episodesPerSeason } = data;
+  
+      for (let season = seasonStart; season <= seasonEnd; season++) {
+        for (let episode = 1; episode <= episodesPerSeason; episode++) {
+          files.push({
+            id: formatMetadataId(currentId),
+            title: seriesTitle,
+            season: season,
+            episode: episode,
+            licenseId: licenseId,
+            draft: 1,
+            createdBy: userId,
+            duration: "00:00:00", // Default required field
+            contentType: "Long Form", // Default required
+            breakTimes: [],
+            tags: [],
+          });
+          currentId++;
+        }
+      }
+  
+      await tx
+        .update(settings)
+        .set({
+          value: currentId.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(settings.key, "next_id"));
+  
+      const created = await tx.insert(metadataFiles).values(files).returning();
+      return created;
+    });
   }
 }
 
