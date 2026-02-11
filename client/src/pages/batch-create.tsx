@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { batchCreateSchema, type BatchCreate } from "@shared/schema";
-import { Card } from "@/components/ui/card";
+import { enhancedBatchCreateSchema, type EnhancedBatchCreate, type MultiBatchCreate } from "@shared/schema";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, Loader2, CalendarIcon, X } from "lucide-react";
+import { CheckCircle2, Loader2, CalendarIcon, X, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -41,19 +41,18 @@ export default function BatchCreate() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showSuccess, setShowSuccess] = useState(false);
+  const [createdCount, setCreatedCount] = useState(0);
 
   const { data: nextId } = useQuery<string>({
     queryKey: ["/api/metadata/next-id"],
   });
 
-  const form = useForm<BatchCreate>({
-    resolver: zodResolver(batchCreateSchema),
+  const form = useForm<EnhancedBatchCreate>({
+    resolver: zodResolver(enhancedBatchCreateSchema),
     defaultValues: {
       title: "",
-      season: 1,
-      startEpisode: 1,
-      episodeCount: 1,
       category: "Series",
+      seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
       channel: "ONS",
       seriesTitle: "",
       description: "",
@@ -73,17 +72,23 @@ export default function BatchCreate() {
       segmented: undefined,
       contentType: undefined,
       seasonType: undefined,
+      draft: 1,
     },
   });
 
-  const episodeCount = form.watch("episodeCount");
-  const startEpisode = form.watch("startEpisode");
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "seasons",
+  });
+
+  const totalEpisodes = form.watch("seasons").reduce((sum, s) => sum + (s.episodeCount || 0), 0);
 
   const batchMutation = useMutation({
-    mutationFn: async (data: BatchCreate) => {
-      return await apiRequest("POST", "/api/metadata/batch", data);
+    mutationFn: async (data: MultiBatchCreate) => {
+      return await apiRequest("POST", "/api/metadata/multi-batch", data);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setCreatedCount(totalEpisodes);
       setShowSuccess(true);
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
@@ -111,15 +116,9 @@ export default function BatchCreate() {
     },
   });
 
-  const onSubmit = (data: BatchCreate) => {
-    const convertedData = {
-      ...data,
-      catchUp: data.catchUp ? 1 : 0,
-      segmented: data.segmented ? 1 : 0,
-      subtitles: data.subtitles ? 1 : 0,
-      draft: 1, // Batch created files are always drafts
-    };
-    batchMutation.mutate(convertedData);
+  const onSubmit = (data: EnhancedBatchCreate) => {
+    // Send as a multi-batch with a single batch
+    batchMutation.mutate({ batches: [data] });
   };
 
   if (showSuccess) {
@@ -129,7 +128,7 @@ export default function BatchCreate() {
           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-semibold mb-2">Batch Created Successfully!</h2>
           <p className="text-muted-foreground mb-4">
-            {episodeCount} files have been created
+            {createdCount} files have been created
           </p>
           <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
         </Card>
@@ -142,7 +141,7 @@ export default function BatchCreate() {
       <div>
         <h1 className="text-3xl font-semibold text-foreground">Batch Create Files</h1>
         <p className="text-muted-foreground mt-2">
-          Create multiple metadata files with auto-incrementing episode numbers
+          Create multiple metadata files with flexible season and episode definitions
         </p>
       </div>
 
@@ -159,7 +158,7 @@ export default function BatchCreate() {
                     <FormItem>
                       <FormLabel>Series Title *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., The Love Boat" {...field} data-testid="input-batch-title" />
+                        <Input placeholder="e.g., The Love Boat" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,7 +173,7 @@ export default function BatchCreate() {
                       <FormLabel>Category *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-batch-category">
+                          <SelectTrigger>
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
@@ -200,7 +199,6 @@ export default function BatchCreate() {
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="01:30:00"
-                          data-testid="input-batch-duration"
                         />
                       </FormControl>
                       <FormMessage />
@@ -219,7 +217,6 @@ export default function BatchCreate() {
                           value={field.value || undefined}
                           onChange={field.onChange}
                           placeholder="00:05:00"
-                          data-testid="input-batch-break-time"
                         />
                       </FormControl>
                       <FormMessage />
@@ -238,7 +235,6 @@ export default function BatchCreate() {
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="00:02:00"
-                          data-testid="input-batch-end-credits"
                         />
                       </FormControl>
                       <FormMessage />
@@ -254,7 +250,7 @@ export default function BatchCreate() {
                       <FormLabel>Season Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-batch-season-type">
+                          <SelectTrigger>
                             <SelectValue placeholder="Select season type" />
                           </SelectTrigger>
                         </FormControl>
@@ -281,7 +277,7 @@ export default function BatchCreate() {
                         value={field.value ?? undefined}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-content-type">
+                          <SelectTrigger>
                             <SelectValue placeholder="Select content type" />
                           </SelectTrigger>
                         </FormControl>
@@ -310,7 +306,6 @@ export default function BatchCreate() {
                       placeholder="Main description for the series"
                       className="min-h-24"
                       {...field}
-                      data-testid="input-batch-description"
                     />
                   </FormControl>
                   <FormDescription>
@@ -334,7 +329,6 @@ export default function BatchCreate() {
                         value={field.value || []}
                         onChange={field.onChange}
                         placeholder="Add actors..."
-                        data-testid="input-batch-actors"
                       />
                     </FormControl>
                     <FormMessage />
@@ -354,7 +348,6 @@ export default function BatchCreate() {
                         value={field.value || []}
                         onChange={field.onChange}
                         placeholder="Add genres..."
-                        data-testid="input-batch-genre"
                       />
                     </FormControl>
                     <FormMessage />
@@ -364,85 +357,108 @@ export default function BatchCreate() {
             </div>
 
             <div className="border-t pt-6">
-              <h3 className="text-xl font-semibold mb-6">Series Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold">Series Information</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ season: fields.length + 1, episodeCount: 1, startEpisode: 1 })}
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Add Season
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg bg-muted/20 relative items-end">
+                    <FormField
+                      control={form.control}
+                      name={`seasons.${index}.season`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Season</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`seasons.${index}.episodeCount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Episodes</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`seasons.${index}.startEpisode`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Ep</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-end pb-1">
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6">
                 <FormField
                   control={form.control}
                   name="seriesTitle"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Series Title</FormLabel>
+                      <FormLabel>Main Series Title (Optional)</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Enter series title"
                           {...field}
-                          data-testid="input-batch-series-title"
                         />
                       </FormControl>
                       <FormDescription>
-                        Different from the main title
+                        Different from the metadata title
                       </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="season"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Season Number *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g., 1"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          data-testid="input-batch-season"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="startEpisode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Episode *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g., 1"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          data-testid="input-start-episode"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="episodeCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Number of Episodes *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g., 45"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
-                          data-testid="input-episode-count"
-                        />
-                      </FormControl>
-                      <FormDescription>How many files to create (max 100)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -463,7 +479,6 @@ export default function BatchCreate() {
                         <Input
                           placeholder="Enter channel"
                           {...field}
-                          data-testid="input-batch-channel"
                         />
                       </FormControl>
                       <FormMessage />
@@ -481,7 +496,6 @@ export default function BatchCreate() {
                         <Input
                           placeholder="Enter audio ID"
                           {...field}
-                          data-testid="input-batch-audio-id"
                         />
                       </FormControl>
                       <FormDescription>
@@ -500,7 +514,7 @@ export default function BatchCreate() {
                       <FormLabel>Program Rating</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-batch-program-rating">
+                          <SelectTrigger>
                             <SelectValue placeholder="Select rating" />
                           </SelectTrigger>
                         </FormControl>
@@ -533,7 +547,6 @@ export default function BatchCreate() {
                                 "w-full pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
-                              data-testid="input-batch-date-start"
                             >
                               {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -569,7 +582,6 @@ export default function BatchCreate() {
                                 "w-full pl-3 text-left font-normal",
                                 !field.value && "text-muted-foreground"
                               )}
-                              data-testid="input-batch-date-end"
                             >
                               {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -626,7 +638,6 @@ export default function BatchCreate() {
                           {...field}
                           onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                           value={field.value || ""}
-                          data-testid="input-batch-year-of-production"
                         />
                       </FormControl>
                       <FormMessage />
@@ -648,7 +659,6 @@ export default function BatchCreate() {
                         <Checkbox
                           checked={field.value === 1}
                           onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
-                          data-testid="checkbox-batch-catch-up"
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -670,7 +680,6 @@ export default function BatchCreate() {
                         <Checkbox
                           checked={field.value === 1}
                           onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
-                          data-testid="checkbox-batch-subtitles"
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -692,7 +701,6 @@ export default function BatchCreate() {
                         <Checkbox
                           checked={field.value === 1}
                           onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
-                          data-testid="checkbox-batch-segmented"
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -707,90 +715,23 @@ export default function BatchCreate() {
               </div>
             </div>
 
-            {nextId && episodeCount > 0 && (
+            {nextId && totalEpisodes > 0 && (
               <Card className="p-6 bg-muted/50">
                 <h3 className="text-sm font-medium mb-4">Batch Preview</h3>
                 <div className="space-y-3 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Episodes to create: </span>
-                    <span className="font-medium">{episodeCount} files</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Episode range: </span>
-                    <span className="font-medium">{startEpisode} - {startEpisode + episodeCount - 1}</span>
+                    <span className="text-muted-foreground">Total episodes to create: </span>
+                    <span className="font-medium">{totalEpisodes} files</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">ID range: </span>
-                    <span className="font-mono font-medium">{nextId} - {formatMetadataId(parseFormattedId(nextId) + episodeCount - 1)}</span>
+                    <span className="font-mono font-medium">{nextId} - {formatMetadataId(parseFormattedId(nextId) + totalEpisodes - 1)}</span>
                   </div>
                   
-                  {form.watch("channel") && (
+                  {form.watch("title") && (
                     <div>
-                      <span className="text-muted-foreground">Channel: </span>
-                      <span className="font-medium">{form.watch("channel")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("seriesTitle") && (
-                    <div>
-                      <span className="text-muted-foreground">Series Title: </span>
-                      <span className="font-medium">{form.watch("seriesTitle")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("programRating") && (
-                    <div>
-                      <span className="text-muted-foreground">Program Rating: </span>
-                      <span className="font-medium">{form.watch("programRating")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("productionCountry") && (
-                    <div>
-                      <span className="text-muted-foreground">Production Country: </span>
-                      <span className="font-medium">{form.watch("productionCountry")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("yearOfProduction") && (
-                    <div>
-                      <span className="text-muted-foreground">Year of Production: </span>
-                      <span className="font-medium">{form.watch("yearOfProduction")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("dateStart") && (
-                    <div>
-                      <span className="text-muted-foreground">Date Start: </span>
-                      <span className="font-medium">{format(form.watch("dateStart")!, "PPP")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("dateEnd") && (
-                    <div>
-                      <span className="text-muted-foreground">Date End: </span>
-                      <span className="font-medium">{format(form.watch("dateEnd")!, "PPP")}</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("catchUp") === 1 && (
-                    <div>
-                      <span className="text-muted-foreground">Catch-Up: </span>
-                      <span className="font-medium">Enabled</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("subtitles") === 1 && (
-                    <div>
-                      <span className="text-muted-foreground">Subtitles: </span>
-                      <span className="font-medium">Enabled</span>
-                    </div>
-                  )}
-                  
-                  {form.watch("segmented") === 1 && (
-                    <div>
-                      <span className="text-muted-foreground">Segmented: </span>
-                      <span className="font-medium">Enabled</span>
+                      <span className="text-muted-foreground">Title: </span>
+                      <span className="font-medium">{form.watch("title")}</span>
                     </div>
                   )}
                 </div>
@@ -810,7 +751,6 @@ export default function BatchCreate() {
             <Button
               type="submit"
               disabled={batchMutation.isPending}
-              data-testid="button-create-batch"
             >
               {batchMutation.isPending ? "Creating..." : "Create Batch"}
             </Button>

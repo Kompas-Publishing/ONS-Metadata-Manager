@@ -317,7 +317,7 @@ export default function ViewLicense() {
                         <h4 className="text-sm font-medium text-muted-foreground mb-2">Season {season}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                           {episodes.sort((a, b) => (a.episode || 0) - (b.episode || 0)).map((file) => (
-                            <Link key={file.id} href={`/files/${file.id}`}>
+                            <Link key={file.id} href={`/view/${file.id}`}>
                               <div className="flex items-center justify-between p-2 rounded border bg-muted/30 hover:bg-muted transition-colors cursor-pointer group">
                                 <span className="text-xs truncate font-medium">
                                   Ep {file.episode}: {file.episodeTitle || "Untitled"}
@@ -337,7 +337,6 @@ export default function ViewLicense() {
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">No content linked to this license yet.</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-2 font-mono">Query: /api/metadata?licenseId={id}</p>
               <Button variant="link" asChild>
                 <Link href={`/licenses/${id}/edit`}>Add content now</Link>
               </Button>
