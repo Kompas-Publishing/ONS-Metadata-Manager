@@ -55,7 +55,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
 
   const linkMutation = useMutation({
     mutationFn: async (metadataIds: string[]) => {
-      await apiRequest("PATCH", `/api/licenses/${licenseId}/link-metadata`, { metadataIds });
+      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseId, metadataIds });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Content linked to license successfully." });

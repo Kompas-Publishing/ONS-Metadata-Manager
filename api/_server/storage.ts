@@ -63,6 +63,9 @@ export interface IStorage {
   getAllGroups(): Promise<Group[]>;
   deleteGroup(groupId: string): Promise<boolean>;
 
+  // Multi-batch creation
+  createMultiBatchMetadataFiles(data: { batches: any[] }, permissions: UserPermissions): Promise<MetadataFile[]>;
+
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
   getLicense(id: string): Promise<License | undefined>;
@@ -506,6 +509,95 @@ export class DatabaseStorage implements IStorage {
         .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(files).returning();
+      return created;
+    });
+  }
+
+  async createMultiBatchMetadataFiles(data: { batches: any[] }, permissions: UserPermissions): Promise<MetadataFile[]> {
+    return await db.transaction(async (tx) => {
+      const [setting] = await tx
+        .select()
+        .from(settings)
+        .where(eq(settings.key, "next_id"));
+      
+      let currentId = 77362;
+      if (setting) {
+        currentId = parseInt(setting.value);
+      } else {
+        await tx.insert(settings).values({
+          key: "next_id",
+          value: currentId.toString(),
+        });
+      }
+
+      const allFiles: any[] = [];
+
+      for (const batch of data.batches) {
+        const normalizedBreakTimes = (batch.breakTimes || [])
+          .filter((t: any) => t && typeof t === 'string' && t.trim())
+          .map((t: any) => t.trim());
+        
+        const normalizedBreakTime = normalizedBreakTimes.length > 0 
+          ? normalizedBreakTimes[0] 
+          : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
+        
+        const finalBreakTimes = normalizedBreakTimes.length > 0 
+          ? normalizedBreakTimes 
+          : (normalizedBreakTime ? [normalizedBreakTime] : []);
+
+        for (const seasonConfig of batch.seasons) {
+          for (let i = 0; i < seasonConfig.episodeCount; i++) {
+            const fileData: any = {
+              id: formatMetadataId(currentId),
+              title: batch.title,
+              season: seasonConfig.season,
+              episode: seasonConfig.startEpisode + i,
+              duration: batch.duration || "00:00:00",
+              breakTime: normalizedBreakTime,
+              breakTimes: finalBreakTimes,
+              endCredits: batch.endCredits,
+              category: batch.category,
+              seasonType: batch.seasonType,
+              contentType: batch.contentType || "Long Form",
+              description: batch.description,
+              genre: batch.genre,
+              actors: batch.actors,
+              tags: [],
+              channel: batch.channel,
+              audioId: batch.audioId,
+              seriesTitle: batch.seriesTitle,
+              programRating: batch.programRating,
+              productionCountry: batch.productionCountry,
+              yearOfProduction: batch.yearOfProduction,
+              catchUp: batch.catchUp,
+              dateStart: batch.dateStart,
+              dateEnd: batch.dateEnd,
+              subtitles: batch.subtitles,
+              segmented: batch.segmented,
+              draft: batch.draft ?? 1,
+              licenseId: batch.licenseId,
+              createdBy: permissions.user.id,
+            };
+
+            if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
+              fileData.groupId = permissions.groupIds[0];
+            }
+            
+            allFiles.push(fileData);
+            currentId++;
+          }
+        }
+      }
+
+      await tx
+        .update(settings)
+        .set({
+          value: currentId.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(settings.key, "next_id"));
+
+      const created = await tx.insert(metadataFiles).values(allFiles).returning();
       return created;
     });
   }

@@ -950,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/licenses/:id/link-metadata", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/licenses/link-metadata", isAuthenticated, async (req: any, res: any) => {
     try {
       const userId = (req.user as any)?.id;
       if (!userId) {
@@ -968,6 +968,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const linkMetadataSchema = z.object({
+        licenseId: z.string(),
         metadataIds: z.array(z.string()),
       });
 
@@ -979,8 +980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const licenseId = req.params.id;
-      const { metadataIds } = validation.data;
+      const { licenseId, metadataIds } = validation.data;
 
       // Update all selected metadata files to point to this license
       await storage.bulkUpdateMetadata(
