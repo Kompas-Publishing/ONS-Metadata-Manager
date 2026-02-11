@@ -401,6 +401,9 @@ export class DatabaseStorage implements IStorage {
           })
           .where(and(...whereConditions))
           .returning();
+        
+        console.log(`[bulkUpdateMetadata] ID: ${update.id}, Data:`, update.data, `Result length: ${result.length}`);
+        
         if (result.length > 0) {
           count++;
         }

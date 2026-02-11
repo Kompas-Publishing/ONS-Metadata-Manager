@@ -16,12 +16,12 @@ export default apiHandler(
       }
 
       // Update all selected metadata files to point to this license
-      await storage.bulkUpdateMetadata(
+      const count = await storage.bulkUpdateMetadata(
         metadataIds.map((id: string) => ({ id, data: { licenseId } })),
         req.permissions!
       );
 
-      res.json({ message: "Metadata linked to license successfully" });
+      res.json({ message: "Metadata linked to license successfully", count });
     } catch (error) {
       console.error("Error linking metadata to license:", error);
       res.status(500).json({ message: "Failed to link metadata" });

@@ -41,7 +41,7 @@ export default function ViewLicense() {
   });
 
   const { data: linkedFiles, isLoading: isFilesLoading } = useQuery<MetadataFile[]>({
-    queryKey: [`/api/metadata`, { licenseId: id }],
+    queryKey: [`/api/metadata?licenseId=${id}`],
     enabled: !!id,
   });
 
@@ -337,6 +337,7 @@ export default function ViewLicense() {
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">No content linked to this license yet.</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-2 font-mono">Query: /api/metadata?licenseId={id}</p>
               <Button variant="link" asChild>
                 <Link href={`/licenses/${id}/edit`}>Add content now</Link>
               </Button>

@@ -23,6 +23,41 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Groups table for group-based file visibility
+export const groups = pgTable("groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Group = typeof groups.$inferSelect;
+export type InsertGroup = typeof groups.$inferInsert;
+
+// User storage table - Supports both password and OAuth authentication
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password"), // Nullable - only set for password-based auth, not OAuth
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  authProvider: varchar("auth_provider").default("local"), // local, google, github, etc.
+  isAdmin: integer("is_admin").default(0).notNull(), // 0 = regular user, 1 = super admin
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, active, archived
+  canRead: integer("can_read").default(0).notNull(), // 0 = no read permission, 1 = can read
+  canWrite: integer("can_write").default(0).notNull(), // 0 = no write/create permission, 1 = can write/create
+  canEdit: integer("can_edit").default(0).notNull(), // 0 = no edit permission, 1 = can edit
+  fileVisibility: varchar("file_visibility", { length: 20 }).default("own").notNull(), // own, all, group
+  groupIds: text("group_ids").array().default(sql`ARRAY[]::text[]`), // Array of group IDs user belongs to
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+
 // License table
 export const licenses = pgTable("licenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -65,41 +100,6 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
 
 export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
-
-// Groups table for group-based file visibility
-export const groups = pgTable("groups", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull().unique(),
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export type Group = typeof groups.$inferSelect;
-export type InsertGroup = typeof groups.$inferInsert;
-
-// User storage table - Supports both password and OAuth authentication
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique().notNull(),
-  password: varchar("password"), // Nullable - only set for password-based auth, not OAuth
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  authProvider: varchar("auth_provider").default("local"), // local, google, github, etc.
-  isAdmin: integer("is_admin").default(0).notNull(), // 0 = regular user, 1 = super admin
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, active, archived
-  canRead: integer("can_read").default(0).notNull(), // 0 = no read permission, 1 = can read
-  canWrite: integer("can_write").default(0).notNull(), // 0 = no write/create permission, 1 = can write/create
-  canEdit: integer("can_edit").default(0).notNull(), // 0 = no edit permission, 1 = can edit
-  fileVisibility: varchar("file_visibility", { length: 20 }).default("own").notNull(), // own, all, group
-  groupIds: text("group_ids").array().default(sql`ARRAY[]::text[]`), // Array of group IDs user belongs to
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
 
 // Metadata files table
 export const metadataFiles = pgTable("metadata_files", {
@@ -187,7 +187,63 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
 export type InsertMetadataFile = z.infer<typeof insertMetadataFileSchema>;
 export type MetadataFile = typeof metadataFiles.$inferSelect;
 
-// Batch creation schema
+// License Batch Generate Schema
+export const licenseBatchGenerateSchema = z.object({
+  licenseId: z.string(),
+  seriesTitle: z.string().min(1, "Series Title is required"),
+  seasonStart: z.number().int().positive(),
+  seasonEnd: z.number().int().positive(),
+  episodesPerSeason: z.number().int().positive(),
+});
+
+export type LicenseBatchGenerate = z.infer<typeof licenseBatchGenerateSchema>;
+
+// Enhanced batch creation schema
+export const batchSeasonSchema = z.object({
+  season: z.number().int().positive(),
+  episodeCount: z.number().int().positive().min(1).max(100),
+  startEpisode: z.number().int().positive().default(1),
+});
+
+export type BatchSeason = z.infer<typeof batchSeasonSchema>;
+
+export const enhancedBatchCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
+  seasons: z.array(batchSeasonSchema).min(1, "At least one season is required"),
+  duration: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
+  breakTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).nullable().optional(),
+  breakTimes: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)).optional().default([]),
+  endCredits: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
+  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
+  contentType: z.string().optional(),
+  description: z.string().optional(),
+  genre: z.array(z.string()).optional().default([]),
+  actors: z.array(z.string()).optional().default([]),
+  channel: z.string().optional().default("ONS"),
+  audioId: z.string().optional(),
+  seriesTitle: z.string().optional(),
+  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
+  productionCountry: z.string().optional(),
+  yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
+  catchUp: z.number().int().min(0).max(1).optional(),
+  dateStart: z.coerce.date().optional(),
+  dateEnd: z.coerce.date().optional(),
+  subtitles: z.number().int().min(0).max(1).optional(),
+  segmented: z.number().int().min(0).max(1).optional(),
+  draft: z.number().int().min(0).max(1).optional().default(1),
+  licenseId: z.string().optional(),
+});
+
+export type EnhancedBatchCreate = z.infer<typeof enhancedBatchCreateSchema>;
+
+export const multiBatchCreateSchema = z.object({
+  batches: z.array(enhancedBatchCreateSchema).min(1),
+});
+
+export type MultiBatchCreate = z.infer<typeof multiBatchCreateSchema>;
+
+// Batch creation schema (Original, kept for backward compatibility)
 export const batchCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),
   season: z.number().int().positive(),
@@ -246,14 +302,3 @@ export const insertUserDefinedTagSchema = createInsertSchema(userDefinedTags, {
 
 export type InsertUserDefinedTag = z.infer<typeof insertUserDefinedTagSchema>;
 export type UserDefinedTag = typeof userDefinedTags.$inferSelect;
-
-// License Batch Generate Schema
-export const licenseBatchGenerateSchema = z.object({
-  licenseId: z.string(),
-  seriesTitle: z.string().min(1, "Series Title is required"),
-  seasonStart: z.number().int().positive(),
-  seasonEnd: z.number().int().positive(),
-  episodesPerSeason: z.number().int().positive(),
-});
-
-export type LicenseBatchGenerate = z.infer<typeof licenseBatchGenerateSchema>;

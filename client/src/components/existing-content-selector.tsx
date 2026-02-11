@@ -37,7 +37,7 @@ export function ExistingContentSelector({
   });
 
   const { data: alreadyLinkedFiles } = useQuery<MetadataFile[]>({
-    queryKey: ["/api/metadata", { licenseId }],
+    queryKey: [`/api/metadata?licenseId=${licenseId}`],
     enabled: !!licenseId,
   });
 
