@@ -63,6 +63,13 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
       setIsOpen(false);
       setSelectedExistingIds([]);
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to link metadata",
+        variant: "destructive",
+      });
+    },
   });
 
   const createBatchMutation = useMutation({
@@ -74,6 +81,13 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       setIsOpen(false);
       form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create batch content",
+        variant: "destructive",
+      });
     },
   });
 
