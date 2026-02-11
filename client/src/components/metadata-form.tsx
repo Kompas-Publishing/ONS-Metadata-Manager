@@ -215,7 +215,11 @@ export function MetadataForm({
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a license (optional)" />
+                          {readOnly && field.value ? (
+                            <span>{licenses?.find(l => l.id === field.value)?.name || "Linked License"}</span>
+                          ) : (
+                            <SelectValue placeholder="Select a license (optional)" />
+                          )}
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
