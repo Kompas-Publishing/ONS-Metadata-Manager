@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Loader2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { LicenseContentManager } from "@/components/license-content-manager";
 
 const CURRENCIES = [
   { label: "EUR (€)", value: "EUR" },
@@ -393,6 +394,8 @@ export default function EditLicense() {
           </Form>
         </CardContent>
       </Card>
+
+      {id && <LicenseContentManager licenseId={id} />}
     </div>
   );
 }

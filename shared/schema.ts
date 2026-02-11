@@ -198,24 +198,29 @@ export const licenseBatchGenerateSchema = z.object({
 
 export type LicenseBatchGenerate = z.infer<typeof licenseBatchGenerateSchema>;
 
-// Batch creation schema
-export const batchCreateSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+// Enhanced batch creation schema
+export const batchSeasonSchema = z.object({
   season: z.number().int().positive(),
-  startEpisode: z.number().int().positive().default(1),
   episodeCount: z.number().int().positive().min(1).max(100),
+  startEpisode: z.number().int().positive().default(1),
+});
+
+export type BatchSeason = z.infer<typeof batchSeasonSchema>;
+
+export const enhancedBatchCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
+  seasons: z.array(batchSeasonSchema).min(1, "At least one season is required"),
   duration: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
   breakTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).nullable().optional(),
   breakTimes: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)).optional().default([]),
   endCredits: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
-  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
   seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
   contentType: z.string().optional(),
-  // Batch-level fields that apply to all episodes
   description: z.string().optional(),
   genre: z.array(z.string()).optional().default([]),
   actors: z.array(z.string()).optional().default([]),
-  channel: z.string().optional(),
+  channel: z.string().optional().default("ONS"),
   audioId: z.string().optional(),
   seriesTitle: z.string().optional(),
   programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
@@ -226,10 +231,17 @@ export const batchCreateSchema = z.object({
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   segmented: z.number().int().min(0).max(1).optional(),
-  draft: z.number().int().min(0).max(1).optional(),
+  draft: z.number().int().min(0).max(1).optional().default(1),
+  licenseId: z.string().optional(),
 });
 
-export type BatchCreate = z.infer<typeof batchCreateSchema>;
+export type EnhancedBatchCreate = z.infer<typeof enhancedBatchCreateSchema>;
+
+export const multiBatchCreateSchema = z.object({
+  batches: z.array(enhancedBatchCreateSchema).min(1),
+});
+
+export type MultiBatchCreate = z.infer<typeof multiBatchCreateSchema>;
 
 // Settings table for storing the next ID counter
 export const settings = pgTable("settings", {

@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { LicenseContentManager } from "@/components/license-content-manager";
 
 const CURRENCIES = [
   { label: "EUR (€)", value: "EUR" },
@@ -50,10 +51,13 @@ export default function CreateLicense() {
     },
   });
 
-  const onSubmit = async (data: InsertLicense) => {
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
+  const onSubmit = async (data: InsertLicense, redirect: boolean = true) => {
     setIsSubmitting(true);
     try {
-      await apiRequest("POST", "/api/licenses", data);
+      const response = await apiRequest("POST", "/api/licenses", data);
+      const newLicense = await response.json();
       
       toast({
         title: "Success",
@@ -61,7 +65,12 @@ export default function CreateLicense() {
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
-      setLocation("/licenses");
+      
+      if (redirect) {
+        setLocation("/licenses");
+      } else {
+        setCreatedId(newLicense.id);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -85,7 +94,7 @@ export default function CreateLicense() {
       <Card>
         <CardContent className="pt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -348,6 +357,17 @@ export default function CreateLicense() {
                 <Button variant="outline" type="button" onClick={() => setLocation("/licenses")}>
                   Cancel
                 </Button>
+                {!createdId && (
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    disabled={isSubmitting}
+                    onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
+                  >
+                    {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Save & Add Content
+                  </Button>
+                )}
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Create License
@@ -357,6 +377,8 @@ export default function CreateLicense() {
           </Form>
         </CardContent>
       </Card>
+
+      {createdId && <LicenseContentManager licenseId={createdId} />}
     </div>
   );
 }

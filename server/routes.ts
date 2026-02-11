@@ -904,6 +904,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/metadata/multi-batch", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "write",
+      );
+
+      if (!allowed) {
+        const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+        return res.status(statusCode).json({ message: reason });
+      }
+
+      const multiBatchCreateSchema = z.object({
+        batches: z.array(z.any()), // We'll let storage handle detailed validation or use the schema from shared
+      });
+
+      const validation = multiBatchCreateSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const files = await storage.createMultiBatchMetadataFiles(
+        validation.data as any,
+        permissions!,
+      );
+
+      res.json({
+        message: "Multi-batch created successfully",
+        count: files.length,
+        files,
+      });
+    } catch (error) {
+      console.error("Error creating multi-batch:", error);
+      res.status(500).json({ message: "Failed to create multi-batch" });
+    }
+  });
+
+  app.patch("/api/licenses/:id/link-metadata", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "edit",
+      );
+
+      if (!allowed) {
+        const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+        return res.status(statusCode).json({ message: reason });
+      }
+
+      const linkMetadataSchema = z.object({
+        metadataIds: z.array(z.string()),
+      });
+
+      const validation = linkMetadataSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const licenseId = req.params.id;
+      const { metadataIds } = validation.data;
+
+      // Update all selected metadata files to point to this license
+      await storage.bulkUpdateMetadata(
+        metadataIds.map(id => ({ id, data: { licenseId } })),
+        permissions!
+      );
+
+      res.json({ message: "Metadata linked to license successfully" });
+    } catch (error) {
+      console.error("Error linking metadata to license:", error);
+      res.status(500).json({ message: "Failed to link metadata" });
+    }
+  });
+
   app.get(
     "/api/metadata/download/series/:title/:format",
     isAuthenticated,
