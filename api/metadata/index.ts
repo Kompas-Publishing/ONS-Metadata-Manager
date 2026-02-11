@@ -8,7 +8,11 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "GET") {
     return requirePermission("read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const files = await storage.getAllMetadataFiles(req.permissions!);
+        const { licenseId } = req.query;
+        const files = await storage.getAllMetadataFiles(
+          req.permissions!,
+          typeof licenseId === "string" ? licenseId : undefined
+        );
         res.json(files);
       } catch (error) {
         console.error("Error fetching metadata files:", error);

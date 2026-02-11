@@ -11,10 +11,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface ExistingContentSelectorProps {
   onSelect: (selectedIds: string[]) => void;
   selectedIds: string[];
+  licenseId?: string;
 }
 
 interface GroupedMetadata {
@@ -26,12 +28,23 @@ interface GroupedMetadata {
 export function ExistingContentSelector({
   onSelect,
   selectedIds,
+  licenseId,
 }: ExistingContentSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
   });
+
+  const { data: alreadyLinkedFiles } = useQuery<MetadataFile[]>({
+    queryKey: ["/api/metadata", { licenseId }],
+    enabled: !!licenseId,
+  });
+
+  const alreadyLinkedIds = useMemo(() => 
+    new Set((alreadyLinkedFiles || []).map(f => f.id)),
+    [alreadyLinkedFiles]
+  );
 
   const groupedMetadata = useMemo(() => {
     if (!files) return {};
@@ -162,22 +175,30 @@ export function ExistingContentSelector({
                             </AccordionTrigger>
                           </div>
                           <AccordionContent className="pl-6 pt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {seasonFiles.map((file) => (
-                              <div key={file.id} className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`file-${file.id}`}
-                                  checked={selectedIds.includes(file.id)}
-                                  onCheckedChange={() => handleToggleFile(file.id)}
-                                />
-                                <label
-                                  htmlFor={`file-${file.id}`}
-                                  className="text-xs cursor-pointer truncate"
-                                  title={`${file.title} - Ep ${file.episode}`}
-                                >
-                                  Ep {file.episode}: {file.episodeTitle || file.title}
-                                </label>
-                              </div>
-                            ))}
+                            {seasonFiles.map((file) => {
+                              const isLinked = alreadyLinkedIds.has(file.id);
+                              return (
+                                <div key={file.id} className="flex items-center gap-2">
+                                  <Checkbox
+                                    id={`file-${file.id}`}
+                                    checked={selectedIds.includes(file.id) || isLinked}
+                                    disabled={isLinked}
+                                    onCheckedChange={() => handleToggleFile(file.id)}
+                                  />
+                                  <label
+                                    htmlFor={`file-${file.id}`}
+                                    className={cn(
+                                      "text-xs cursor-pointer truncate",
+                                      isLinked && "text-muted-foreground italic"
+                                    )}
+                                    title={`${file.title} - Ep ${file.episode}${isLinked ? " (Already linked)" : ""}`}
+                                  >
+                                    Ep {file.episode}: {file.episodeTitle || file.title}
+                                    {isLinked && " (Linked)"}
+                                  </label>
+                                </div>
+                              );
+                            })}
                           </AccordionContent>
                         </AccordionItem>
                       );

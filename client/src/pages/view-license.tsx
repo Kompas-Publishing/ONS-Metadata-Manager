@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Trash2, Calendar, FileText, Link as LinkIcon, ExternalLink, Copy, Edit, Banknote, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
-import type { License } from "@shared/schema";
+import type { License, MetadataFile } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Layers } from "lucide-react";
 
 export default function ViewLicense() {
   const [, params] = useRoute("/licenses/:id");
@@ -28,10 +35,24 @@ export default function ViewLicense() {
   const queryClient = useQueryClient();
   const id = params?.id;
 
-  const { data: license, isLoading } = useQuery<License>({
+  const { data: license, isLoading: isLicenseLoading } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
     enabled: !!id,
   });
+
+  const { data: linkedFiles, isLoading: isFilesLoading } = useQuery<MetadataFile[]>({
+    queryKey: [`/api/metadata`, { licenseId: id }],
+    enabled: !!id,
+  });
+
+  const groupedFiles = (linkedFiles || []).reduce((acc, file) => {
+    const seriesTitle = file.seriesTitle || file.title || "Unknown Series";
+    const season = file.season?.toString() || "No Season";
+    if (!acc[seriesTitle]) acc[seriesTitle] = {};
+    if (!acc[seriesTitle][season]) acc[seriesTitle][season] = [];
+    acc[seriesTitle][season].push(file);
+    return acc;
+  }, {} as Record<string, Record<string, MetadataFile[]>>);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -73,7 +94,7 @@ export default function ViewLicense() {
     }).format(amount);
   };
 
-  if (isLoading) {
+  if (isLicenseLoading || isFilesLoading) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -268,6 +289,61 @@ export default function ViewLicense() {
           </div>
         </div>
       </div>
+
+      {/* Linked Content Section */}
+      <Card>
+        <CardHeader className="border-b pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              Linked Content ({linkedFiles?.length || 0})
+            </CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/licenses/${id}/edit`}>Manage Content</Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {linkedFiles && linkedFiles.length > 0 ? (
+            <Accordion type="multiple" className="w-full">
+              {Object.entries(groupedFiles).map(([seriesTitle, seasons]) => (
+                <AccordionItem key={seriesTitle} value={seriesTitle} className="border rounded-lg mb-4 px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <span className="font-semibold">{seriesTitle}</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                    {Object.entries(seasons).map(([season, episodes]) => (
+                      <div key={season} className="mb-4 last:mb-0">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Season {season}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {episodes.sort((a, b) => (a.episode || 0) - (b.episode || 0)).map((file) => (
+                            <Link key={file.id} href={`/files/${file.id}`}>
+                              <div className="flex items-center justify-between p-2 rounded border bg-muted/30 hover:bg-muted transition-colors cursor-pointer group">
+                                <span className="text-xs truncate font-medium">
+                                  Ep {file.episode}: {file.episodeTitle || "Untitled"}
+                                </span>
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0" />
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed rounded-lg">
+              <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">No content linked to this license yet.</p>
+              <Button variant="link" asChild>
+                <Link href={`/licenses/${id}/edit`}>Add content now</Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

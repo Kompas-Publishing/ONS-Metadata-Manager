@@ -34,7 +34,7 @@ export interface IStorage {
   consumeNextId(): Promise<string>;
   getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined>;
   getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
-  getAllMetadataFiles(permissions: UserPermissions): Promise<MetadataFile[]>;
+  getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]>;
   getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
   updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
@@ -245,7 +245,7 @@ export class DatabaseStorage implements IStorage {
     return files.map(normalizeMetadataFile);
   }
 
-  async getAllMetadataFiles(permissions: UserPermissions): Promise<MetadataFile[]> {
+  async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
@@ -258,6 +258,10 @@ export class DatabaseStorage implements IStorage {
       } else {
         whereConditions.push(sql`1 = 0`);
       }
+    }
+
+    if (licenseId) {
+      whereConditions.push(eq(metadataFiles.licenseId, licenseId));
     }
     
     const files = await db

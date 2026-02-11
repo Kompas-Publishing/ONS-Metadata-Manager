@@ -512,7 +512,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(statusCode).json({ message: reason });
       }
 
-      const files = await storage.getAllMetadataFiles(permissions!);
+      const { licenseId } = req.query;
+      const files = await storage.getAllMetadataFiles(
+        permissions!,
+        typeof licenseId === "string" ? licenseId : undefined
+      );
       res.json(files);
     } catch (error) {
       console.error("Error fetching metadata files:", error);
@@ -735,6 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "catchUp",
           "subtitles",
           "segmented",
+          "licenseId",
         ];
 
         const sanitized = validation.data.updates.map((u) => {

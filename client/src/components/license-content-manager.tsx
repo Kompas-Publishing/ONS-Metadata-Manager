@@ -144,6 +144,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
               <ExistingContentSelector
                 selectedIds={selectedExistingIds}
                 onSelect={setSelectedExistingIds}
+                licenseId={licenseId}
               />
             </TabsContent>
 
