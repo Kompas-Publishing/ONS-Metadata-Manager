@@ -243,6 +243,39 @@ export const multiBatchCreateSchema = z.object({
 
 export type MultiBatchCreate = z.infer<typeof multiBatchCreateSchema>;
 
+// Batch creation schema (Original, kept for backward compatibility)
+export const batchCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  season: z.number().int().positive(),
+  startEpisode: z.number().int().positive().default(1),
+  episodeCount: z.number().int().positive().min(1).max(100),
+  duration: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
+  breakTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).nullable().optional(),
+  breakTimes: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)).optional().default([]),
+  endCredits: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
+  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
+  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
+  contentType: z.string().optional(),
+  // Batch-level fields that apply to all episodes
+  description: z.string().optional(),
+  genre: z.array(z.string()).optional().default([]),
+  actors: z.array(z.string()).optional().default([]),
+  channel: z.string().optional(),
+  audioId: z.string().optional(),
+  seriesTitle: z.string().optional(),
+  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
+  productionCountry: z.string().optional(),
+  yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
+  catchUp: z.number().int().min(0).max(1).optional(),
+  dateStart: z.coerce.date().optional(),
+  dateEnd: z.coerce.date().optional(),
+  subtitles: z.number().int().min(0).max(1).optional(),
+  segmented: z.number().int().min(0).max(1).optional(),
+  draft: z.number().int().min(0).max(1).optional(),
+});
+
+export type BatchCreate = z.infer<typeof batchCreateSchema>;
+
 // Settings table for storing the next ID counter
 export const settings = pgTable("settings", {
   key: varchar("key").primaryKey(),
