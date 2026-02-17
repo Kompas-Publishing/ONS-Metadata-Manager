@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MetadataFile } from "@shared/schema";
+import type { MetadataFile } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Accordion,

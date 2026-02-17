@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Trash2, Calendar, FileText, Link as LinkIcon, ExternalLink, Copy, Edit, Banknote, ShieldCheck } from "lucide-react";
+import { SiGoogledrive } from "react-icons/si";
 import { format } from "date-fns";
 import type { License, MetadataFile } from "@shared/schema";
 import {
@@ -288,6 +289,7 @@ export default function ViewLicense() {
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1 border-blue-200 hover:bg-blue-50 hover:text-blue-700" asChild>
                       <a href={license.googleDriveLink} target="_blank" rel="noopener noreferrer">
+                        <SiGoogledrive className="w-3 h-3 mr-2 text-[#4285F4]" />
                         Open Assets <ExternalLink className="w-3 h-3 ml-2" />
                       </a>
                     </Button>

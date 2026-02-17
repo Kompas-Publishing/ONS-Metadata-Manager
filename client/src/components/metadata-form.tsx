@@ -33,7 +33,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, X, Check, ChevronsUpDown, FileKey } from "lucide-react";
+import { CalendarIcon, X, Check, ChevronsUpDown, FileKey, ExternalLink } from "lucide-react";
+import { SiGoogledrive } from "react-icons/si";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -452,14 +453,29 @@ export function MetadataForm({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Google Drive Link</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="https://drive.google.com/..."
-                              {...field}
-                              value={field.value || ""}
-                              data-testid="input-google-drive-link"
-                            />
-                          </FormControl>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input
+                                placeholder="https://drive.google.com/..."
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-google-drive-link"
+                                readOnly={readOnly}
+                                className={cn(readOnly && "bg-muted font-mono text-xs")}
+                              />
+                            </FormControl>
+                            {field.value && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="shrink-0 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                onClick={() => window.open(field.value, '_blank', 'noopener,noreferrer')}
+                              >
+                                <SiGoogledrive className="w-4 h-4 mr-2 text-[#4285F4]" />
+                                Open Assets
+                              </Button>
+                            )}
+                          </div>
                           <FormDescription>
                             Link to promotional material, thumbnails, or videos
                           </FormDescription>

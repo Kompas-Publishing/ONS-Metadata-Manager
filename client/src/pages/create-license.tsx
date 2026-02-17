@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
 
+import { z } from "zod";
+
 const CURRENCIES = [
   { label: "EUR (€)", value: "EUR" },
   { label: "USD ($)", value: "USD" },
@@ -29,6 +31,11 @@ const CURRENCIES = [
 
 const RATINGS = ["AL", "6", "9", "12", "16", "18"];
 
+// Extended schema for the form
+const createLicenseFormSchema = insertLicenseSchema.extend({
+  metadataIds: z.array(z.string()).optional(),
+});
+
 export default function CreateLicense() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -36,10 +43,8 @@ export default function CreateLicense() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMetadataIds, setSelectedMetadataIds] = useState<string[]>([]);
 
-  const form = useForm<InsertLicense & { metadataIds?: string[] }>({
-    resolver: zodResolver(insertLicenseSchema.extend({
-      metadataIds: zodResolver(insertLicenseSchema)._def.schema.optional() as any
-    })),
+  const form = useForm<z.infer<typeof createLicenseFormSchema>>({
+    resolver: zodResolver(createLicenseFormSchema),
     defaultValues: {
       name: "",
       distributor: "",
@@ -53,6 +58,7 @@ export default function CreateLicense() {
       imdbLink: "",
       googleDriveLink: "",
       notes: "",
+      metadataIds: [],
     },
   });
 
