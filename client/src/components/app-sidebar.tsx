@@ -17,25 +17,33 @@ import {
   LayoutDashboard,
   FilePlus,
   Layers,
-  List,
-  FileText,
-  LogOut,
-  Shield,
-  FileKey,
-} from "lucide-react";
-
-const allMenuItems = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-    testId: "nav-dashboard",
-    adminOnly: false,
-    requiresWrite: false,
-  },
-  {
-    title: "License Manager",
-    url: "/licenses",
+    List,
+    FileText,
+    LogOut,
+    Shield,
+    FileKey,
+    CheckSquare,
+  } from "lucide-react";
+  
+  const allMenuItems = [
+    {
+      title: "Dashboard",
+      url: "/",
+      icon: LayoutDashboard,
+      testId: "nav-dashboard",
+      adminOnly: false,
+      requiresWrite: false,
+    },
+    {
+      title: "Task List",
+      url: "/tasks",
+      icon: CheckSquare,
+      testId: "nav-tasks",
+      adminOnly: false,
+      requiresWrite: false,
+    },
+    {
+      title: "License Manager",    url: "/licenses",
     icon: FileKey,
     testId: "nav-licenses",
     adminOnly: false, // Or true if you want to restrict it

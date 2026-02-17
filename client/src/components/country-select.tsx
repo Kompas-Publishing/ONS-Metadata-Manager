@@ -21,9 +21,10 @@ interface CountrySelectProps {
   value?: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-export function CountrySelect({ value, onChange, placeholder = "Select country..." }: CountrySelectProps) {
+export function CountrySelect({ value, onChange, placeholder = "Select country...", disabled = false }: CountrySelectProps) {
   const [open, setOpen] = useState(false);
 
   const handleClear = (e: React.MouseEvent) => {
@@ -33,7 +34,7 @@ export function CountrySelect({ value, onChange, placeholder = "Select country..
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={disabled ? () => {} : setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -41,12 +42,13 @@ export function CountrySelect({ value, onChange, placeholder = "Select country..
           aria-expanded={open}
           className="w-full justify-between font-normal"
           data-testid="input-production-country"
+          disabled={disabled}
         >
           <span className={cn(!value && "text-muted-foreground")}>
             {value || placeholder}
           </span>
           <div className="flex items-center gap-2">
-            {value && (
+            {value && !disabled && (
               <X
                 className="h-4 w-4 shrink-0 opacity-50 hover:opacity-100"
                 onClick={handleClear}

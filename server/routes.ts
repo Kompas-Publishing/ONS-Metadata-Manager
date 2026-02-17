@@ -10,6 +10,7 @@ import {
   insertUserDefinedTagSchema,
   insertLicenseSchema,
   licenseBatchGenerateSchema,
+  insertTaskSchema,
   type InsertMetadataFile,
 } from "@shared/schema";
 import { create } from "xmlbuilder2";
@@ -1934,6 +1935,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating license drafts:", error);
       res.status(500).json({ message: "Failed to generate drafts" });
+    }
+  });
+
+  // Task Management Routes
+  app.get("/api/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const permissions = await getUserPermissions(userId);
+      if (!permissions) return res.status(403).json({ message: "Unauthorized" });
+
+      const { status } = req.query;
+      const tasksList = await storage.listTasks(permissions, typeof status === "string" ? status : undefined);
+      res.json(tasksList);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  app.get("/api/metadata/:id/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const permissions = await getUserPermissions(userId);
+      if (!permissions) return res.status(403).json({ message: "Unauthorized" });
+
+      const fileTasks = await storage.getTasksByFileId(req.params.id, permissions);
+      res.json(fileTasks);
+    } catch (error) {
+      console.error("Error fetching file tasks:", error);
+      res.status(500).json({ message: "Failed to fetch file tasks" });
+    }
+  });
+
+  app.post("/api/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const validation = insertTaskSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const task = await storage.createTask({
+        ...validation.data,
+        createdBy: userId,
+      });
+      res.json(task);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
+
+      const validation = insertTaskSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const updated = await storage.updateTask(taskId, validation.data);
+      if (!updated) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
+
+      const success = await storage.deleteTask(taskId);
+      if (!success) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      res.json({ message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ message: "Failed to delete task" });
     }
   });
 

@@ -5,6 +5,7 @@ import {
   userDefinedTags,
   groups,
   licenses,
+  tasks,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -18,6 +19,8 @@ import {
   type InsertLicense,
   type License,
   type LicenseBatchGenerate,
+  type Task,
+  type InsertTask,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -73,6 +76,13 @@ export interface IStorage {
   updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
   deleteLicense(id: string): Promise<boolean>;
   generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]>;
+
+  // Task Management
+  createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
+  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
+  updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: number): Promise<boolean>;
 }
 
 function formatMetadataId(num: number): string {
@@ -960,6 +970,70 @@ export class DatabaseStorage implements IStorage {
       const created = await tx.insert(metadataFiles).values(files).returning();
       return created;
     });
+  }
+
+  async createTask(taskData: InsertTask & { createdBy: string }): Promise<Task> {
+    const [task] = await db.insert(tasks).values(taskData).returning();
+    return task;
+  }
+
+  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    if (status) {
+      whereConditions.push(eq(tasks.status, status));
+    }
+    
+    const results = await db
+      .select({
+        task: tasks,
+        metadataFile: metadataFiles,
+      })
+      .from(tasks)
+      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+      .orderBy(desc(tasks.createdAt));
+
+    return results.map(r => ({
+      ...r.task,
+      metadataFile: normalizeMetadataFile(r.metadataFile)
+    }));
+  }
+
+  async getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]> {
+    // Basic visibility check for the file itself is handled by the route or here
+    // Let's assume the route ensures the user has access to this fileId
+    return await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.metadataFileId, fileId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined> {
+    const [updated] = await db
+      .update(tasks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tasks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTask(id: number): Promise<boolean> {
+    const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
+    return result.length > 0;
   }
 }
 

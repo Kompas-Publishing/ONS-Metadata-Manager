@@ -308,3 +308,28 @@ export const insertUserDefinedTagSchema = createInsertSchema(userDefinedTags, {
 
 export type InsertUserDefinedTag = z.infer<typeof insertUserDefinedTagSchema>;
 export type UserDefinedTag = typeof userDefinedTags.$inferSelect;
+
+// Tasks table for metadata files
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
+  description: text("description").notNull(), // e.g., "heeft meta nodig"
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, completed
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks, {
+  metadataFileId: z.string().min(1),
+  description: z.string().min(1, "Description is required"),
+  status: z.enum(["pending", "completed"]).optional(),
+}).omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;

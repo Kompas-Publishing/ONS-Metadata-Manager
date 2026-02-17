@@ -24,6 +24,7 @@ import Licenses from "@/pages/licenses";
 import CreateLicense from "@/pages/create-license";
 import ViewLicense from "@/pages/view-license";
 import EditLicense from "@/pages/edit-license";
+import Tasks from "@/pages/tasks";
 
 function Router() {
   return (
@@ -124,6 +125,14 @@ function Router() {
         <AuthenticatedRoute>
           <ProtectedLayout>
             <EditLicense />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/tasks">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <Tasks />
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>
