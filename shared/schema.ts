@@ -73,6 +73,7 @@ export const licenses = pgTable("licenses", {
   contentRating: text("content_rating"),
   description: text("description"),
   imdbLink: text("imdb_link"),
+  googleDriveLink: text("google_drive_link"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -91,6 +92,7 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
   contentRating: z.string().optional(),
   description: z.string().optional(),
   imdbLink: z.string().optional(),
+  googleDriveLink: z.string().optional(),
   notes: z.string().optional(),
 }).omit({
   id: true,
@@ -135,6 +137,7 @@ export const metadataFiles = pgTable("metadata_files", {
   dateEnd: timestamp("date_end"), // Availability end date
   subtitles: integer("subtitles"), // Subtitle availability (0 or 1 as boolean)
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
+  googleDriveLink: text("google_drive_link"),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
   licenseId: varchar("license_id").references(() => licenses.id), // Link to license
   createdBy: varchar("created_by").references(() => users.id),
@@ -175,6 +178,7 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   subtitlesId: z.string().optional(),
+  googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
   licenseId: z.string().optional(),
 }).omit({
@@ -231,6 +235,7 @@ export const enhancedBatchCreateSchema = z.object({
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   segmented: z.number().int().min(0).max(1).optional(),
+  googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional().default(1),
   licenseId: z.string().optional(),
 });
@@ -271,6 +276,7 @@ export const batchCreateSchema = z.object({
   dateEnd: z.coerce.date().optional(),
   subtitles: z.number().int().min(0).max(1).optional(),
   segmented: z.number().int().min(0).max(1).optional(),
+  googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
 });
 

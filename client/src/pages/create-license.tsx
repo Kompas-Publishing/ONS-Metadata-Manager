@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertLicenseSchema, type InsertLicense } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, Database } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
+import { ExistingContentSelector } from "@/components/existing-content-selector";
 
 const CURRENCIES = [
   { label: "EUR (€)", value: "EUR" },
@@ -33,9 +34,12 @@ export default function CreateLicense() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedMetadataIds, setSelectedMetadataIds] = useState<string[]>([]);
 
-  const form = useForm<InsertLicense>({
-    resolver: zodResolver(insertLicenseSchema),
+  const form = useForm<InsertLicense & { metadataIds?: string[] }>({
+    resolver: zodResolver(insertLicenseSchema.extend({
+      metadataIds: zodResolver(insertLicenseSchema)._def.schema.optional() as any
+    })),
     defaultValues: {
       name: "",
       distributor: "",
@@ -47,6 +51,7 @@ export default function CreateLicense() {
       contentRating: "",
       description: "",
       imdbLink: "",
+      googleDriveLink: "",
       notes: "",
     },
   });
@@ -56,12 +61,19 @@ export default function CreateLicense() {
   const onSubmit = async (data: InsertLicense, redirect: boolean = true) => {
     setIsSubmitting(true);
     try {
-      const response = await apiRequest("POST", "/api/licenses", data);
+      const payload = {
+        ...data,
+        metadataIds: selectedMetadataIds,
+      };
+      
+      const response = await apiRequest("POST", "/api/licenses", payload);
       const newLicense = await response.json();
       
       toast({
         title: "Success",
-        description: "License created successfully.",
+        description: selectedMetadataIds.length > 0 
+          ? `License created and ${selectedMetadataIds.length} items linked.`
+          : "License created successfully.",
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
@@ -70,6 +82,13 @@ export default function CreateLicense() {
         setLocation("/licenses");
       } else {
         setCreatedId(newLicense.id);
+        // Scroll to content manager if it appears
+        setTimeout(() => {
+          const element = document.getElementById("content-manager");
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 100);
       }
     } catch (error: any) {
       toast({
@@ -91,11 +110,16 @@ export default function CreateLicense() {
         </p>
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))} className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>License Information</CardTitle>
+              <CardDescription>Enter the primary details of the license contract</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* ... existing fields ... */}
                 <FormField
                   control={form.control}
                   name="name"
@@ -323,62 +347,105 @@ export default function CreateLicense() {
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="googleDriveLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Drive Link</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://drive.google.com/..." {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormDescription>
+                        Link to promotional material, thumbnails, or videos
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description (Omschrijving)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Content description..." {...field} value={field.value || ""} className="min-h-[100px]" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 gap-6 mt-6">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Omschrijving)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Content description..." {...field} value={field.value || ""} className="min-h-[100px]" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Extra Notes</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Any internal notes or comments..." {...field} value={field.value || ""} className="min-h-[80px]" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-4 border-t pt-6">
-                <Button variant="outline" type="button" onClick={() => setLocation("/licenses")}>
-                  Cancel
-                </Button>
-                {!createdId && (
-                  <Button 
-                    type="button" 
-                    variant="secondary" 
-                    disabled={isSubmitting}
-                    onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
-                  >
-                    {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Save & Add Content
-                  </Button>
-                )}
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Create License
-                </Button>
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Extra Notes</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Any internal notes or comments..." {...field} value={field.value || ""} className="min-h-[80px]" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {createdId && <LicenseContentManager licenseId={createdId} />}
+          {!createdId && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-primary" />
+                  <CardTitle>Link Initial Content</CardTitle>
+                </div>
+                <CardDescription>
+                  Optional: Select existing metadata files to link to this license upon creation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ExistingContentSelector
+                  selectedIds={selectedMetadataIds}
+                  onSelect={setSelectedMetadataIds}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex justify-end gap-4 border-t pt-6">
+            <Button variant="outline" type="button" onClick={() => setLocation("/licenses")}>
+              Cancel
+            </Button>
+            {!createdId && (
+              <Button 
+                type="button" 
+                variant="secondary" 
+                disabled={isSubmitting}
+                onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save & Add More Content
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Create License
+            </Button>
+          </div>
+        </form>
+      </Form>
+
+      {createdId && (
+        <div id="content-manager">
+          <LicenseContentManager licenseId={createdId} />
+        </div>
+      )}
     </div>
   );
 }

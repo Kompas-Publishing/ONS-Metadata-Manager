@@ -53,6 +53,7 @@ export default function EditLicense() {
       contentRating: "",
       description: "",
       imdbLink: "",
+      googleDriveLink: "",
       notes: "",
     },
   });
@@ -72,6 +73,7 @@ export default function EditLicense() {
         contentRating: license.contentRating || "",
         description: license.description || "",
         imdbLink: license.imdbLink || "",
+        googleDriveLink: license.googleDriveLink || "",
         notes: license.notes || "",
       });
     }
@@ -347,6 +349,23 @@ export default function EditLicense() {
                       <FormControl>
                         <Input placeholder="https://www.imdb.com/title/..." {...field} value={field.value || ""} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="googleDriveLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Drive Link</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://drive.google.com/..." {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormDescription>
+                        Link to promotional material, thumbnails, or videos
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

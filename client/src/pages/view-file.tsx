@@ -168,6 +168,7 @@ export default function ViewFile() {
             subtitles: file.subtitles ?? undefined,
             subtitlesId: file.subtitlesId ?? "",
             audioId: file.audioId ?? "",
+            googleDriveLink: file.googleDriveLink ?? "",
             originalFilename: file.originalFilename ?? "",
           }}
           onSubmit={() => {}}

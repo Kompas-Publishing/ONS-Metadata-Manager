@@ -121,6 +121,7 @@ export function MetadataForm({
       audioId: undefined,
       originalFilename: "",
       subtitlesId: "",
+      googleDriveLink: "",
       catchUp: undefined,
       segmented: undefined,
       subtitles: undefined,
@@ -443,6 +444,28 @@ export function MetadataForm({
                       <FormMessage />
                       </FormItem>
                     )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="googleDriveLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Google Drive Link</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="https://drive.google.com/..."
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-google-drive-link"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Link to promotional material, thumbnails, or videos
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
 
                     <FormField

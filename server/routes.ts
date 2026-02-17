@@ -1806,7 +1806,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/licenses", isAuthenticated, async (req: any, res) => {
     try {
-      const validation = insertLicenseSchema.safeParse(req.body);
+      const createLicenseWithMetadataSchema = insertLicenseSchema.extend({
+        metadataIds: z.array(z.string()).optional(),
+      });
+
+      const validation = createLicenseWithMetadataSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
           message: "Validation failed",
@@ -1814,7 +1818,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const license = await storage.createLicense(validation.data);
+      const { metadataIds, ...licenseData } = validation.data;
+      const license = await storage.createLicense(licenseData);
+      
+      if (metadataIds && metadataIds.length > 0) {
+        const userId = (req.user as any)?.id;
+        const permissions = await getUserPermissions(userId);
+        if (permissions) {
+          await storage.bulkUpdateMetadata(
+            metadataIds.map(id => ({ id, data: { licenseId: license.id } })),
+            permissions
+          );
+        }
+      }
+
       res.json(license);
     } catch (error) {
       console.error("Error creating license:", error);

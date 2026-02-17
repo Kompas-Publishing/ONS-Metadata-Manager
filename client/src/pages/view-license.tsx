@@ -281,6 +281,24 @@ export default function ViewLicense() {
                   <p className="text-sm text-muted-foreground italic">No link provided</p>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Google Drive Link</p>
+                {license.googleDriveLink ? (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 border-blue-200 hover:bg-blue-50 hover:text-blue-700" asChild>
+                      <a href={license.googleDriveLink} target="_blank" rel="noopener noreferrer">
+                        Open Assets <ExternalLink className="w-3 h-3 ml-2" />
+                      </a>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => copyToClipboard(license.googleDriveLink!)}>
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No link provided</p>
+                )}
+              </div>
             </CardContent>
           </Card>
           
