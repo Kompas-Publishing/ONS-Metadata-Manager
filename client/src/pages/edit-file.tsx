@@ -175,6 +175,7 @@ export default function EditFile() {
             subtitlesId: file.subtitlesId ?? "",
             audioId: file.audioId ?? "",
             originalFilename: file.originalFilename ?? "",
+            googleDriveLink: file.googleDriveLink ?? "",
             draft: file.draft ?? 0,
             licenseId: file.licenseId || undefined,
           }}

@@ -183,7 +183,7 @@ export function MetadataForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        <fieldset disabled={readOnly}>
+        <div className="space-y-8">
           {generatedId && (
             <div className="p-6 border rounded-lg bg-card">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
@@ -257,6 +257,7 @@ export function MetadataForm({
                         placeholder="Enter title"
                         {...field}
                         data-testid="input-title"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -303,6 +304,7 @@ export function MetadataForm({
                         onChange={field.onChange}
                         placeholder="01:30:00"
                         data-testid="input-duration"
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -317,21 +319,23 @@ export function MetadataForm({
                   <FormItem>
                     <FormLabel>Break Times (HH:MM:SS)</FormLabel>
                     <div className="space-y-3">
-                      <div className="flex gap-2">
-                        <TimeInput
-                          value={breakTimeInput}
-                          onChange={setBreakTimeInput}
-                          placeholder="00:05:00"
-                          data-testid="input-break-time"
-                        />
-                        <Button
-                          type="button"
-                          onClick={addBreakTime}
-                          data-testid="button-add-break-time"
-                        >
-                          Add
-                        </Button>
-                      </div>
+                      {!readOnly && (
+                        <div className="flex gap-2">
+                          <TimeInput
+                            value={breakTimeInput}
+                            onChange={setBreakTimeInput}
+                            placeholder="00:05:00"
+                            data-testid="input-break-time"
+                          />
+                          <Button
+                            type="button"
+                            onClick={addBreakTime}
+                            data-testid="button-add-break-time"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      )}
                       {breakTimes.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                           {breakTimes.map((time, index) => (
@@ -342,14 +346,16 @@ export function MetadataForm({
                               data-testid={`badge-break-time-${index}`}
                             >
                               {time}
-                              <button
-                                type="button"
-                                onClick={() => removeBreakTime(index)}
-                                className="ml-1 hover:text-destructive"
-                                data-testid={`button-remove-break-time-${index}`}
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
+                              {!readOnly && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeBreakTime(index)}
+                                  className="ml-1 hover:text-destructive"
+                                  data-testid={`button-remove-break-time-${index}`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
                             </Badge>
                           ))}
                         </div>
@@ -372,6 +378,7 @@ export function MetadataForm({
                         onChange={field.onChange}
                         placeholder="00:02:00"
                         data-testid="input-end-credits"
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -428,18 +435,6 @@ export function MetadataForm({
                       <SelectContent>
                         <SelectItem value="program">Program</SelectItem>
                         <SelectItem value="commercial">Commercial</SelectItem>
-                        {/* <SelectItem value="Short Form">Short Form</SelectItem>
-                        <SelectItem value="Long form format">
-                          Long Form
-                        </SelectItem>
-                        <SelectItem value="Promo">Promo</SelectItem>
-                        <SelectItem value="Campaign">Campaign</SelectItem>
-                        <SelectItem value="Commercial">Commercial</SelectItem>
-                        <SelectItem value="Filler">Filler</SelectItem>
-                        <SelectItem value="OSD">OSD</SelectItem>
-                        <SelectItem value="Ad">Ad</SelectItem>
-                        <SelectItem value="bumper">bumper</SelectItem>
-                        <SelectItem value="Ident">Ident</SelectItem> */}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -642,6 +637,7 @@ export function MetadataForm({
                     className="min-h-32"
                     {...field}
                     data-testid="input-description"
+                    readOnly={readOnly}
                   />
                 </FormControl>
                 <FormMessage />
@@ -656,27 +652,29 @@ export function MetadataForm({
               <FormItem>
                 <FormLabel>Actors</FormLabel>
                 <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add actor name"
-                      value={actorInput}
-                      onChange={(e) => setActorInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addActor();
-                        }
-                      }}
-                      data-testid="input-actor"
-                    />
-                    <Button
-                      type="button"
-                      onClick={addActor}
-                      data-testid="button-add-actor"
-                    >
-                      Add
-                    </Button>
-                  </div>
+                  {!readOnly && (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add actor name"
+                        value={actorInput}
+                        onChange={(e) => setActorInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addActor();
+                          }
+                        }}
+                        data-testid="input-actor"
+                      />
+                      <Button
+                        type="button"
+                        onClick={addActor}
+                        data-testid="button-add-actor"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  )}
                   {actors.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {actors.map((actor, index) => (
@@ -687,14 +685,16 @@ export function MetadataForm({
                           data-testid={`badge-actor-${index}`}
                         >
                           {actor}
-                          <button
-                            type="button"
-                            onClick={() => removeActor(index)}
-                            className="ml-1 hover:text-destructive"
-                            data-testid={`button-remove-actor-${index}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeActor(index)}
+                              className="ml-1 hover:text-destructive"
+                              data-testid={`button-remove-actor-${index}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </Badge>
                       ))}
                     </div>
@@ -741,6 +741,7 @@ export function MetadataForm({
                         placeholder="Enter channel"
                         {...field}
                         data-testid="input-channel"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -794,6 +795,7 @@ export function MetadataForm({
                               !field.value && "text-muted-foreground",
                             )}
                             data-testid="input-date-start"
+                            disabled={readOnly}
                           >
                             {field.value ? (
                               format(field.value, "PPP")
@@ -834,6 +836,7 @@ export function MetadataForm({
                               !field.value && "text-muted-foreground",
                             )}
                             data-testid="input-date-end"
+                            disabled={readOnly}
                           >
                             {field.value ? (
                               format(field.value, "PPP")
@@ -874,6 +877,7 @@ export function MetadataForm({
                         placeholder="Enter series title"
                         {...field}
                         data-testid="input-series-title"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -892,6 +896,7 @@ export function MetadataForm({
                         placeholder="Enter episode title"
                         {...field}
                         data-testid="input-episode-title"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -919,6 +924,7 @@ export function MetadataForm({
                         }
                         value={field.value || ""}
                         data-testid="input-season"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -946,6 +952,7 @@ export function MetadataForm({
                         }
                         value={field.value || ""}
                         data-testid="input-episode"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -966,6 +973,7 @@ export function MetadataForm({
                       className="min-h-32"
                       {...field}
                       data-testid="input-episode-description"
+                      readOnly={readOnly}
                     />
                   </FormControl>
                   <FormMessage />
@@ -990,6 +998,7 @@ export function MetadataForm({
                         value={field.value}
                         onChange={field.onChange}
                         placeholder="Select country..."
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1017,6 +1026,7 @@ export function MetadataForm({
                         }
                         value={field.value || ""}
                         data-testid="input-year-of-production"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1042,6 +1052,7 @@ export function MetadataForm({
                         placeholder="Enter original filename"
                         {...field}
                         data-testid="input-original-filename"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1061,6 +1072,7 @@ export function MetadataForm({
                         {...field}
                         value={field.value ?? ""}
                         data-testid="input-audio-id"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1079,6 +1091,7 @@ export function MetadataForm({
                         placeholder="Enter subtitles ID"
                         {...field}
                         data-testid="input-subtitles-id"
+                        readOnly={readOnly}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1103,6 +1116,7 @@ export function MetadataForm({
                           field.onChange(checked ? 1 : 0)
                         }
                         data-testid="checkbox-catch-up"
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -1124,6 +1138,7 @@ export function MetadataForm({
                           field.onChange(checked ? 1 : 0)
                         }
                         data-testid="checkbox-segmented"
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -1145,6 +1160,7 @@ export function MetadataForm({
                           field.onChange(checked ? 1 : 0)
                         }
                         data-testid="checkbox-subtitles"
+                        disabled={readOnly}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -1181,7 +1197,7 @@ export function MetadataForm({
               )}
             </div>
           )}
-        </fieldset>
+        </div>
       </form>
     </Form>
   );
