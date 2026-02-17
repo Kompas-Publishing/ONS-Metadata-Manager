@@ -70,7 +70,7 @@ export default function Tasks() {
   // Form for New Assets tab
   const batchForm = useForm<MultiBatchCreate & { taskDescription: string }>({
     resolver: zodResolver(multiBatchCreateSchema.extend({
-      taskDescription: zodResolver(multiBatchCreateSchema)._def.schema.optional() as any
+      taskDescription: z.string().optional()
     })),
     defaultValues: {
       batches: [
