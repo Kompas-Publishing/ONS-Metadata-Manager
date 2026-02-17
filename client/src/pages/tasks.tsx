@@ -46,7 +46,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
 import { BatchCreateForm } from "@/components/batch-create-form";
-import { Form } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };

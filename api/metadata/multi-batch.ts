@@ -15,7 +15,10 @@ export default apiHandler(
       }
 
       const files = await storage.createMultiBatchMetadataFiles(
-        req.body,
+        {
+          batches: req.body.batches,
+          taskDescription: req.body.taskDescription
+        },
         req.permissions!,
       );
 
