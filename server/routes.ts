@@ -944,6 +944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const multiBatchCreateSchema = z.object({
         batches: z.array(z.any()), // We'll let storage handle detailed validation or use the schema from shared
+        taskDescription: z.string().optional(),
       });
 
       const validation = multiBatchCreateSchema.safeParse(req.body);
@@ -956,7 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const files = await storage.createMultiBatchMetadataFiles(
-        validation.data as any,
+        validation.data,
         permissions!,
       );
 
@@ -1988,6 +1989,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating task:", error);
       res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.post("/api/tasks/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const schema = z.object({
+        metadataFileIds: z.array(z.string()).min(1),
+        description: z.string().min(1),
+      });
+
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validation.error.errors,
+        });
+      }
+
+      const tasks = await storage.bulkCreateTasks({
+        ...validation.data,
+        createdBy: userId,
+      });
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error creating bulk tasks:", error);
+      res.status(500).json({ message: "Failed to create bulk tasks" });
     }
   });
 

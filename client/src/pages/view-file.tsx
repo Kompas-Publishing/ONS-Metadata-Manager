@@ -237,31 +237,9 @@ export default function ViewFile() {
                 <CheckSquare className="w-5 h-5 text-primary" />
                 Tasks
               </CardTitle>
-              <CardDescription>Assign tasks to this file</CardDescription>
+              <CardDescription>Current tasks for this file</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="New task..." 
-                    value={newTaskDesc}
-                    onChange={(e) => setNewTaskDesc(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addTaskMutation.mutate(newTaskDesc)}
-                  />
-                  <Button size="icon" onClick={() => addTaskMutation.mutate(newTaskDesc)} disabled={!newTaskDesc.trim() || addTaskMutation.isPending}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => addTaskMutation.mutate("heeft meta nodig")}>
-                    + Meta
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => addTaskMutation.mutate("heeft subs nodig")}>
-                    + Subs
-                  </Button>
-                </div>
-              </div>
-
               <div className="space-y-3 pt-2">
                 {tasksLoading ? (
                   <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" /></div>

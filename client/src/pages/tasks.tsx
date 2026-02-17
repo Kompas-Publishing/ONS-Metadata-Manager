@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,9 +17,13 @@ import {
   Clock, 
   ExternalLink,
   Plus,
-  Trash2
+  Trash2,
+  Layers,
+  Database,
+  CheckSquare
 } from "lucide-react";
-import type { Task, MetadataFile } from "@shared/schema";
+import type { Task, MetadataFile, MultiBatchCreate } from "@shared/schema";
+import { multiBatchCreateSchema } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -36,6 +42,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExistingContentSelector } from "@/components/existing-content-selector";
+import { BatchCreateForm } from "@/components/batch-create-form";
+import { Form } from "@/components/ui/form";
+import { cn } from "@/lib/utils";
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
@@ -45,9 +56,39 @@ export default function Tasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [descFilter, setDescFilter] = useState<string>("all");
+  
+  // Dialog state
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [activeAddTab, setActiveAddTab] = useState<"existing" | "new">("existing");
+  const [selectedExistingIds, setSelectedExistingIds] = useState<string[]>([]);
+  const [taskDescription, setTaskDescription] = useState("");
 
   const { data: tasks, isLoading } = useQuery<TaskWithFile[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  // Form for New Assets tab
+  const batchForm = useForm<MultiBatchCreate & { taskDescription: string }>({
+    resolver: zodResolver(multiBatchCreateSchema.extend({
+      taskDescription: zodResolver(multiBatchCreateSchema)._def.schema.optional() as any
+    })),
+    defaultValues: {
+      batches: [
+        {
+          title: "",
+          category: "Series",
+          seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
+          channel: "ONS",
+          draft: 1,
+        },
+      ],
+      taskDescription: "heeft meta nodig"
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: batchForm.control,
+    name: "batches",
   });
 
   const toggleMutation = useMutation({
@@ -56,13 +97,6 @@ export default function Tasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update task",
-        variant: "destructive",
-      });
     },
   });
 
@@ -75,6 +109,53 @@ export default function Tasks() {
       toast({ title: "Success", description: "Task deleted" });
     },
   });
+
+  const bulkAddMutation = useMutation({
+    mutationFn: async (data: { metadataFileIds: string[], description: string }) => {
+      await apiRequest("POST", "/api/tasks/bulk", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      setIsAddDialogOpen(false);
+      setSelectedExistingIds([]);
+      setTaskDescription("");
+      toast({ title: "Success", description: "Tasks assigned successfully." });
+    },
+  });
+
+  const createBatchWithTaskMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest("POST", "/api/metadata/multi-batch", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      setIsAddDialogOpen(false);
+      batchForm.reset();
+      toast({ title: "Success", description: "Batch created with tasks." });
+    },
+  });
+
+  const handleBulkAdd = () => {
+    if (activeAddTab === "existing") {
+      if (selectedExistingIds.length === 0) {
+        toast({ title: "Error", description: "Select at least one file", variant: "destructive" });
+        return;
+      }
+      if (!taskDescription.trim()) {
+        toast({ title: "Error", description: "Enter a task description", variant: "destructive" });
+        return;
+      }
+      bulkAddMutation.mutate({
+        metadataFileIds: selectedExistingIds,
+        description: taskDescription
+      });
+    } else {
+      batchForm.handleSubmit((data) => {
+        createBatchWithTaskMutation.mutate(data);
+      })();
+    }
+  };
 
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
@@ -107,7 +188,7 @@ export default function Tasks() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Task List</h1>
@@ -115,6 +196,124 @@ export default function Tasks() {
             Manage and track tasks assigned to metadata files
           </p>
         </div>
+
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" /> Add Tasks
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Assign Tasks</DialogTitle>
+              <DialogDescription>
+                Select existing metadata or create new assets with tasks attached.
+              </DialogDescription>
+            </DialogHeader>
+
+            <Tabs value={activeAddTab} onValueChange={(v: any) => setActiveAddTab(v)} className="flex-1 overflow-hidden flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="existing" className="gap-2">
+                  <Database className="w-4 h-4" /> Existing Content
+                </TabsTrigger>
+                <TabsTrigger value="new" className="gap-2">
+                  <Layers className="w-4 h-4" /> Create New Assets
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4">
+                <div className="space-y-2">
+                  <Label>Task Description</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="e.g., heeft meta nodig" 
+                      value={taskDescription}
+                      onChange={(e) => setTaskDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft meta nodig")}>
+                      heeft meta nodig
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft subs nodig")}>
+                      heeft subs nodig
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <Label className="mb-2 block">Select Files</Label>
+                  <ExistingContentSelector
+                    selectedIds={selectedExistingIds}
+                    onSelect={setSelectedExistingIds}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="new" className="flex-1 overflow-y-auto space-y-6 pr-2">
+                <Form {...batchForm}>
+                  <div className="space-y-6">
+                    <FormField
+                      control={batchForm.control}
+                      name="taskDescription"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Task for these assets</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., heeft meta nodig" {...field} />
+                          </FormControl>
+                          <div className="flex gap-2 mt-2">
+                            <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft meta nodig")}>
+                              heeft meta nodig
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft subs nodig")}>
+                              heeft subs nodig
+                            </Button>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-4">
+                      {fields.map((field, index) => (
+                        <BatchCreateForm
+                          key={field.id}
+                          index={index}
+                          form={batchForm}
+                          onRemove={() => remove(index)}
+                        />
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-dashed"
+                        onClick={() => append({
+                          title: "",
+                          category: "Series",
+                          seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
+                          channel: "ONS",
+                          draft: 1,
+                        })}
+                      >
+                        <Plus className="w-4 h-4 mr-2" /> Add Another Batch
+                      </Button>
+                    </div>
+                  </div>
+                </Form>
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter className="pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+              <Button 
+                onClick={handleBulkAdd} 
+                disabled={bulkAddMutation.isPending || createBatchWithTaskMutation.isPending}
+              >
+                {(bulkAddMutation.isPending || createBatchWithTaskMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {activeAddTab === "existing" ? `Assign to ${selectedExistingIds.length} Files` : "Create & Assign Tasks"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -214,7 +413,7 @@ export default function Tasks() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button variant="ghost" size="icon" asChild>
+                  <Button variant="ghost" size="icon" asChild title="View File">
                     <Link href={`/view/${task.metadataFileId}`}>
                       <ExternalLink className="w-4 h-4" />
                     </Link>
@@ -223,6 +422,7 @@ export default function Tasks() {
                     variant="ghost" 
                     size="icon" 
                     className="text-destructive hover:bg-destructive/10"
+                    title="Delete Task"
                     onClick={() => {
                       if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
                     }}
@@ -238,7 +438,7 @@ export default function Tasks() {
             <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-muted-foreground">No tasks found</h3>
             <p className="text-sm text-muted-foreground">
-              Try adjusting your filters or add tasks from a file's view page.
+              Click "Add Tasks" to assign work to programs.
             </p>
           </div>
         )}

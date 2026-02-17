@@ -67,7 +67,7 @@ export interface IStorage {
   deleteGroup(groupId: string): Promise<boolean>;
 
   // Multi-batch creation
-  createMultiBatchMetadataFiles(data: MultiBatchCreate, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]>;
 
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
@@ -79,6 +79,7 @@ export interface IStorage {
 
   // Task Management
   createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
+  bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]>;
   listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]>;
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
@@ -530,7 +531,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[] }, permissions: UserPermissions): Promise<MetadataFile[]> {
+  async createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
       const [setting] = await tx
         .select()
@@ -594,6 +595,7 @@ export class DatabaseStorage implements IStorage {
               segmented: batch.segmented,
               draft: batch.draft ?? 1,
               licenseId: batch.licenseId,
+              googleDriveLink: batch.googleDriveLink,
               createdBy: permissions.user.id,
             };
 
@@ -616,6 +618,18 @@ export class DatabaseStorage implements IStorage {
         .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(allFiles).returning();
+
+      // If a task description was provided, create a task for each new file
+      if (data.taskDescription && created.length > 0) {
+        const taskValues = created.map(file => ({
+          metadataFileId: file.id,
+          description: data.taskDescription!,
+          status: "pending" as const,
+          createdBy: permissions.user.id,
+        }));
+        await tx.insert(tasks).values(taskValues);
+      }
+
       return created;
     });
   }
@@ -975,6 +989,20 @@ export class DatabaseStorage implements IStorage {
   async createTask(taskData: InsertTask & { createdBy: string }): Promise<Task> {
     const [task] = await db.insert(tasks).values(taskData).returning();
     return task;
+  }
+
+  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]> {
+    const { metadataFileIds, description, createdBy } = taskData;
+    if (metadataFileIds.length === 0) return [];
+
+    const values = metadataFileIds.map(fileId => ({
+      metadataFileId: fileId,
+      description,
+      status: "pending" as const,
+      createdBy,
+    }));
+
+    return await db.insert(tasks).values(values).returning();
   }
 
   async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
