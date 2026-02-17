@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { insertLicenseSchema, type InsertLicense, type License } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -441,7 +441,7 @@ export default function EditLicense() {
         </CardContent>
       </Card>
 
-      {/* {id && <LicenseContentManager licenseId={id} />} */}
+      {id && <LicenseContentManager licenseId={id} />}
     </div>
   );
 }
