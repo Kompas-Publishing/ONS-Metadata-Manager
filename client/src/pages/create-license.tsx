@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertLicenseSchema, type InsertLicense } from "@shared/schema";
+import { insertLicenseSchema, type InsertLicense, enhancedBatchCreateSchema, type EnhancedBatchCreate } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
@@ -15,11 +15,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2, Database } from "lucide-react";
+import { CalendarIcon, Loader2, Database, Layers, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
+import { BatchCreateForm } from "@/components/batch-create-form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { z } from "zod";
 
@@ -34,7 +36,10 @@ const RATINGS = ["AL", "6", "9", "12", "16", "18"];
 // Extended schema for the form
 const createLicenseFormSchema = insertLicenseSchema.extend({
   metadataIds: z.array(z.string()).optional(),
+  newBatches: z.array(enhancedBatchCreateSchema).optional(),
 });
+
+type CreateLicenseFormValues = z.infer<typeof createLicenseFormSchema>;
 
 export default function CreateLicense() {
   const [, setLocation] = useLocation();
@@ -42,8 +47,9 @@ export default function CreateLicense() {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMetadataIds, setSelectedMetadataIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
 
-  const form = useForm<z.infer<typeof createLicenseFormSchema>>({
+  const form = useForm<CreateLicenseFormValues>({
     resolver: zodResolver(createLicenseFormSchema),
     defaultValues: {
       name: "",
@@ -59,12 +65,18 @@ export default function CreateLicense() {
       googleDriveLink: "",
       notes: "",
       metadataIds: [],
+      newBatches: [],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "newBatches",
   });
 
   const [createdId, setCreatedId] = useState<string | null>(null);
 
-  const onSubmit = async (data: InsertLicense, redirect: boolean = true) => {
+  const onSubmit = async (data: CreateLicenseFormValues, redirect: boolean = true) => {
     setIsSubmitting(true);
     try {
       const payload = {
@@ -77,12 +89,11 @@ export default function CreateLicense() {
       
       toast({
         title: "Success",
-        description: selectedMetadataIds.length > 0 
-          ? `License created and ${selectedMetadataIds.length} items linked.`
-          : "License created successfully.",
+        description: "License created and content processed successfully.",
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       
       if (redirect) {
         setLocation("/licenses");
@@ -108,7 +119,7 @@ export default function CreateLicense() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
         <p className="text-muted-foreground mt-2">
@@ -125,7 +136,6 @@ export default function CreateLicense() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* ... existing fields ... */}
                 <FormField
                   control={form.control}
                   name="name"
@@ -408,18 +418,58 @@ export default function CreateLicense() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-primary" />
-                  <CardTitle>Link Initial Content</CardTitle>
+                  <Plus className="w-5 h-5 text-primary" />
+                  <CardTitle>Add Content to License</CardTitle>
                 </div>
                 <CardDescription>
-                  Optional: Select existing metadata files to link to this license upon creation.
+                  Choose between linking existing files or creating new ones.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ExistingContentSelector
-                  selectedIds={selectedMetadataIds}
-                  onSelect={setSelectedMetadataIds}
-                />
+                <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="existing" className="flex items-center gap-2">
+                      <Database className="w-4 h-4" /> Link Existing
+                    </TabsTrigger>
+                    <TabsTrigger value="new" className="flex items-center gap-2">
+                      <Layers className="w-4 h-4" /> Create New Assets
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="existing">
+                    <ExistingContentSelector
+                      selectedIds={selectedMetadataIds}
+                      onSelect={setSelectedMetadataIds}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="new" className="space-y-6">
+                    <div className="space-y-6">
+                      {fields.map((field, index) => (
+                        <BatchCreateForm
+                          key={field.id}
+                          index={index}
+                          form={form}
+                          onRemove={() => remove(index)}
+                        />
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full border-dashed"
+                        onClick={() => append({
+                          title: form.getValues("contentTitle") || "",
+                          category: "Series",
+                          seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
+                          channel: "ONS",
+                          draft: 1,
+                        })}
+                      >
+                        <Plus className="w-4 h-4 mr-2" /> Add a Batch
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           )}

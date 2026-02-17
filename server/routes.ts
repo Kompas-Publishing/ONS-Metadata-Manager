@@ -16,6 +16,15 @@ import { create } from "xmlbuilder2";
 import { z } from "zod";
 import { getUserPermissions, requirePermission } from "./permissions";
 import * as XLSX from "xlsx";
+import { rateLimit } from "express-rate-limit";
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 login requests per window
+  message: { message: "Too many login attempts, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function transformFileForDownload(file: any): any {
   // Convert booleans to True/False strings
@@ -416,13 +425,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", loginLimiter, (req, res, next) => {
+    // Pentest Fix: Strict type validation to prevent NoSQL/Object injection
+    const { email, password } = req.body;
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: "Invalid input types. Email and password must be strings." });
+    }
+
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
-        return res.status(500).json({ message: "Login failed" });
+        return res.status(500).json({ message: "Authentication failed" });
       }
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+        return res.status(401).json({ message: "Authentication failed" });
       }
       
       req.logIn(user, (loginErr) => {
@@ -1808,6 +1823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const createLicenseWithMetadataSchema = insertLicenseSchema.extend({
         metadataIds: z.array(z.string()).optional(),
+        newBatches: z.array(z.any()).optional(),
       });
 
       const validation = createLicenseWithMetadataSchema.safeParse(req.body);
@@ -1818,15 +1834,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { metadataIds, ...licenseData } = validation.data;
+      const { metadataIds, newBatches, ...licenseData } = validation.data;
       const license = await storage.createLicense(licenseData);
       
-      if (metadataIds && metadataIds.length > 0) {
-        const userId = (req.user as any)?.id;
-        const permissions = await getUserPermissions(userId);
-        if (permissions) {
+      const userId = (req.user as any)?.id;
+      const permissions = await getUserPermissions(userId);
+
+      if (permissions) {
+        // Link existing metadata
+        if (metadataIds && metadataIds.length > 0) {
           await storage.bulkUpdateMetadata(
             metadataIds.map(id => ({ id, data: { licenseId: license.id } })),
+            permissions
+          );
+        }
+
+        // Create new batches
+        if (newBatches && newBatches.length > 0) {
+          await storage.createMultiBatchMetadataFiles(
+            {
+              batches: newBatches.map(batch => ({
+                ...batch,
+                licenseId: license.id
+              }))
+            },
             permissions
           );
         }

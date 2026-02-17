@@ -61,7 +61,7 @@ export default function EditLicense() {
   useEffect(() => {
     if (license) {
       form.reset({
-        name: license.name,
+        name: license.name || "",
         distributor: license.distributor || "",
         contentTitle: license.contentTitle || "",
         licenseFeeCurrency: license.licenseFeeCurrency || "EUR",
@@ -77,7 +77,7 @@ export default function EditLicense() {
         notes: license.notes || "",
       });
     }
-  }, [license, form]);
+  }, [license, form.reset]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertLicense) => {

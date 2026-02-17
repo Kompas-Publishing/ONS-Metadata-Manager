@@ -13,24 +13,28 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
   try {
     const { email, password } = req.body;
 
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ message: "Invalid input types" });
+    }
+
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({ message: "Authentication failed" });
     }
 
     const user = await storage.getUserByEmail(email);
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Authentication failed" });
     }
 
     if (!user.password) {
-      return res.status(401).json({ message: "Please use social login" });
+      return res.status(401).json({ message: "Authentication failed" });
     }
 
     const isValid = await bcrypt.compare(password, user.password as string);
 
     if (!isValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Authentication failed" });
     }
 
     if (user.status !== "active") {
