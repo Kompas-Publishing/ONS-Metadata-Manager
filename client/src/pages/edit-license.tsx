@@ -29,16 +29,20 @@ const CURRENCIES = [
 const RATINGS = ["AL", "6", "9", "12", "16", "18"];
 
 export default function EditLicense() {
-  const [, params] = useRoute("/licenses/:id/edit");
+  const [match, params] = useRoute("/licenses/:id/edit");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const id = params?.id;
 
-  const { data: license, isLoading } = useQuery<License>({
+  console.log("EditLicense: id =", id);
+
+  const { data: license, isLoading, isError, error: queryError } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
     enabled: !!id,
   });
+
+  if (queryError) console.error("EditLicense: Query error =", queryError);
 
   const form = useForm<InsertLicense>({
     resolver: zodResolver(insertLicenseSchema),
@@ -60,22 +64,27 @@ export default function EditLicense() {
 
   useEffect(() => {
     if (license) {
-      form.reset({
-        name: license.name || "",
-        distributor: license.distributor || "",
-        contentTitle: license.contentTitle || "",
-        licenseFeeCurrency: license.licenseFeeCurrency || "EUR",
-        licenseFeeAmount: license.licenseFeeAmount || "",
-        licenseFeePaid: license.licenseFeePaid || 0,
-        licenseStart: license.licenseStart ? new Date(license.licenseStart) : undefined,
-        licenseEnd: license.licenseEnd ? new Date(license.licenseEnd) : undefined,
-        allowedRuns: license.allowedRuns || "",
-        contentRating: license.contentRating || "",
-        description: license.description || "",
-        imdbLink: license.imdbLink || "",
-        googleDriveLink: license.googleDriveLink || "",
-        notes: license.notes || "",
-      });
+      console.log("EditLicense: resetting form with license data", license);
+      try {
+        form.reset({
+          name: license.name || "",
+          distributor: license.distributor || "",
+          contentTitle: license.contentTitle || "",
+          licenseFeeCurrency: license.licenseFeeCurrency || "EUR",
+          licenseFeeAmount: license.licenseFeeAmount || "",
+          licenseFeePaid: license.licenseFeePaid || 0,
+          licenseStart: license.licenseStart ? new Date(license.licenseStart) : undefined,
+          licenseEnd: license.licenseEnd ? new Date(license.licenseEnd) : undefined,
+          allowedRuns: license.allowedRuns || "",
+          contentRating: license.contentRating || "",
+          description: license.description || "",
+          imdbLink: license.imdbLink || "",
+          googleDriveLink: license.googleDriveLink || "",
+          notes: license.notes || "",
+        });
+      } catch (err) {
+        console.error("EditLicense: error resetting form", err);
+      }
     }
   }, [license, form.reset]);
 
@@ -101,10 +110,28 @@ export default function EditLicense() {
     },
   });
 
+  if (!id) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <h2 className="text-2xl font-bold">Invalid License ID</h2>
+        <Button onClick={() => setLocation("/licenses")}>Back to Licenses</Button>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !license) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <h2 className="text-2xl font-bold">Error loading license</h2>
+        <Button onClick={() => setLocation("/licenses")}>Back to Licenses</Button>
       </div>
     );
   }
@@ -414,7 +441,7 @@ export default function EditLicense() {
         </CardContent>
       </Card>
 
-      {id && <LicenseContentManager licenseId={id} />}
+      {/* {id && <LicenseContentManager licenseId={id} />} */}
     </div>
   );
 }
