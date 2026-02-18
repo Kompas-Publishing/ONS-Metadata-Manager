@@ -11,7 +11,7 @@ export default apiHandler(
     try {
       const { licenseId, metadataIds } = req.body;
 
-      if (!licenseId || !metadataIds || !Array.isArray(metadataIds)) {
+      if (licenseId === undefined || !metadataIds || !Array.isArray(metadataIds)) {
         return res.status(400).json({ message: "licenseId and metadataIds array are required" });
       }
 

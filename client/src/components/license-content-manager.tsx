@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { multiBatchCreateSchema, type MultiBatchCreate } from "@shared/schema";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { multiBatchCreateSchema, type MultiBatchCreate, type MetadataFile } from "@shared/schema";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExistingContentSelector } from "./existing-content-selector";
 import { BatchCreateForm } from "./batch-create-form";
-import { Loader2, Plus, Layers, Database } from "lucide-react";
+import { Loader2, Plus, Layers, Database, Trash2, ExternalLink } from "lucide-react";
 import { Form } from "@/components/ui/form";
+import { Link } from "wouter";
+import { Badge } from "@/components/ui/badge";
 
 interface LicenseContentManagerProps {
   licenseId: string;
@@ -31,6 +39,30 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
   const [selectedExistingIds, setSelectedExistingIds] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: linkedFiles, isLoading: isLoadingLinked } = useQuery<MetadataFile[]>({
+    queryKey: [`/api/metadata?licenseId=${licenseId}`],
+    enabled: !!licenseId,
+  });
+
+  const groupedLinked = useMemo(() => {
+    if (!linkedFiles) return {};
+    const grouped: Record<string, Record<string, MetadataFile[]>> = {};
+    linkedFiles.forEach(file => {
+      const series = file.seriesTitle || file.title || "Unknown Series";
+      const season = file.season?.toString() || "No Season";
+      if (!grouped[series]) grouped[series] = {};
+      if (!grouped[series][season]) grouped[series][season] = [];
+      grouped[series][season].push(file);
+    });
+    // Sort episodes
+    Object.values(grouped).forEach(seasons => {
+      Object.values(seasons).forEach(episodes => {
+        episodes.sort((a, b) => (a.episode || 0) - (b.episode || 0));
+      });
+    });
+    return grouped;
+  }, [linkedFiles]);
 
   const form = useForm<MultiBatchCreate>({
     resolver: zodResolver(multiBatchCreateSchema),
@@ -59,6 +91,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Content linked to license successfully." });
+      queryClient.invalidateQueries({ queryKey: [`/api/metadata?licenseId=${licenseId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       setIsOpen(false);
       setSelectedExistingIds([]);
@@ -72,12 +105,32 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
     },
   });
 
+  const unlinkMutation = useMutation({
+    mutationFn: async (metadataIds: string[]) => {
+      // We use the same link endpoint but with null licenseId
+      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseId: null, metadataIds });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Content unlinked from license." });
+      queryClient.invalidateQueries({ queryKey: [`/api/metadata?licenseId=${licenseId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unlink metadata",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createBatchMutation = useMutation({
     mutationFn: async (data: MultiBatchCreate) => {
       await apiRequest("POST", "/api/metadata/multi-batch", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Batch content created and linked successfully." });
+      queryClient.invalidateQueries({ queryKey: [`/api/metadata?licenseId=${licenseId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       setIsOpen(false);
       form.reset();
@@ -100,7 +153,6 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
       linkMutation.mutate(selectedExistingIds);
     } else {
       form.handleSubmit((data) => {
-        // Ensure all batches have the licenseId
         const dataWithLicense = {
           batches: data.batches.map(b => ({ ...b, licenseId }))
         };
@@ -119,6 +171,95 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
         <Button onClick={() => setIsOpen(true)} type="button">
           <Plus className="w-4 h-4 mr-2" /> Add Content
         </Button>
+      </div>
+
+      <div className="space-y-4">
+        {isLoadingLinked ? (
+          <div className="flex justify-center p-8">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : !linkedFiles || linkedFiles.length === 0 ? (
+          <Card className="border-dashed flex flex-col items-center justify-center p-8 text-muted-foreground">
+            <p>No content linked to this license yet.</p>
+          </Card>
+        ) : (
+          <Accordion type="multiple" className="w-full space-y-2">
+            {Object.entries(groupedLinked).map(([series, seasons]) => (
+              <AccordionItem key={series} value={series} className="border rounded-md px-4 bg-card">
+                <div className="flex items-center justify-between">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex items-center gap-3 text-left">
+                      <span className="font-semibold">{series}</span>
+                      <Badge variant="secondary">{Object.values(seasons).flat().length} items</Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Unlink all ${Object.values(seasons).flat().length} items from this series?`)) {
+                        unlinkMutation.mutate(Object.values(seasons).flat().map(f => f.id));
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Unlink Series
+                  </Button>
+                </div>
+                <AccordionContent className="pb-4">
+                  <div className="space-y-4 pl-4 border-l-2 ml-2">
+                    {Object.entries(seasons).map(([season, episodes]) => (
+                      <div key={season} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Season {season}</h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive h-7 px-2 text-xs"
+                            onClick={() => {
+                              if (confirm(`Unlink all ${episodes.length} items from Season ${season}?`)) {
+                                unlinkMutation.mutate(episodes.map(f => f.id));
+                              }
+                            }}
+                          >
+                            Unlink Season
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {episodes.map(file => (
+                            <div key={file.id} className="group flex items-center justify-between p-2 rounded bg-muted/50 text-xs border border-transparent hover:border-primary/20">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono text-[10px] text-muted-foreground w-12 flex-shrink-0">{file.id}</span>
+                                <span className="truncate" title={file.episodeTitle || file.title}>
+                                  Ep {file.episode}: {file.episodeTitle || file.title}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Link href={`/view/${file.id}`}>
+                                  <a target="_blank" className="p-1 hover:text-primary">
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </Link>
+                                <button
+                                  onClick={() => unlinkMutation.mutate([file.id])}
+                                  className="p-1 hover:text-destructive"
+                                  title="Unlink file"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

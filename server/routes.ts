@@ -997,7 +997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const linkMetadataSchema = z.object({
-        licenseId: z.string(),
+        licenseId: z.string().nullable(),
         metadataIds: z.array(z.string()),
       });
 
