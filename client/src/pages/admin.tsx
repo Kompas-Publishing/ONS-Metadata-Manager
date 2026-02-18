@@ -78,7 +78,7 @@ function AiConfigSection() {
   });
 
   const [provider, setProvider] = useState("google");
-  const [model, setModel] = useState("gemini-1.5-pro");
+  const [model, setModel] = useState("gemini-3-pro-preview");
   const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
@@ -139,9 +139,11 @@ function AiConfigSection() {
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="gemini-3-pro-preview">Gemini 3 Pro (Preview)</SelectItem>
+                <SelectItem value="gemini-3-flash-preview">Gemini 3 Flash (Preview)</SelectItem>
+                <SelectItem value="gemini-3-deep-think">Gemini 3 Deep Think</SelectItem>
                 <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
                 <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-                <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -163,9 +165,14 @@ function AiConfigSection() {
                 Save Configuration
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Currently, only Google Gemini is supported. Your API key is stored securely.
-            </p>
+            <div className="flex flex-col gap-1 mt-2">
+              <p className="text-xs text-muted-foreground">
+                Currently, only Google Gemini is supported. Gemini 3 is now available.
+              </p>
+              <p className="text-xs text-yellow-600 font-medium">
+                Note: Vercel has a 4.5MB limit for file uploads. Larger files may fail.
+              </p>
+            </div>
           </div>
         </div>
       </Card>

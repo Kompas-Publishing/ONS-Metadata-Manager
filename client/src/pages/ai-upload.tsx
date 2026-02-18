@@ -75,7 +75,20 @@ export default function AiUpload() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB for Vercel
+      
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        toast({
+          title: "File too large",
+          description: "Vercel limits uploads to 4.5MB. Please upload a smaller file.",
+          variant: "destructive",
+        });
+        e.target.value = ""; // Clear the input
+        return;
+      }
+      
+      setFile(selectedFile);
     }
   };
 

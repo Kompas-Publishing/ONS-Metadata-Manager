@@ -1,12 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import { 
   type InsertLicense, 
   type InsertMetadataFile,
   type License,
   type MetadataFile 
-} from "@shared/schema";
-import { UserPermissions } from "./permissions";
+} from "../_shared/schema.js";
+import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
 
 export class AiService {
@@ -23,7 +23,7 @@ export class AiService {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = configuredModel || "gemini-1.5-pro";
+    this.model = configuredModel || "gemini-3-pro-preview";
   }
 
   private extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): string {
@@ -81,7 +81,9 @@ JSON Schema:
   ]
 }
 
-${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
+${!isPdf ? `The document content is as follows:
+
+${extractedText}` : ""}
 
 Only return the JSON object. Do not include markdown formatting or extra text.`;
 
@@ -138,7 +140,9 @@ JSON Schema:
   ]
 }
 
-${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
+${!isPdf ? `The document content is as follows:
+
+${extractedText}` : ""}
 
 Only return the JSON object.`;
 
