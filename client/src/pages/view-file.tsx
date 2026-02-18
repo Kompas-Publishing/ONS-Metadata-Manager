@@ -185,105 +185,47 @@ export default function ViewFile() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-8">
-          <Card className="p-6">
-            <MetadataForm
-              defaultValues={{
-                title: file.title,
-                season: file.season || undefined,
-                episode: file.episode || undefined,
-                duration: file.duration ?? "",
-                breakTime: file.breakTime ?? "",
-                breakTimes: file.breakTimes || [],
-                endCredits: file.endCredits ?? "",
-                description: file.description || "",
-                actors: file.actors || [],
-                genre: file.genre || [],
-                tags: file.tags || [],
-                seasonType: (file.seasonType as any) || undefined,
-                contentType: file.contentType || "",
-                category: (file.category as any) || undefined,
-                channel: file.channel ?? "ONS",
-                programRating: (file.programRating as any) || undefined,
-                productionCountry: file.productionCountry ?? "",
-                seriesTitle: file.seriesTitle ?? "",
-                yearOfProduction: file.yearOfProduction || undefined,
-                catchUp: file.catchUp ?? undefined,
-                episodeCount: file.episodeCount || undefined,
-                episodeTitle: file.episodeTitle ?? "",
-                episodeDescription: file.episodeDescription ?? "",
-                segmented: file.segmented ?? undefined,
-                dateStart: file.dateStart ? new Date(file.dateStart) : undefined,
-                dateEnd: file.dateEnd ? new Date(file.dateEnd) : undefined,
-                subtitles: file.subtitles ?? undefined,
-                subtitlesId: file.subtitlesId ?? "",
-                audioId: file.audioId ?? "",
-                googleDriveLink: file.googleDriveLink ?? "",
-                originalFilename: file.originalFilename ?? "",
-              }}
-              onSubmit={() => {}}
-              isPending={false}
-              submitLabel="Save"
-              readOnly={true}
-            />
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-primary" />
-                Tasks
-              </CardTitle>
-              <CardDescription>Current tasks for this file</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3 pt-2">
-                {tasksLoading ? (
-                  <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin" /></div>
-                ) : tasks && tasks.length > 0 ? (
-                  tasks.map(task => (
-                    <div key={task.id} className="flex items-start gap-3 p-2 rounded border bg-muted/20">
-                      <Checkbox 
-                        checked={task.status === "completed"}
-                        onCheckedChange={(checked) => toggleTaskMutation.mutate({ id: task.id, status: checked ? "completed" : "pending" })}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm font-medium leading-none mb-1",
-                          task.status === "completed" && "line-through text-muted-foreground"
-                        )}>
-                          {task.description}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          {task.status === "completed" ? (
-                            <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] bg-green-50 text-green-700 border-green-100">Done</Badge>
-                          ) : (
-                            <Badge variant="outline" className="px-1.5 py-0 h-4 text-[10px] text-amber-600 bg-amber-50 border-amber-100">Pending</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteTaskMutation.mutate(task.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-center text-muted-foreground py-4">No tasks assigned.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="p-6">
+        <MetadataForm
+          defaultValues={{
+            title: file.title,
+            season: file.season || undefined,
+            episode: file.episode || undefined,
+            duration: file.duration ?? "",
+            breakTime: file.breakTime ?? "",
+            breakTimes: file.breakTimes || [],
+            endCredits: file.endCredits ?? "",
+            description: file.description || "",
+            actors: file.actors || [],
+            genre: file.genre || [],
+            tags: file.tags || [],
+            seasonType: (file.seasonType as any) || undefined,
+            contentType: file.contentType || "",
+            category: (file.category as any) || undefined,
+            channel: file.channel ?? "ONS",
+            programRating: (file.programRating as any) || undefined,
+            productionCountry: file.productionCountry ?? "",
+            seriesTitle: file.seriesTitle ?? "",
+            yearOfProduction: file.yearOfProduction || undefined,
+            catchUp: file.catchUp ?? undefined,
+            episodeCount: file.episodeCount || undefined,
+            episodeTitle: file.episodeTitle ?? "",
+            episodeDescription: file.episodeDescription ?? "",
+            segmented: file.segmented ?? undefined,
+            dateStart: file.dateStart ? new Date(file.dateStart) : undefined,
+            dateEnd: file.dateEnd ? new Date(file.dateEnd) : undefined,
+            subtitles: file.subtitles ?? undefined,
+            subtitlesId: file.subtitlesId ?? "",
+            audioId: file.audioId ?? "",
+            googleDriveLink: file.googleDriveLink ?? "",
+            originalFilename: file.originalFilename ?? "",
+          }}
+          onSubmit={() => {}}
+          isPending={false}
+          submitLabel="Save"
+          readOnly={true}
+        />
+      </Card>
     </div>
   );
 }

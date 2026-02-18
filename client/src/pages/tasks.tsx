@@ -96,7 +96,27 @@ export default function Tasks() {
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await apiRequest("PATCH", `/api/tasks/${id}`, { status });
     },
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks"] });
+      const previousTasks = queryClient.getQueryData<TaskWithFile[]>(["/api/tasks"]);
+      if (previousTasks) {
+        queryClient.setQueryData<TaskWithFile[]>(["/api/tasks"], 
+          previousTasks.map(t => t.id === id ? { ...t, status: status as any } : t)
+        );
+      }
+      return { previousTasks };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["/api/tasks"], context.previousTasks);
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update task status",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
     },
   });
