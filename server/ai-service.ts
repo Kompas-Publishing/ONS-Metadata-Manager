@@ -83,7 +83,8 @@ Granularity Logic:
 Data Rules:
 - Name: Use the Content Title and Season (e.g., "Ballykissangel Series 2"). DO NOT include legal headers like "Amendment Agreement".
 - Distributor Normalization: Use "MGM" instead of "MGM International Television Distribution Inc." and "BBC" instead of its full legal name.
-- Comparison: If an entry in CANDIDATES matches the name and distributor, propose an "update" with that ID. Otherwise, "create".
+- Comparison: If an entry in CANDIDATES matches the name and distributor AND has overlapping or identical dates, propose an "update" with that ID.
+- NEW LICENSE TERMS: If the dates (start/end) are significantly different from the CANDIDATES (e.g., a new contract for a different year), propose a "create" action even if the name matches. We want to keep historical licenses.
 - Season Rule: If a season is 0 or missing, set it to 1.
 
 JSON Schema (MATCH EXACT DATABASE FIELDS):

@@ -57,15 +57,22 @@ export default function AiUpload() {
   });
 
   const executeMutation = useMutation({
-    mutationFn: async (proposalIndex: number) => {
-      const proposal = proposals![proposalIndex];
+    mutationFn: async (arg: number | Proposal) => {
+      const proposal = typeof arg === "number" ? proposals![arg] : arg;
       const res = await apiRequest("POST", "/api/ai/execute-proposal", proposal);
-      return await res.json();
+      return { result: await res.json(), index: typeof arg === "number" ? arg : -1 };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data) => {
       toast({ title: "Success", description: "Proposal executed successfully" });
-      // Remove the executed proposal from the list
-      setProposals(prev => prev ? prev.filter((_, i) => i !== variables) : null);
+      // Remove the executed proposal from the list if we have an index
+      if (data.index !== -1) {
+        setProposals(prev => prev ? prev.filter((_, i) => i !== data.index) : null);
+      } else {
+        // If it was a custom proposal (Create as New), we can't easily find the index to remove
+        // So we clear the proposals or re-fetch (simplest is to just clear this specific one if we can find it)
+        // For now, let's just clear the whole list or assume the user will discard it
+        setProposals(null); 
+      }
       queryClient.invalidateQueries();
     },
     onError: (error: any) => {
@@ -255,6 +262,30 @@ export default function AiUpload() {
                         >
                           Discard
                         </Button>
+                        
+                        {proposal.action === "update" && (
+                          <Button 
+                            variant="secondary"
+                            onClick={() => {
+                              const newData = { ...proposal.data };
+                              delete newData.id;
+                              executeMutation.mutate({ 
+                                ...proposal, 
+                                action: "create", 
+                                data: newData 
+                              } as any);
+                            }}
+                            disabled={executeMutation.isPending}
+                          >
+                            {executeMutation.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="mr-2 h-4 w-4" />
+                            )}
+                            Create as New
+                          </Button>
+                        )}
+
                         <Button 
                           onClick={() => executeMutation.mutate(index)}
                           disabled={executeMutation.isPending}
