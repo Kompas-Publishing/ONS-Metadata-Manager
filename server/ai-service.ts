@@ -23,7 +23,7 @@ export class AiService {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = configuredModel || "gemini-1.5-pro";
+    this.model = configuredModel || "gemini-3-pro-preview";
   }
 
   private extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): string {
@@ -117,81 +117,94 @@ Only return the JSON object. Do not include markdown formatting or extra text.`;
     const isPdf = mimeType === "application/pdf";
     const extractedText = isPdf ? "" : this.extractTextFromBuffer(fileBuffer, mimeType);
 
-    const prompt = `Task: Extract video metadata from this document.
-Return a JSON array of metadata objects.
+    // Phase 1: Extract titles to find candidates
+    const searchPrompt = `Task: Extract the series title or main title from this metadata document. 
+Return ONLY a JSON object with a "keywords" array of strings to search for in a database.
+
+${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
+
+Example: { "keywords": ["Holland Heritage", "Heritage"] }`;
+
+    const phase1Content: any[] = [searchPrompt];
+    if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const phase1Result = await model.generateContent(phase1Content);
+    const keywordsData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
+    
+    // Search DB for candidates
+    let candidates: MetadataFile[] = [];
+    for (const kw of keywordsData.keywords || []) {
+      const results = await storage.searchMetadata(kw, permissions);
+      candidates = [...candidates, ...results];
+    }
+    // De-duplicate candidates by ID
+    const uniqueCandidates = Array.from(new Map(candidates.map(c => [c.id, c])).values());
+
+    // Phase 2: Final parsing and comparison
+    const finalPrompt = `Role: Expert Metadata Librarian.
+Task: Extract metadata from the provided document and compare it against existing database entries to prevent duplicates.
+
+Existing Database Candidates (CANDIDATES):
+${JSON.stringify(uniqueCandidates.map(c => ({ id: c.id, title: c.title, seriesTitle: c.seriesTitle, season: c.season, episode: c.episode })), null, 2)}
+
+Instructions:
+1. Extract every metadata item found in the document.
+2. For each extracted item:
+   - Search the CANDIDATES list for an entry that matches (similar title + same season + same episode).
+   - If a strong match is found: Propose an "update" action. Use the existing ID.
+   - If no match is found: Propose a "create" action.
+3. Be strict about duplicates. We do not want two entries for the same episode of the same series.
 
 JSON Schema:
 {
-  "items": [
+  "proposals": [
     {
-      "title": "string",
-      "series_title": "string",
-      "season": number,
-      "episode": number,
-      "episode_title": "string",
-      "duration": "HH:MM:SS",
-      "description": "string",
-      "genre": ["string"],
-      "actors": ["string"],
-      "production_country": "string",
-      "year_of_production": number
+      "type": "metadata",
+      "action": "create" | "update",
+      "explanation": "string explaining why it matched or didn't",
+      "data": {
+        "id": "string (only if update)",
+        "title": "string",
+        "seriesTitle": "string",
+        "season": number,
+        "episode": number,
+        "episodeTitle": "string",
+        "duration": "HH:MM:SS",
+        "description": "string",
+        "genre": ["string"],
+        "actors": ["string"],
+        "productionCountry": "string",
+        "yearOfProduction": number,
+        "originalFilename": "string",
+        "programRating": "string",
+        "channel": "string",
+        "episodeCount": number,
+        "segmented": 0 | 1,
+        "catchUp": 0 | 1,
+        "subtitles": 0 | 1
+      }
     }
   ]
 }
 
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
 
-Only return the JSON object.`;
+Only return the JSON object. Do not include markdown formatting.`;
 
-    const content: any[] = [prompt];
-    if (isPdf) {
-      content.push({
-        inlineData: {
-          data: fileBuffer.toString("base64"),
-          mimeType: mimeType
-        }
-      });
-    }
+    const finalContent: any[] = [finalPrompt];
+    if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
-    const result = await model.generateContent(content);
-    const response = await result.response;
-    const extractedData = JSON.parse(response.text().replace(/```json|```/g, "").trim());
+    const finalResult = await model.generateContent(finalContent);
+    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
 
-    const proposals = [];
-    const allFiles = await storage.getAllMetadataFiles(permissions);
-    
-    for (const item of extractedData.items || []) {
-      let existingFile: MetadataFile | undefined;
-      
-      if (item.series_title && item.season && item.episode) {
-        existingFile = allFiles.find(f => 
-          f.seriesTitle === item.series_title && 
-          f.season === item.season && 
-          f.episode === item.episode
-        );
-      } else if (item.title) {
-        existingFile = allFiles.find(f => f.title === item.title);
-      }
-
-      if (existingFile) {
-        proposals.push({
-          type: "metadata",
-          action: "update",
-          data: { ...item, id: existingFile.id },
-          existingData: existingFile,
-          explanation: `Found matching metadata for "${item.title || item.series_title}" Season ${item.season} Ep ${item.episode}. Proposing update with new information from document.`
-        });
-      } else {
-        proposals.push({
-          type: "metadata",
-          action: "create",
-          data: item,
-          explanation: `No matching file found for "${item.title || item.series_title}". Proposing to create a new metadata entry.`
-        });
+    // Enrich proposals with existingData for UI comparison
+    for (const proposal of resultJson.proposals || []) {
+      if (proposal.action === "update" && proposal.data.id) {
+        proposal.existingData = uniqueCandidates.find(c => c.id === proposal.data.id);
       }
     }
 
-    return { proposals };
+    return resultJson;
   }
 }
 

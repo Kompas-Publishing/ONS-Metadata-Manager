@@ -48,6 +48,7 @@ export interface IStorage {
   getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]>;
   getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }>;
+  searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]>;
   
   getUserTags(userId: string, type: string): Promise<UserDefinedTag[]>;
   createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag>;
@@ -800,6 +801,35 @@ export class DatabaseStorage implements IStorage {
       prev: prevFile ? normalizeMetadataFile(prevFile) : null,
       next: nextFile ? normalizeMetadataFile(nextFile) : null,
     };
+  }
+
+  async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [
+      or(
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + keyword + '%'})`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`
+      )
+    ];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+    
+    const files = await db
+      .select()
+      .from(metadataFiles)
+      .where(and(...whereConditions))
+      .orderBy(metadataFiles.title, metadataFiles.season, metadataFiles.episode)
+      .limit(100);
+    return files.map(normalizeMetadataFile);
   }
 
   async listAllUsers(): Promise<User[]> {
