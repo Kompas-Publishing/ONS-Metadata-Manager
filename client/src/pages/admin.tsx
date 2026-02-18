@@ -170,7 +170,7 @@ function AiConfigSection() {
                 Currently, only Google Gemini is supported. Gemini 3 is now available.
               </p>
               <p className="text-xs text-yellow-600 font-medium">
-                Note: Vercel has a 4.5MB limit for file uploads. Larger files may fail.
+                Note: Vercel has a 4.5MB limit for file uploads. For large metadata files, please save as CSV before uploading to significantly reduce size.
               </p>
             </div>
           </div>

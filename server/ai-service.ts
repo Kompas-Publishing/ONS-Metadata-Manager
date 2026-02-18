@@ -181,11 +181,16 @@ JSON Schema:
         "episodeCount": number,
         "segmented": 0 | 1,
         "catchUp": 0 | 1,
-        "subtitles": 0 | 1
+        "subtitles": 0 | 1,
+        "breakTimes": ["HH:MM:SS"]
       }
     }
   ]
 }
+
+Instructions for Mapping Files:
+- Breaktimes are often located in the final columns of the document. Look for multiple timestamp columns and group them into the "breakTimes" array.
+- Duration is critical and must be in HH:MM:SS format.
 
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
 
