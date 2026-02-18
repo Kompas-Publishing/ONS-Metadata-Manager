@@ -1927,10 +1927,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (type === "license") {
           if (action === "create") {
-            const license = await storage.createLicense(data);
-            return res.json({ message: "License created successfully", id: license.id });
+            // Convert date strings to Date objects
+            const licenseData = { ...data };
+            if (licenseData.licenseStart) licenseData.licenseStart = new Date(licenseData.licenseStart);
+            if (licenseData.licenseEnd) licenseData.licenseEnd = new Date(licenseData.licenseEnd);
+            
+            const license = await storage.createLicense(licenseData);
+            
+            // Generate linked content (metadata drafts) if items are listed
+            if (data.content_items && Array.isArray(data.content_items)) {
+              for (const item of data.content_items) {
+                if (item.episodes > 0) {
+                  await storage.generateLicenseDrafts({
+                    licenseId: license.id,
+                    seriesTitle: item.title,
+                    seasonStart: 1, // Defaulting to season 1 for new imports
+                    seasonEnd: 1,
+                    episodesPerSeason: item.episodes
+                  }, userId);
+                }
+              }
+            }
+            
+            return res.json({ message: "License and linked content created successfully", id: license.id });
           } else if (action === "update") {
-            const license = await storage.updateLicense(data.id, data);
+            const licenseData = { ...data };
+            if (licenseData.licenseStart) licenseData.licenseStart = new Date(licenseData.licenseStart);
+            if (licenseData.licenseEnd) licenseData.licenseEnd = new Date(licenseData.licenseEnd);
+            
+            const license = await storage.updateLicense(data.id, licenseData);
             return res.json({ message: "License updated successfully", id: license?.id });
           }
         } else if (type === "metadata") {

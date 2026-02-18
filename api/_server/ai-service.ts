@@ -58,32 +58,31 @@ Granularity Logic:
 * If the contract contains multiple titles, seasons, or packages with different dates or fees (e.g., a Schedule A table): Atomize the data. Create a unique license object for every distinct row or content group that has its own financial or timing terms.
 
 Data Rules:
-- Internal Name: Use [Contract #] + [Title/Season].
+- Name: Use the Content Title and Season (e.g., "Ballykissangel Series 2"). DO NOT include legal headers like "Amendment Agreement", "Deal Memo", or contract numbers in the name itself.
 - Fee Calculation: If the contract lists a "Price per Episode," multiply it by the episode count for that specific entry's total amount.
-- Missing Fields: Use null for fields not found (e.g., Kijkwijzer). Do not guess.
+- Missing Fields: Use null for fields not found. Do not guess.
 - Distributor Normalization: Use "MGM" instead of "MGM International Television Distribution Inc." and "BBC" instead of its full legal name.
 
-JSON Schema:
+JSON Schema (MATCH EXACT DATABASE FIELDS):
 {
   "licenses": [
     {
       "name": "string",
       "distributor": "string",
-      "content_title": "string",
-      "license_fee_amount": "string", (Total amount as string)
-      "license_fee_currency": "string",
-      "license_start": "YYYY-MM-DD",
-      "license_end": "YYYY-MM-DD",
+      "contentTitle": "string",
+      "licenseFeeAmount": "string", (Total amount as numeric string)
+      "licenseFeeCurrency": "string", (e.g. "EUR", "USD")
+      "licenseStart": "YYYY-MM-DD",
+      "licenseEnd": "YYYY-MM-DD",
       "allowed_runs": "string",
       "description": "string",
+      "notes": "string", (Include legal headers or specific contract context here, e.g. "Amendment Agreement No.2")
       "content_items": [{ "title": "string", "episodes": number }]
     }
   ]
 }
 
-${!isPdf ? `The document content is as follows:
-
-${extractedText}` : ""}
+${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
 
 Only return the JSON object. Do not include markdown formatting or extra text.`;
 
