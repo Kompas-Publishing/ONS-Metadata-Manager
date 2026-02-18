@@ -40,12 +40,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
 
     if (type === "license") {
       const result = await aiService.parseLicenseContract(file.buffer, file.mimetype);
-      proposals = (result.licenses || []).map((l: any) => ({
-        type: "license",
-        action: "create",
-        data: l,
-        explanation: `AI extracted license for "${l.content_title || l.name}" from ${l.distributor || "unknown distributor"}.`
-      }));
+      proposals = result.proposals || [];
     } else if (type === "metadata") {
       const result = await aiService.parseMetadataDocument(file.buffer, file.mimetype, req.permissions!);
       proposals = result.proposals;

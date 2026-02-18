@@ -1892,12 +1892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (type === "license") {
           const result = await aiService.parseLicenseContract(req.file.buffer, req.file.mimetype);
-          proposals = (result.licenses || []).map((l: any) => ({
-            type: "license",
-            action: "create",
-            data: l,
-            explanation: `AI extracted license for "${l.content_title || l.name}" from ${l.distributor || "unknown distributor"}.`
-          }));
+          proposals = result.proposals || [];
         } else if (type === "metadata") {
           const result = await aiService.parseMetadataDocument(req.file.buffer, req.file.mimetype, permissions);
           proposals = result.proposals;
