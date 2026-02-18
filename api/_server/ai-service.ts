@@ -77,10 +77,15 @@ JSON Schema (MATCH EXACT DATABASE FIELDS):
       "allowed_runs": "string",
       "description": "string",
       "notes": "string", (Include legal headers or specific contract context here, e.g. "Amendment Agreement No.2")
-      "content_items": [{ "title": "string", "episodes": number }]
+      "content_items": [{ "title": "string", "episodes": number, "season": number }]
     }
   ]
 }
+
+Data Rules for Content Items:
+- Title: The clean series title (e.g., "Ballykissangel"). DO NOT include "Series X" or "Season X" in this field.
+- Season: Extract the season/series number as a standalone integer.
+- Episodes: Total number of episodes for that specific season.
 
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
 

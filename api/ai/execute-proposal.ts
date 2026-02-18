@@ -24,11 +24,12 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
         if (data.content_items && Array.isArray(data.content_items)) {
           for (const item of data.content_items) {
             if (item.episodes > 0) {
+              const seasonNum = item.season || 1;
               await storage.generateLicenseDrafts({
                 licenseId: license.id,
                 seriesTitle: item.title,
-                seasonStart: 1,
-                seasonEnd: 1,
+                seasonStart: seasonNum,
+                seasonEnd: seasonNum,
                 episodesPerSeason: item.episodes
               }, userId);
             }
