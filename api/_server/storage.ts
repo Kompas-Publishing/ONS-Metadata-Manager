@@ -5,6 +5,7 @@ import {
   userDefinedTags,
   groups,
   licenses,
+  tasks,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -18,6 +19,8 @@ import {
   type InsertLicense,
   type License,
   type LicenseBatchGenerate,
+  type Task,
+  type InsertTask,
 } from "../_shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -64,7 +67,7 @@ export interface IStorage {
   deleteGroup(groupId: string): Promise<boolean>;
 
   // Multi-batch creation
-  createMultiBatchMetadataFiles(data: { batches: any[] }, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]>;
 
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
@@ -73,6 +76,14 @@ export interface IStorage {
   updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
   deleteLicense(id: string): Promise<boolean>;
   generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]>;
+
+  // Task Management
+  createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
+  bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]>;
+  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
+  updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: number): Promise<boolean>;
 }
 
 function formatMetadataId(num: number): string {
@@ -520,7 +531,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createMultiBatchMetadataFiles(data: { batches: any[] }, permissions: UserPermissions): Promise<MetadataFile[]> {
+  async createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
       const [setting] = await tx
         .select()
@@ -583,6 +594,7 @@ export class DatabaseStorage implements IStorage {
               segmented: batch.segmented,
               draft: batch.draft ?? 1,
               licenseId: batch.licenseId,
+              googleDriveLink: batch.googleDriveLink,
               createdBy: permissions.user.id,
             };
 
@@ -605,6 +617,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(allFiles).returning();
+
+      if (data.taskDescription && created.length > 0) {
+        const taskValues = created.map(file => ({
+          metadataFileId: file.id,
+          description: data.taskDescription!,
+          status: "pending" as const,
+          createdBy: permissions.user.id,
+        }));
+        await tx.insert(tasks).values(taskValues);
+      }
+
       return created;
     });
   }
@@ -740,7 +763,7 @@ export class DatabaseStorage implements IStorage {
         baseConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
         baseConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
       } else {
-        baseConditions.push(sql`1 = 0`);
+        whereConditions.push(sql`1 = 0`);
       }
     }
 
@@ -959,6 +982,82 @@ export class DatabaseStorage implements IStorage {
       const created = await tx.insert(metadataFiles).values(files).returning();
       return created;
     });
+  }
+
+  async createTask(taskData: InsertTask & { createdBy: string }): Promise<Task> {
+    const [task] = await db.insert(tasks).values(taskData).returning();
+    return task;
+  }
+
+  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]> {
+    const { metadataFileIds, description, createdBy } = taskData;
+    if (metadataFileIds.length === 0) return [];
+
+    const values = metadataFileIds.map(fileId => ({
+      metadataFileId: fileId,
+      description,
+      status: "pending" as const,
+      createdBy,
+    }));
+
+    return await db.insert(tasks).values(values).returning();
+  }
+
+  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    if (status) {
+      whereConditions.push(eq(tasks.status, status));
+    }
+    
+    const results = await db
+      .select({
+        task: tasks,
+        metadataFile: metadataFiles,
+      })
+      .from(tasks)
+      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
+      .orderBy(desc(tasks.createdAt));
+
+    return results.map(r => ({
+      ...r.task,
+      metadataFile: normalizeMetadataFile(r.metadataFile)
+    }));
+  }
+
+  async getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]> {
+    return await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.metadataFileId, fileId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined> {
+    const [updated] = await db
+      .update(tasks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tasks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTask(id: number): Promise<boolean> {
+    const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
+    return result.length > 0;
   }
 }
 
