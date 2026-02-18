@@ -63,12 +63,115 @@ import {
   FileText,
   Edit,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import type { User, Group } from "@shared/schema";
+import type { User, Group, Setting } from "@shared/schema";
 import { useEffect, useState } from "react";
+
+function AiConfigSection() {
+  const { toast } = useToast();
+  const { data: aiSettings, isLoading } = useQuery<{ settings: Setting[] }>({
+    queryKey: ['/api/admin/settings/ai'],
+  });
+
+  const [provider, setProvider] = useState("google");
+  const [model, setModel] = useState("gemini-1.5-pro");
+  const [apiKey, setApiKey] = useState("");
+
+  useEffect(() => {
+    if (aiSettings?.settings) {
+      const p = aiSettings.settings.find(s => s.key === "ai_provider")?.value;
+      const m = aiSettings.settings.find(s => s.key === "ai_model")?.value;
+      const k = aiSettings.settings.find(s => s.key === "ai_api_key")?.value;
+      if (p) setProvider(p);
+      if (m) setModel(m);
+      if (k) setApiKey(k);
+    }
+  }, [aiSettings]);
+
+  const updateAiConfigMutation = useMutation({
+    mutationFn: async (config: { provider: string; model: string; apiKey: string }) => {
+      await apiRequest('POST', '/api/admin/settings/ai', config);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings/ai'] });
+      toast({ title: "Success", description: "AI configuration saved" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save AI configuration",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) return <Skeleton className="h-48 w-full" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-primary" />
+        <h2 className="text-xl font-semibold text-foreground">AI Configuration</h2>
+      </div>
+      <Card className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="ai-provider">AI Provider</Label>
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger id="ai-provider">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="google">Google Gemini</SelectItem>
+                <SelectItem value="openai">OpenAI (Planned)</SelectItem>
+                <SelectItem value="anthropic">Anthropic (Planned)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ai-model">Model</Label>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger id="ai-model">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+                <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-2 space-y-2">
+            <Label htmlFor="ai-api-key">API Key</Label>
+            <div className="flex gap-2">
+              <Input
+                id="ai-api-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter your API key"
+                className="flex-grow"
+              />
+              <Button
+                onClick={() => updateAiConfigMutation.mutate({ provider, model, apiKey })}
+                disabled={updateAiConfigMutation.isPending}
+              >
+                Save Configuration
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Currently, only Google Gemini is supported. Your API key is stored securely.
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 export default function Admin() {
   const { user: currentUser, isLoading: authLoading } = useAuth();
@@ -797,6 +900,9 @@ export default function Admin() {
           </Card>
         )}
       </div>
+
+      {/* AI Configuration Section */}
+      <AiConfigSection />
 
       {/* Create Group Dialog */}
       <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>

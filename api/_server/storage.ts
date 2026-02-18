@@ -84,6 +84,11 @@ export interface IStorage {
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
+
+  // Settings
+  getSetting(key: string): Promise<Setting | undefined>;
+  setSetting(key: string, value: string): Promise<Setting>;
+  getSettingsByKeys(keys: string[]): Promise<Setting[]>;
 }
 
 function formatMetadataId(num: number): string {
@@ -1058,6 +1063,28 @@ export class DatabaseStorage implements IStorage {
   async deleteTask(id: number): Promise<boolean> {
     const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getSetting(key: string): Promise<Setting | undefined> {
+    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
+    return setting;
+  }
+
+  async setSetting(key: string, value: string): Promise<Setting> {
+    const [setting] = await db
+      .insert(settings)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value, updatedAt: new Date() },
+      })
+      .returning();
+    return setting;
+  }
+
+  async getSettingsByKeys(keys: string[]): Promise<Setting[]> {
+    if (keys.length === 0) return [];
+    return await db.select().from(settings).where(inArray(settings.key, keys));
   }
 }
 

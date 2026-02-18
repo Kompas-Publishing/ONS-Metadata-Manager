@@ -25,6 +25,7 @@ import CreateLicense from "@/pages/create-license";
 import ViewLicense from "@/pages/view-license";
 import EditLicense from "@/pages/edit-license";
 import Tasks from "@/pages/tasks";
+import AiUpload from "@/pages/ai-upload";
 
 function Router() {
   return (
@@ -133,6 +134,14 @@ function Router() {
         <AuthenticatedRoute>
           <ProtectedLayout>
             <Tasks />
+          </ProtectedLayout>
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/ai-upload">
+        <AuthenticatedRoute>
+          <ProtectedLayout>
+            <AiUpload />
           </ProtectedLayout>
         </AuthenticatedRoute>
       </Route>

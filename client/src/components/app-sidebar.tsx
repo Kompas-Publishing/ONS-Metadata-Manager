@@ -23,6 +23,7 @@ import {
     Shield,
     FileKey,
     CheckSquare,
+    Sparkles,
   } from "lucide-react";
   
   const allMenuItems = [
@@ -41,6 +42,14 @@ import {
       testId: "nav-tasks",
       adminOnly: false,
       requiresWrite: false,
+    },
+    {
+      title: "AI Upload",
+      url: "/ai-upload",
+      icon: Sparkles,
+      testId: "nav-ai-upload",
+      adminOnly: false,
+      requiresWrite: true,
     },
     {
       title: "License Manager",    url: "/licenses",

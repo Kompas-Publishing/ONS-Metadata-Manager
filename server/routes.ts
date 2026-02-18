@@ -18,6 +18,13 @@ import { z } from "zod";
 import { getUserPermissions, requirePermission } from "./permissions";
 import * as XLSX from "xlsx";
 import { rateLimit } from "express-rate-limit";
+import multer from "multer";
+import { aiService } from "./ai-service";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -1806,6 +1813,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error deleting group:", error);
         res.status(500).json({ message: "Failed to delete group" });
+      }
+    },
+  );
+
+  // AI Configuration Routes
+  app.get(
+    "/api/admin/settings/ai",
+    isAuthenticated,
+    isAdminUser,
+    async (req: any, res) => {
+      try {
+        const keys = ["ai_provider", "ai_model", "ai_api_key"];
+        const settingsList = await storage.getSettingsByKeys(keys);
+        
+        // Mask the API key
+        const sanitized = settingsList.map(s => {
+          if (s.key === "ai_api_key" && s.value) {
+            // Only mask if it's long enough
+            const val = s.value;
+            if (val.length > 8) {
+              return { ...s, value: val.substring(0, 4) + "****" + val.substring(val.length - 4) };
+            }
+            return { ...s, value: "****" };
+          }
+          return s;
+        });
+        
+        res.json({ settings: sanitized });
+      } catch (error) {
+        console.error("Error fetching AI settings:", error);
+        res.status(500).json({ message: "Failed to fetch AI settings" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/admin/settings/ai",
+    isAuthenticated,
+    isAdminUser,
+    async (req: any, res) => {
+      try {
+        const { provider, model, apiKey } = req.body;
+        
+        if (provider) await storage.setSetting("ai_provider", provider);
+        if (model) await storage.setSetting("ai_model", model);
+        if (apiKey && !apiKey.includes("****")) {
+          await storage.setSetting("ai_api_key", apiKey);
+        }
+        
+        res.json({ message: "AI settings updated successfully" });
+      } catch (error) {
+        console.error("Error updating AI settings:", error);
+        res.status(500).json({ message: "Failed to update AI settings" });
+      }
+    },
+  );
+
+  // AI Upload Routes
+  app.post(
+    "/api/ai/parse-upload",
+    isAuthenticated,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        const permissions = await getUserPermissions(userId);
+        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
+          return res.status(403).json({ message: "Write permission required" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const type = req.body.type || "license";
+        let proposals = [];
+
+        if (type === "license") {
+          const result = await aiService.parseLicenseContract(req.file.buffer, req.file.mimetype);
+          proposals = (result.licenses || []).map((l: any) => ({
+            type: "license",
+            action: "create",
+            data: l,
+            explanation: `AI extracted license for "${l.content_title || l.name}" from ${l.distributor || "unknown distributor"}.`
+          }));
+        } else if (type === "metadata") {
+          const result = await aiService.parseMetadataDocument(req.file.buffer, req.file.mimetype, permissions);
+          proposals = result.proposals;
+        }
+
+        res.json({ proposals });
+      } catch (error: any) {
+        console.error("Error in AI parse upload:", error);
+        res.status(500).json({ message: error.message || "AI parsing failed" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/ai/execute-proposal",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        const permissions = await getUserPermissions(userId);
+        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
+          return res.status(403).json({ message: "Write permission required" });
+        }
+
+        const proposal = req.body;
+        const { type, action, data } = proposal;
+
+        if (type === "license") {
+          if (action === "create") {
+            const license = await storage.createLicense(data);
+            return res.json({ message: "License created successfully", id: license.id });
+          } else if (action === "update") {
+            const license = await storage.updateLicense(data.id, data);
+            return res.json({ message: "License updated successfully", id: license?.id });
+          }
+        } else if (type === "metadata") {
+          if (action === "create") {
+            const nextId = await storage.consumeNextId();
+            // Default required fields if AI missed them
+            const metadataToCreate = {
+              ...data,
+              duration: data.duration || "00:00:00",
+              contentType: data.contentType || "Long Form",
+            };
+            const file = await storage.createMetadataFile(metadataToCreate, nextId, permissions);
+            return res.json({ message: "Metadata file created successfully", id: file.id });
+          } else if (action === "update") {
+            const file = await storage.updateMetadataFile(data.id, data, permissions);
+            return res.json({ message: "Metadata file updated successfully", id: file?.id });
+          }
+        }
+
+        res.status(400).json({ message: "Invalid proposal or action" });
+      } catch (error: any) {
+        console.error("Error executing proposal:", error);
+        res.status(500).json({ message: error.message || "Failed to execute proposal" });
       }
     },
   );
