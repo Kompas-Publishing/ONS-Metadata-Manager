@@ -49,69 +49,91 @@ export class AiService {
     const isPdf = mimeType === "application/pdf";
     const extractedText = isPdf ? "" : this.extractTextFromBuffer(fileBuffer, mimeType);
 
-    const prompt = `Role: Expert Legal Content Analyst.
+    // Phase 1: Extract basic info to find candidates
+    const searchPrompt = `Task: Extract the license name and distributor from this contract. 
+Return ONLY a JSON object with "name" and "distributor" strings.
 
-Task: Extract contract data into a structured JSON array of "license" objects.
+${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
+
+Example: { "name": "Ballykissangel", "distributor": "BBC" }`;
+
+    const phase1Content: any[] = [searchPrompt];
+    if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const phase1Result = await model.generateContent(phase1Content);
+    const searchData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
+    
+    // Search DB for candidate licenses
+    const allLicenses = await storage.listLicenses();
+    const candidates = allLicenses.filter(l => 
+      (l.distributor?.toLowerCase() === searchData.distributor?.toLowerCase()) ||
+      (l.name.toLowerCase().includes(searchData.name?.toLowerCase()))
+    ).slice(0, 10);
+
+    const finalPrompt = `Role: Expert Legal Content Analyst.
+Task: Extract contract data into a structured JSON array of "license" objects and compare against candidates to prevent duplicates.
+
+Existing Database Candidates (CANDIDATES):
+${JSON.stringify(candidates.map(c => ({ id: c.id, name: c.name, distributor: c.distributor, start: c.licenseStart, end: c.licenseEnd })), null, 2)}
 
 Granularity Logic:
 * If the contract is for a single title/package: Return an array with one license object.
-* If the contract contains multiple titles, seasons, or packages with different dates or fees (e.g., a Schedule A table): Atomize the data. Create a unique license object for every distinct row or content group that has its own financial or timing terms.
+* If the contract contains multiple titles, seasons, or packages: Atomize the data.
 
 Data Rules:
-- Name: Use the Content Title and Season (e.g., "Ballykissangel Series 2"). DO NOT include legal headers like "Amendment Agreement", "Deal Memo", or contract numbers in the name itself.
-- Fee Calculation: If the contract lists a "Price per Episode," multiply it by the episode count for that specific entry's total amount.
-- Missing Fields: Use null for fields not found. Do not guess.
+- Name: Use the Content Title and Season (e.g., "Ballykissangel Series 2"). DO NOT include legal headers like "Amendment Agreement".
 - Distributor Normalization: Use "MGM" instead of "MGM International Television Distribution Inc." and "BBC" instead of its full legal name.
+- Comparison: If an entry in CANDIDATES matches the name and distributor, propose an "update" with that ID. Otherwise, "create".
+- Season Rule: If a season is 0 or missing, set it to 1.
 
 JSON Schema (MATCH EXACT DATABASE FIELDS):
 {
-  "licenses": [
+  "proposals": [
     {
-      "name": "string",
-      "distributor": "string",
-      "contentTitle": "string",
-      "licenseFeeAmount": "string", (Total amount as numeric string)
-      "licenseFeeCurrency": "string", (e.g. "EUR", "USD")
-      "licenseStart": "YYYY-MM-DD",
-      "licenseEnd": "YYYY-MM-DD",
-      "allowed_runs": "string",
-      "description": "string",
-      "notes": "string", (Include legal headers or specific contract context here, e.g. "Amendment Agreement No.2")
-      "content_items": [{ "title": "string", "episodes": number, "season": number }]
+      "type": "license",
+      "action": "create" | "update",
+      "explanation": "string explaining why it matched or didn't",
+      "data": {
+        "id": "string (only if update)",
+        "name": "string",
+        "distributor": "string",
+        "contentTitle": "string",
+        "licenseFeeAmount": "string",
+        "licenseFeeCurrency": "string",
+        "licenseStart": "YYYY-MM-DD",
+        "licenseEnd": "YYYY-MM-DD",
+        "allowed_runs": "string",
+        "description": "string",
+        "notes": "string",
+        "content_items": [{ "title": "string", "episodes": number, "season": number }]
+      }
     }
   ]
 }
 
-Data Rules for Content Items:
-- Title: The clean series title (e.g., "Ballykissangel"). DO NOT include "Series X" or "Season X" in this field.
-- Season: Extract the season/series number as a standalone integer.
-- Episodes: Total number of episodes for that specific season.
-
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
 
-Only return the JSON object. Do not include markdown formatting or extra text.`;
+Only return the JSON object.`;
 
-    const content: any[] = [prompt];
-    if (isPdf) {
-      content.push({
-        inlineData: {
-          data: fileBuffer.toString("base64"),
-          mimeType: mimeType
+    const finalContent: any[] = [finalPrompt];
+    if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const finalResult = await model.generateContent(finalContent);
+    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
+
+    // Enrich and normalize
+    for (const p of resultJson.proposals || []) {
+      if (p.data.content_items) {
+        for (const item of p.data.content_items) {
+          if (!item.season || item.season === 0) item.season = 1;
         }
-      });
+      }
+      if (p.action === "update" && p.data.id) {
+        p.existingData = candidates.find(c => c.id === p.data.id);
+      }
     }
 
-    const result = await model.generateContent(content);
-    const response = await result.response;
-    const text = response.text();
-    
-    try {
-      const jsonStr = text.replace(/```json|```/g, "").trim();
-      return JSON.parse(jsonStr);
-    } catch (e) {
-      console.error("Failed to parse AI response:", text);
-      throw new Error("AI returned invalid JSON. Please try again.");
-    }
+    return resultJson;
   }
 
   async parseMetadataDocument(fileBuffer: Buffer, mimeType: string, permissions: UserPermissions): Promise<any> {
@@ -159,6 +181,7 @@ Instructions:
    - If a strong match is found: Propose an "update" action. Use the existing ID.
    - If no match is found: Propose a "create" action.
 3. Be strict about duplicates. We do not want two entries for the same episode of the same series.
+4. IMPORTANT: If a season is listed as 0 or missing, set it to 1. Our systems do not support season 0.
 
 JSON Schema:
 {
@@ -207,8 +230,11 @@ Only return the JSON object. Do not include markdown formatting.`;
     const finalResult = await model.generateContent(finalContent);
     const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
 
-    // Enrich proposals with existingData for UI comparison
+    // Enrich proposals with existingData for UI comparison and normalize season
     for (const proposal of resultJson.proposals || []) {
+      if (proposal.data.season === 0 || proposal.data.season === null) {
+        proposal.data.season = 1;
+      }
       if (proposal.action === "update" && proposal.data.id) {
         proposal.existingData = uniqueCandidates.find(c => c.id === proposal.data.id);
       }

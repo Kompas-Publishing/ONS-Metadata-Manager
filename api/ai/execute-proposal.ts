@@ -69,7 +69,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
 }
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 export default withCors(requirePermission("write")(handler));
