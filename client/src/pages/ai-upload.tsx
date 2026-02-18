@@ -151,11 +151,11 @@ export default function AiUpload() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="file-upload">Document (PDF, CSV, XLSX, TXT)</Label>
+              <Label htmlFor="file-upload">Document (PDF, CSV, XLSX, DOCX, TXT)</Label>
               <Input
                 id="file-upload"
                 type="file"
-                accept=".pdf,.csv,.xlsx,.txt"
+                accept=".pdf,.csv,.xlsx,.docx,.txt"
                 onChange={handleFileChange}
                 className="cursor-pointer"
               />

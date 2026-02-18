@@ -8,6 +8,7 @@ import {
 } from "@shared/schema";
 import { UserPermissions } from "./permissions";
 import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 export class AiService {
   private genAI: GoogleGenerativeAI | null = null;
@@ -26,7 +27,7 @@ export class AiService {
     this.model = configuredModel || "gemini-3-pro-preview";
   }
 
-  private extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): string {
+  private async extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {
     if (mimeType === "text/csv" || mimeType === "text/plain") {
       return fileBuffer.toString("utf-8");
     } else if (
@@ -37,8 +38,12 @@ export class AiService {
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       return XLSX.utils.sheet_to_csv(worksheet);
+    } else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      return result.value;
     }
-    return "";
+    // Fallback for other potential text formats
+    return fileBuffer.toString("utf-8");
   }
 
   async parseLicenseContract(fileBuffer: Buffer, mimeType: string): Promise<any> {
@@ -47,7 +52,7 @@ export class AiService {
 
     const model = this.genAI.getGenerativeModel({ model: this.model });
     const isPdf = mimeType === "application/pdf";
-    const extractedText = isPdf ? "" : this.extractTextFromBuffer(fileBuffer, mimeType);
+    const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
 
     // Phase 1: Extract basic info to find candidates
     const searchPrompt = `Task: Extract the license name and distributor from this contract. 
@@ -143,7 +148,7 @@ Only return the JSON object.`;
 
     const model = this.genAI.getGenerativeModel({ model: this.model });
     const isPdf = mimeType === "application/pdf";
-    const extractedText = isPdf ? "" : this.extractTextFromBuffer(fileBuffer, mimeType);
+    const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
 
     // Phase 1: Extract titles to find candidates
     const searchPrompt = `Task: Extract the series title or main title from this metadata document. 
