@@ -222,7 +222,7 @@ export default function Tasks() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4">
+              <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
                 <div className="space-y-2">
                   <Label>Task Description</Label>
                   <div className="flex gap-2">
@@ -250,7 +250,7 @@ export default function Tasks() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="new" className="flex-1 overflow-y-auto space-y-6 pr-2">
+              <TabsContent value="new" className="flex-1 overflow-y-auto space-y-6 px-1">
                 <Form {...batchForm}>
                   <div className="space-y-6">
                     <FormField
