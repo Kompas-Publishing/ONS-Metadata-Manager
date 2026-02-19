@@ -8,7 +8,6 @@ import {
 } from "../_shared/schema.js";
 import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
-import mammoth from "mammoth";
 
 export class AiService {
   private genAI: GoogleGenerativeAI | null = null;
@@ -38,9 +37,6 @@ export class AiService {
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       return XLSX.utils.sheet_to_csv(worksheet);
-    } else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      const result = await mammoth.extractRawText({ buffer: fileBuffer });
-      return result.value;
     }
     // Fallback for other potential text formats
     return fileBuffer.toString("utf-8");
@@ -78,18 +74,17 @@ Example: { "name": "Ballykissangel", "distributor": "BBC" }`;
     const finalPrompt = `Role: Expert Legal Content Analyst.
 Task: Extract contract data into a structured JSON array of "license" objects and compare against candidates to prevent duplicates.
 
-Existing Database Candidates (CANDIDATES):
-${JSON.stringify(candidates.map(c => ({ id: c.id, name: c.name, distributor: c.distributor, start: c.licenseStart, end: c.licenseEnd })), null, 2)}
-
-Granularity Logic:
-* If the contract is for a single title/package: Return an array with one license object.
-* If the contract contains multiple titles, seasons, or packages: Atomize the data.
+Granularity Logic (STRICT):
+* Group all content under ONE license object if they share the same financial terms (one price for the whole package).
+* ONLY create separate license objects if specific titles have their own unique price or totally different contract dates.
+* If most content has the same rules (e.g. 2 runs) but a few differ, capture the standard rule in "allowedRuns" and explain the exceptions in the "notes" field. Do not split the license.
 
 Data Rules:
 - Name: Use the Content Title and Season (e.g., "Ballykissangel Series 2"). DO NOT include legal headers like "Amendment Agreement".
+- Allowed Runs: Extract ONLY the number (e.g. "2"). If not a number, use null. No text allowed here.
 - Distributor Normalization: Use "MGM" instead of "MGM International Television Distribution Inc." and "BBC" instead of its full legal name.
 - Comparison: If an entry in CANDIDATES matches the name and distributor AND has overlapping or identical dates, propose an "update" with that ID.
-- NEW LICENSE TERMS: If the dates (start/end) are significantly different from the CANDIDATES (e.g., a new contract for a different year), propose a "create" action even if the name matches. We want to keep historical licenses.
+- NEW LICENSE TERMS: If the dates (start/end) are significantly different from the CANDIDATES (e.g., a new contract for a different year), propose a "create" action even if the name matches.
 - Season Rule: If a season is 0 or missing, set it to 1.
 
 JSON Schema (MATCH EXACT DATABASE FIELDS):
@@ -108,9 +103,9 @@ JSON Schema (MATCH EXACT DATABASE FIELDS):
         "licenseFeeCurrency": "string",
         "licenseStart": "YYYY-MM-DD",
         "licenseEnd": "YYYY-MM-DD",
-        "allowed_runs": "string",
+        "allowedRuns": number, (STRICTLY A NUMBER)
         "description": "string",
-        "notes": "string",
+        "notes": "string", (Include legal context or variation in rules here)
         "content_items": [{ "title": "string", "episodes": number, "season": number }]
       }
     }
@@ -208,7 +203,7 @@ JSON Schema:
         "genre": ["string"],
         "actors": ["string"],
         "productionCountry": "string",
-        "yearOfProduction": number,
+        "year_of_production": number,
         "originalFilename": "string",
         "programRating": "string",
         "channel": "string",
