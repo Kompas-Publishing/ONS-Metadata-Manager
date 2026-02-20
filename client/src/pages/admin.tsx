@@ -68,6 +68,7 @@ import {
   Copy,
   ShieldCheck,
   AlertTriangle,
+  CheckSquare,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
