@@ -1307,42 +1307,48 @@ export default function Admin() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex items-center space-x-2 mt-4">
-            <div className="grid flex-1 gap-2">
-              <Label htmlFor="new-password">
-                Generated Password
-              </Label>
-              <div className="relative group">
-                <Input
-                  id="new-password"
-                  value={resetPasswordData?.password}
-                  readOnly
-                  className="pr-12 font-mono text-lg bg-muted/50 border-muted-foreground/20 h-12"
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-1 top-1 bottom-1 h-10 w-10 hover:bg-background/80 text-muted-foreground hover:text-foreground transition-all"
-                  onClick={() => {
-                    if (resetPasswordData?.password) {
-                      navigator.clipboard.writeText(resetPasswordData.password);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                      toast({ title: "Copied", description: "Password copied to clipboard" });
-                    }
-                  }}
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
+          <div className="mt-4">
+            <Label htmlFor="new-password" id="password-label" className="mb-2 block">
+              Generated Password
+            </Label>
+            {/* This relative container ensures the button aligns 
+                to the input, not the whole dialog. 
+            */}
+            <div className="relative flex items-center">
+              <Input
+                id="new-password"
+                value={resetPasswordData?.password}
+                readOnly
+                className="pr-12 font-mono text-lg bg-muted/50 border-muted-foreground/20 h-12 w-full focus-visible:ring-1"
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-labelledby="password-label"
+                className="absolute right-1 h-10 w-10 hover:bg-background/80 text-muted-foreground hover:text-foreground transition-all"
+                onClick={() => {
+                  if (resetPasswordData?.password) {
+                    navigator.clipboard.writeText(resetPasswordData.password);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                    toast({ 
+                      title: "Copied", 
+                      description: "Password copied to clipboard",
+                      variant: "success" // Assuming your toast supports variants
+                    });
+                  }
+                }}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
             </div>
           </div>
           
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className="sm:justify-start mt-4">
             <Button
               type="button"
               variant="secondary"
