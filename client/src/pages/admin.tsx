@@ -198,6 +198,7 @@ export default function Admin() {
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [resetConfirmUser, setResetConfirmUser] = useState<User | null>(null);
   const [resetPasswordData, setResetPasswordData] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     document.title = "Admin Panel - Metadata Manager";
@@ -1308,28 +1309,34 @@ export default function Admin() {
           
           <div className="flex items-center space-x-2 mt-4">
             <div className="grid flex-1 gap-2">
-              <Label htmlFor="new-password" title="New Password">
+              <Label htmlFor="new-password">
                 Generated Password
               </Label>
-              <div className="relative">
+              <div className="relative group">
                 <Input
                   id="new-password"
-                  defaultValue={resetPasswordData?.password}
+                  value={resetPasswordData?.password}
                   readOnly
-                  className="pr-10 font-mono text-lg bg-muted"
+                  className="pr-12 font-mono text-lg bg-muted/50 border-muted-foreground/20 h-12"
                 />
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-1 top-1 bottom-1 h-10 w-10 hover:bg-background/80 text-muted-foreground hover:text-foreground transition-all"
                   onClick={() => {
                     if (resetPasswordData?.password) {
                       navigator.clipboard.writeText(resetPasswordData.password);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
                       toast({ title: "Copied", description: "Password copied to clipboard" });
                     }
                   }}
                 >
-                  <Copy className="h-4 w-4" />
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
