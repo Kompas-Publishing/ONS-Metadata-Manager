@@ -96,6 +96,12 @@ export default function Licenses() {
         if (sortConfig.key === "status") {
           aValue = (a.licenseEnd && new Date(a.licenseEnd) < new Date()) ? "expired" : "active";
           bValue = (b.licenseEnd && new Date(b.licenseEnd) < new Date()) ? "expired" : "active";
+        } else if (sortConfig.key === "licenseFeeAmount") {
+          // Numerical sort for fees
+          aValue = a.licenseFeeAmount ? parseFloat(a.licenseFeeAmount.replace(/[^0-9.-]+/g, "")) : 0;
+          bValue = b.licenseFeeAmount ? parseFloat(b.licenseFeeAmount.replace(/[^0-9.-]+/g, "")) : 0;
+          if (isNaN(aValue)) aValue = 0;
+          if (isNaN(bValue)) bValue = 0;
         } else {
           aValue = a[sortConfig.key as keyof License];
           bValue = b[sortConfig.key as keyof License];
