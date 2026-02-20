@@ -28,6 +28,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Layers } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function ViewLicense() {
   const [, params] = useRoute("/licenses/:id");
@@ -44,7 +45,7 @@ export default function ViewLicense() {
 
   const { data: linkedFiles, isLoading: isFilesLoading } = useQuery<MetadataFile[]>({
     queryKey: [`/api/metadata?licenseId=${id}`],
-    enabled: !!id,
+    enabled: !!id && (canReadLicenses || canWriteLicenses),
   });
 
   const groupedFiles = (linkedFiles || []).reduce((acc, file) => {

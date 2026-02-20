@@ -142,7 +142,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-base font-semibold px-4 py-4">
-            Metadata Manager
+            ONS Broadcast Portal
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>

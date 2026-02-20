@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/use-auth";
 
 type SortConfig = {
   key: keyof License | "status";
@@ -41,9 +42,10 @@ type SortConfig = {
 };
 
 export default function Licenses() {
-  const { canWriteLicenses } = useAuth();
+  const { canWriteLicenses, canReadLicenses } = useAuth();
   const { data: licenses, isLoading } = useQuery<License[]>({
     queryKey: ["/api/licenses"],
+    enabled: canReadLicenses || canWriteLicenses,
   });
 
   const [search, setSearch] = useState("");

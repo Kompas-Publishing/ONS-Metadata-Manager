@@ -201,7 +201,7 @@ export default function Admin() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    document.title = "Admin Panel - Metadata Manager";
+    document.title = "Admin Panel";
   }, []);
 
   useEffect(() => {

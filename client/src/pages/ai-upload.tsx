@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, Upload, FileText, Check, X, Loader2, AlertCircle, Plus, MessageSquare, Send } from "lucide-react";
+import { Sparkles, Upload, FileText, Check, X, Loader2, AlertCircle, Plus, MessageSquare, Send, Bot, BrainCircuit, Lightbulb, Layers, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type Proposal = {
   type: "license" | "metadata";
@@ -249,9 +250,24 @@ export default function AiUpload() {
             </Card>
           ) : (
             <ScrollArea className="h-[calc(100vh-250px)]">
-              <div className="space-y-6 pr-4">
+              <div className="space-y-6 pr-4 relative">
+                {refineMutation.isPending && (
+                  <div className="absolute inset-0 z-50 bg-background/40 backdrop-blur-[1px] flex items-start justify-center pt-20">
+                    <Card className="p-4 shadow-2xl border-primary/20 flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <span className="font-medium text-sm">AI is thinking...</span>
+                    </Card>
+                  </div>
+                )}
+                
                 {proposals.map((proposal, index) => (
-                  <Card key={index} className="overflow-hidden border-primary/20">
+                  <Card 
+                    key={index} 
+                    className={cn(
+                      "overflow-hidden border-primary/20 transition-all duration-500",
+                      refineMutation.isPending && "opacity-50 grayscale-[0.5] scale-[0.98]"
+                    )}
+                  >
                     <div className="bg-primary/5 px-6 py-3 border-b border-primary/10 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Badge variant={proposal.action === "create" ? "default" : "secondary"}>
@@ -347,40 +363,74 @@ export default function AiUpload() {
                 ))}
 
                 {proposals.length > 0 && (
-                  <Card className="border-primary bg-primary/5">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-primary" />
-                        Suggest Changes
-                      </CardTitle>
-                      <CardDescription>
-                        Is something incorrect? Tell Gemini what to fix (e.g., "group these by season" or "the price is $500").
-                      </CardDescription>
+                  <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-background border-t-4 border-t-primary shadow-lg overflow-hidden">
+                    <CardHeader className="pb-2 border-b border-primary/10 bg-primary/5">
+                      <div className="flex items-center gap-2">
+                        <div className="bg-primary/20 p-1.5 rounded-lg">
+                          <BrainCircuit className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-semibold">AI Assistant</CardTitle>
+                          <CardDescription className="text-[11px]">
+                            Refine the extraction results with natural language feedback
+                          </CardDescription>
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      <Textarea 
-                        placeholder="Type your feedback here..."
-                        value={userFeedback}
-                        onChange={(e) => setUserFeedback(e.target.value)}
-                        className="bg-background min-h-[80px]"
-                      />
-                      <Button 
-                        className="w-full" 
-                        disabled={!userFeedback.trim() || refineMutation.isPending}
-                        onClick={() => refineMutation.mutate()}
-                      >
-                        {refineMutation.isPending ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Refining proposals...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="mr-2 h-4 w-4" />
-                            Send Feedback to AI
-                          </>
-                        )}
-                      </Button>
+                    <CardContent className="pt-4 space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <button 
+                            onClick={() => setUserFeedback("Group these by season")}
+                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
+                          >
+                            <Layers className="w-3 h-3" /> Group by season
+                          </button>
+                          <button 
+                            onClick={() => setUserFeedback("These are all movies, not series")}
+                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
+                          >
+                            <FileText className="w-3 h-3" /> Mark as movies
+                          </button>
+                          <button 
+                            onClick={() => setUserFeedback("The license start date should be 2025")}
+                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
+                          >
+                            <CalendarIcon className="w-3 h-3" /> Fix dates
+                          </button>
+                        </div>
+                        
+                        <div className="relative">
+                          <Textarea 
+                            placeholder="Tell Gemini what to fix or improve..."
+                            value={userFeedback}
+                            onChange={(e) => setUserFeedback(e.target.value)}
+                            className="bg-background min-h-[100px] pr-12 focus-visible:ring-primary/30 border-primary/20 resize-none shadow-inner"
+                          />
+                          <Button 
+                            size="icon"
+                            className={cn(
+                              "absolute right-2 bottom-2 rounded-full w-8 h-8 transition-all",
+                              userFeedback.trim() ? "bg-primary opacity-100 scale-100" : "bg-muted opacity-50 scale-90"
+                            )}
+                            disabled={!userFeedback.trim() || refineMutation.isPending}
+                            onClick={() => refineMutation.mutate()}
+                          >
+                            {refineMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 px-1">
+                        <Lightbulb className="w-3 h-3 text-yellow-500" />
+                        <span className="text-[10px] text-muted-foreground italic">
+                          Tip: You can ask the AI to recalculate durations, fix typos, or re-categorize items.
+                        </span>
+                      </div>
                     </CardContent>
                   </Card>
                 )}

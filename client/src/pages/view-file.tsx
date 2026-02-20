@@ -54,7 +54,7 @@ export default function ViewFile() {
 
   const { data: tasks, isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/metadata", params?.id, "tasks"],
-    enabled: !!params?.id,
+    enabled: !!params?.id && (canReadMetadata || canWriteMetadata),
   });
 
   const addTaskMutation = useMutation({

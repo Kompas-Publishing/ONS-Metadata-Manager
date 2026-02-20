@@ -8,11 +8,11 @@ export default function Landing() {
         <div className="flex flex-col items-center text-center space-y-8">
           <div className="space-y-4">
             <h1 className="text-5xl font-semibold text-foreground tracking-tight">
-              Broadcast Metadata Management
+              ONS Broadcast Portal
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl">
-              Professional metadata management system for broadcasting servers. 
-              Create, organize, and export metadata files with ease.
+              Professional management system for ONS broadcasting operations. 
+              Manage metadata, licenses, and tasks with ease.
             </p>
           </div>
 

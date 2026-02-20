@@ -42,7 +42,7 @@ export default function AllFiles() {
 
   const { data: files, isLoading, error } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
-    enabled: !authLoading,
+    enabled: !authLoading && (canReadMetadata || canWriteMetadata),
   });
 
   // Move all hooks to the top before any conditional returns

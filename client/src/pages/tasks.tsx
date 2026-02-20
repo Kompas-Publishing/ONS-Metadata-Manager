@@ -48,6 +48,7 @@ import { ExistingContentSelector } from "@/components/existing-content-selector"
 import { BatchCreateForm } from "@/components/batch-create-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
@@ -67,6 +68,7 @@ export default function Tasks() {
 
   const { data: tasks, isLoading } = useQuery<TaskWithFile[]>({
     queryKey: ["/api/tasks"],
+    enabled: canReadTasks || canWriteTasks,
   });
 
   // Form for New Assets tab

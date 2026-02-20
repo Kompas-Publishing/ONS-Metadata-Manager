@@ -20,10 +20,12 @@ export default function Dashboard() {
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ["/api/stats"],
+    enabled: canReadMetadata || canWriteMetadata,
   });
 
   const { data: recentFiles, isLoading: filesLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata/recent"],
+    enabled: canReadMetadata || canWriteMetadata,
   });
 
   return (

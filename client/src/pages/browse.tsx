@@ -34,6 +34,7 @@ export default function Browse() {
 
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
+    enabled: canReadMetadata || canWriteMetadata,
   });
 
   const seriesGroups: { [key: string]: SeriesGroup } = {};
