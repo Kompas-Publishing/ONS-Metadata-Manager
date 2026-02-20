@@ -16,10 +16,7 @@ interface Stats {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
-  const canWrite = user?.canWrite === 1;
-  const canRead = user?.canRead === 1;
-  const isAdmin = user?.isAdmin === 1;
+  const { isAdmin, canWriteMetadata, canReadMetadata } = useAuth();
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ["/api/stats"],
@@ -38,7 +35,7 @@ export default function Dashboard() {
             Overview of your metadata files and recent activity
           </p>
         </div>
-        {(canWrite || isAdmin) && (
+        {canWriteMetadata && (
           <Link href="/create">
             <Button data-testid="button-create-file">
               <Plus className="w-4 h-4 mr-2" />
@@ -197,14 +194,14 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {(canRead || canWrite) && (
+                  {canReadMetadata && (
                     <Link href={`/view/${file.id}`}>
                       <Button size="sm" variant="outline" data-testid={`button-view-${file.id}`} title="View File">
                         <Eye className="w-4 h-4" />
                       </Button>
                     </Link>
                   )}
-                  {canWrite && (
+                  {canWriteMetadata && (
                     <Link href={`/edit/${file.id}`}>
                       <Button size="sm" variant="outline" data-testid={`button-edit-${file.id}`} title="Edit File">
                         <Pencil className="w-4 h-4" />
@@ -224,7 +221,7 @@ export default function Dashboard() {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No files created yet</p>
-            {(canWrite || isAdmin) && (
+            {canWriteMetadata && (
               <Link href="/create">
                 <Button className="mt-4" data-testid="button-create-first">
                   Create Your First File

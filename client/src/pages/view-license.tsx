@@ -34,11 +34,12 @@ export default function ViewLicense() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canWriteLicenses, canReadLicenses } = useAuth();
   const id = params?.id;
 
   const { data: license, isLoading: isLicenseLoading } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
-    enabled: !!id,
+    enabled: !!id && (canReadLicenses || canWriteLicenses),
   });
 
   const { data: linkedFiles, isLoading: isFilesLoading } = useQuery<MetadataFile[]>({
@@ -132,35 +133,39 @@ export default function ViewLicense() {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/licenses/${id}/edit`}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Link>
-          </Button>
-          
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-destructive hover:bg-destructive/10">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+          {canWriteLicenses && (
+            <>
+              <Button variant="outline" asChild>
+                <Link href={`/licenses/${id}/edit`}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Link>
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. Associated metadata files will lose their association but will NOT be deleted.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="text-destructive hover:bg-destructive/10">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. Associated metadata files will lose their association but will NOT be deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
         </div>
       </div>
 
@@ -318,9 +323,11 @@ export default function ViewLicense() {
               <Layers className="w-4 h-4" />
               Linked Content ({linkedFiles?.length || 0})
             </CardTitle>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/licenses/${id}/edit`}>Manage Content</Link>
-            </Button>
+            {canWriteLicenses && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/licenses/${id}/edit`}>Manage Content</Link>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -357,9 +364,11 @@ export default function ViewLicense() {
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
               <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">No content linked to this license yet.</p>
-              <Button variant="link" asChild>
-                <Link href={`/licenses/${id}/edit`}>Add content now</Link>
-              </Button>
+              {canWriteLicenses && (
+                <Button variant="link" asChild>
+                  <Link href={`/licenses/${id}/edit`}>Add content now</Link>
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { storage } from "../_server/storage.js";
 import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPayload } from "../_server/jwt.js";
 import type { User } from "../_shared/schema.js";
-import { getUserPermissions, requirePermission as checkPermission, type UserPermissions } from "../_server/permissions.js";
+import { getUserPermissions, requirePermission as checkPermission, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
 
 export interface AuthenticatedRequest extends VercelRequest {
   user?: User;
@@ -71,7 +71,7 @@ export function requireAuth(handler: ApiHandler): ApiHandler {
   };
 }
 
-export function requirePermission(permission: "read" | "write" | "edit" | "delete") {
+export function requirePermission(feature: PermissionFeature, action: PermissionAction = "read") {
   return (handler: ApiHandler): ApiHandler => {
     return async (req: AuthenticatedRequest, res: VercelResponse) => {
       const user = await authenticate(req);
@@ -80,7 +80,7 @@ export function requirePermission(permission: "read" | "write" | "edit" | "delet
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { allowed, permissions, reason } = await checkPermission(user.id, permission);
+      const { allowed, permissions, reason } = await checkPermission(user.id, feature, action);
 
       if (!allowed) {
         const statusCode = permissions?.user.status === "pending" ? 423 : 403;

@@ -5,7 +5,7 @@ import { transformFileForDownload, buildSeriesXml, buildMetadataXlsx } from "../
 import * as XLSX from "xlsx";
 
 export default apiHandler(
-  requirePermission("read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+  requirePermission("metadata", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method !== "GET") {
       return res.status(405).json({ message: "Method not allowed" });
     }

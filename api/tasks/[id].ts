@@ -8,7 +8,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
 
   if (req.method === "PATCH") {
-    return requirePermission("edit")(async (req, res) => {
+    return requirePermission("tasks", "write")(async (req, res) => {
       try {
         const updateTaskSchema = z.object({
           status: z.enum(["pending", "completed"]).optional(),
@@ -34,7 +34,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   }
 
   if (req.method === "DELETE") {
-    return requirePermission("delete")(async (req, res) => {
+    return requirePermission("tasks", "write")(async (req, res) => {
       try {
         const success = await storage.deleteTask(taskId);
         if (!success) return res.status(404).json({ message: "Task not found" });

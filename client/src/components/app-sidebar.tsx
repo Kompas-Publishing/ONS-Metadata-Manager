@@ -33,7 +33,7 @@ import {
       icon: LayoutDashboard,
       testId: "nav-dashboard",
       adminOnly: false,
-      requiresWrite: false,
+      permissionKey: "canReadMetadata",
     },
     {
       title: "Task List",
@@ -41,7 +41,7 @@ import {
       icon: CheckSquare,
       testId: "nav-tasks",
       adminOnly: false,
-      requiresWrite: false,
+      permissionKey: "canReadTasks",
     },
     {
       title: "AI Upload",
@@ -49,14 +49,14 @@ import {
       icon: Sparkles,
       testId: "nav-ai-upload",
       adminOnly: false,
-      requiresWrite: true,
+      permissionKey: "canUseAI",
     },
     {
       title: "License Manager",    url: "/licenses",
     icon: FileKey,
     testId: "nav-licenses",
-    adminOnly: false, // Or true if you want to restrict it
-    requiresWrite: true,
+    adminOnly: false,
+    permissionKey: "canReadLicenses",
   },
   {
     title: "Create File",
@@ -64,7 +64,7 @@ import {
     icon: FilePlus,
     testId: "nav-create",
     adminOnly: false,
-    requiresWrite: true,
+    permissionKey: "canWriteMetadata",
   },
   {
     title: "Batch Create",
@@ -72,7 +72,7 @@ import {
     icon: Layers,
     testId: "nav-batch",
     adminOnly: false,
-    requiresWrite: true,
+    permissionKey: "canWriteMetadata",
   },
   {
     title: "Browse Series",
@@ -80,7 +80,7 @@ import {
     icon: List,
     testId: "nav-browse",
     adminOnly: false,
-    requiresWrite: false,
+    permissionKey: "canReadMetadata",
   },
   {
     title: "All Files",
@@ -88,7 +88,7 @@ import {
     icon: FileText,
     testId: "nav-all-files",
     adminOnly: false,
-    requiresWrite: false,
+    permissionKey: "canReadMetadata",
   },
   {
     title: "Admin Panel",
@@ -96,13 +96,13 @@ import {
     icon: Shield,
     testId: "link-admin",
     adminOnly: true,
-    requiresWrite: false,
+    permissionKey: null,
   },
 ];
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, isAdmin, ...permissions } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -117,9 +117,6 @@ export function AppSidebar() {
     }
     return "U";
   };
-
-  const canWrite = user?.canWrite === 1;
-  const isAdmin = user?.isAdmin === 1;
   
   const menuItems = allMenuItems.filter((item) => {
     // Filter out admin-only items for non-admins
@@ -127,15 +124,14 @@ export function AppSidebar() {
       return false;
     }
     
-    // Don't apply requiresWrite filter during auth loading to prevent flicker
+    // Don't apply filters during auth loading to prevent flicker
     if (isLoading) {
       return true;
     }
     
-    // Filter out write-required items for users without write permission
-    // Admins bypass this check
-    if (item.requiresWrite && !canWrite && !isAdmin) {
-      return false;
+    // Check granular permissions if defined
+    if (item.permissionKey && !isAdmin) {
+      return !!(permissions as any)[item.permissionKey];
     }
     
     return true;

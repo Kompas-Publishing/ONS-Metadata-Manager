@@ -38,10 +38,7 @@ export default function AllFiles() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user, isLoading: authLoading } = useAuth();
-  
-  const canWrite = user?.canWrite === 1;
-  const canRead = user?.canRead === 1;
+  const { canReadMetadata, canWriteMetadata, isLoading: authLoading } = useAuth();
 
   const { data: files, isLoading, error } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
@@ -158,7 +155,7 @@ export default function AllFiles() {
 
   // Check for permission errors (403/423) or explicit lack of permissions
   const isPermissionError = error && isUnauthorizedError(error as Error);
-  if (isPermissionError || (!canRead && !canWrite)) {
+  if (isPermissionError || (!canReadMetadata && !canWriteMetadata)) {
     return (
       <div className="max-w-4xl mx-auto">
         <Card className="p-12 text-center">
@@ -363,14 +360,14 @@ export default function AllFiles() {
                       <Download className="w-4 h-4 mr-1" />
                       .xlsx
                     </Button>
-                    {(canRead || canWrite) && (
+                    {canReadMetadata && (
                       <Link href={`/view/${file.id}`}>
                         <Button size="sm" variant="outline" data-testid={`button-view-file-${file.id}`} title="View File">
                           <Eye className="w-4 h-4" />
                         </Button>
                       </Link>
                     )}
-                    {canWrite && (
+                    {canWriteMetadata && (
                       <>
                         <Link href={`/edit/${file.id}`}>
                           <Button size="sm" variant="outline" data-testid={`button-edit-file-${file.id}`} title="Edit File">

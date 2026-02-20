@@ -5,10 +5,12 @@ export interface UserPermissions {
   user: User;
   isAdmin: boolean;
   isActive: boolean;
-  canRead: boolean;
-  canWrite: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
+  permissions: {
+    metadata: { read: boolean; write: boolean };
+    licenses: { read: boolean; write: boolean };
+    tasks: { read: boolean; write: boolean };
+    ai: boolean;
+  };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
 }
@@ -22,25 +24,38 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
   const isAdmin = user.isAdmin === 1;
   const isActive = user.status === "active";
-  const isPending = user.status === "pending";
-  const isArchived = user.status === "archived";
 
   return {
     user,
     isAdmin,
     isActive,
-    canRead: isAdmin || (isActive && user.canRead === 1),
-    canWrite: isAdmin || (isActive && user.canWrite === 1),
-    canEdit: isAdmin || (isActive && user.canEdit === 1),
-    canDelete: isAdmin,
+    permissions: {
+      metadata: {
+        read: isAdmin || (isActive && user.canReadMetadata === 1),
+        write: isAdmin || (isActive && user.canWriteMetadata === 1),
+      },
+      licenses: {
+        read: isAdmin || (isActive && user.canReadLicenses === 1),
+        write: isAdmin || (isActive && user.canWriteLicenses === 1),
+      },
+      tasks: {
+        read: isAdmin || (isActive && user.canReadTasks === 1),
+        write: isAdmin || (isActive && user.canWriteTasks === 1),
+      },
+      ai: isAdmin || (isActive && user.canUseAI === 1),
+    },
     fileVisibility: user.fileVisibility as "own" | "all" | "group",
     groupIds: user.groupIds || [],
   };
 }
 
+export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai";
+export type PermissionAction = "read" | "write";
+
 export async function requirePermission(
   userId: string, 
-  permission: "read" | "write" | "edit" | "delete"
+  feature: PermissionFeature,
+  action: PermissionAction = "read"
 ): Promise<{ allowed: boolean; permissions: UserPermissions | null; reason?: string }> {
   const permissions = await getUserPermissions(userId);
   
@@ -56,19 +71,17 @@ export async function requirePermission(
     return { allowed: false, permissions, reason: "Account pending approval" };
   }
 
-  const permissionMap = {
-    read: permissions.canRead,
-    write: permissions.canWrite,
-    edit: permissions.canEdit,
-    delete: permissions.canDelete,
-  };
-
-  const allowed = permissionMap[permission];
+  let allowed = false;
+  if (feature === "ai") {
+    allowed = permissions.permissions.ai;
+  } else {
+    allowed = permissions.permissions[feature][action];
+  }
   
   return {
     allowed,
     permissions,
-    reason: allowed ? undefined : `No ${permission} permission`
+    reason: allowed ? undefined : `No ${action} permission for ${feature}`
   };
 }
 

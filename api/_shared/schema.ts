@@ -46,9 +46,13 @@ export const users = pgTable("users", {
   authProvider: varchar("auth_provider").default("local"), // local, google, github, etc.
   isAdmin: integer("is_admin").default(0).notNull(), // 0 = regular user, 1 = super admin
   status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, active, archived
-  canRead: integer("can_read").default(0).notNull(), // 0 = no read permission, 1 = can read
-  canWrite: integer("can_write").default(0).notNull(), // 0 = no write/create permission, 1 = can write/create
-  canEdit: integer("can_edit").default(0).notNull(), // 0 = no edit permission, 1 = can edit
+  canReadMetadata: integer("can_read_metadata").default(1).notNull(),
+  canWriteMetadata: integer("can_write_metadata").default(0).notNull(),
+  canReadLicenses: integer("can_read_licenses").default(1).notNull(),
+  canWriteLicenses: integer("can_write_licenses").default(0).notNull(),
+  canReadTasks: integer("can_read_tasks").default(1).notNull(),
+  canWriteTasks: integer("can_write_tasks").default(0).notNull(),
+  canUseAI: integer("can_use_ai").default(0).notNull(),
   fileVisibility: varchar("file_visibility", { length: 20 }).default("own").notNull(), // own, all, group
   groupIds: text("group_ids").array().default(sql`ARRAY[]::text[]`), // Array of group IDs user belongs to
   createdAt: timestamp("created_at").defaultNow(),

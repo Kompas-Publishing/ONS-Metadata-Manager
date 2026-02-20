@@ -30,10 +30,7 @@ export default function Browse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  
-  const canWrite = user?.canWrite === 1;
-  const canRead = user?.canRead === 1;
+  const { canWriteMetadata, canReadMetadata } = useAuth();
 
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
@@ -194,19 +191,21 @@ export default function Browse() {
                     Season {seasonNum === "0" ? "Unknown" : seasonNum}
                   </h3>
                   <div className="flex gap-2 flex-wrap">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`);
-                      }}
-                      data-testid={`button-edit-season-${seasonNum}`}
-                      className="gap-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Edit All Episodes
-                    </Button>
+                    {canWriteMetadata && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`);
+                        }}
+                        data-testid={`button-edit-season-${seasonNum}`}
+                        className="gap-2"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Edit All Episodes
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -289,14 +288,14 @@ export default function Browse() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {(canRead || canWrite) && (
+                            {canReadMetadata && (
                               <Link href={`/view/${episode.id}`}>
                                 <Button size="sm" variant="outline" data-testid={`button-view-episode-${episode.id}`} title="View Episode">
                                   <Eye className="w-4 h-4" />
                                 </Button>
                               </Link>
                             )}
-                            {canWrite && (
+                            {canWriteMetadata && (
                               <Link href={`/edit/${episode.id}`}>
                                 <Button size="sm" variant="outline" data-testid={`button-edit-episode-${episode.id}`} title="Edit Episode">
                                   <Edit className="w-4 h-4" />

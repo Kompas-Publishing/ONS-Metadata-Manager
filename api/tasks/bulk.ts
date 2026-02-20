@@ -4,7 +4,7 @@ import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_li
 import { z } from "zod";
 
 export default apiHandler(
-  requirePermission("write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+  requirePermission("tasks", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method !== "POST") {
       return res.status(405).json({ message: "Method not allowed" });
     }

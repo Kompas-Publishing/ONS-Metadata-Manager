@@ -67,12 +67,28 @@ export function useAuth() {
   const isAuthenticated = !!user && user.status === "active";
   const isAdmin = user?.isAdmin === 1;
 
+  // Granular permission helpers
+  const canReadMetadata = isAdmin || (isAuthenticated && user?.canReadMetadata === 1);
+  const canWriteMetadata = isAdmin || (isAuthenticated && user?.canWriteMetadata === 1);
+  const canReadLicenses = isAdmin || (isAuthenticated && user?.canReadLicenses === 1);
+  const canWriteLicenses = isAdmin || (isAuthenticated && user?.canWriteLicenses === 1);
+  const canReadTasks = isAdmin || (isAuthenticated && user?.canReadTasks === 1);
+  const canWriteTasks = isAdmin || (isAuthenticated && user?.canWriteTasks === 1);
+  const canUseAI = isAdmin || (isAuthenticated && user?.canUseAI === 1);
+
   return {
     user,
     isLoading,
     isPending,
     isAuthenticated,
     isAdmin,
+    canReadMetadata,
+    canWriteMetadata,
+    canReadLicenses,
+    canWriteLicenses,
+    canReadTasks,
+    canWriteTasks,
+    canUseAI,
     login,
     logout,
     register,

@@ -17,7 +17,7 @@ export default function EditFile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, canWriteMetadata } = useAuth();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -33,7 +33,7 @@ export default function EditFile() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (!authLoading && user && user.canWrite !== 1) {
+    if (!authLoading && !canWriteMetadata) {
       toast({
         title: "Permission Denied",
         description: "You don't have permission to edit files.",
@@ -41,16 +41,16 @@ export default function EditFile() {
       });
       setLocation(`/view/${params?.id}`);
     }
-  }, [authLoading, user, params?.id, toast, setLocation]);
+  }, [authLoading, canWriteMetadata, params?.id, toast, setLocation]);
 
   const { data: file, isLoading } = useQuery<MetadataFile>({
     queryKey: ["/api/metadata", params?.id],
-    enabled: !!params?.id && user?.canWrite === 1,
+    enabled: !!params?.id && canWriteMetadata,
   });
 
   const { data: adjacent } = useQuery<{ prev: MetadataFile | null; next: MetadataFile | null }>({
     queryKey: ["/api/metadata", params?.id, "adjacent"],
-    enabled: !!params?.id && user?.canWrite === 1,
+    enabled: !!params?.id && canWriteMetadata,
   });
 
   const updateMutation = useMutation({
@@ -92,7 +92,7 @@ export default function EditFile() {
     updateMutation.mutate({ ...data, draft: 1 });
   };
 
-  if (authLoading || (user && user.canWrite !== 1)) {
+  if (authLoading || !canWriteMetadata) {
     return (
       <div className="max-w-4xl mx-auto space-y-8">
         <Skeleton className="h-10 w-64" />

@@ -6,7 +6,7 @@ import { insertMetadataFileSchema } from "../_shared/schema.js";
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   // GET /api/metadata - Get all metadata files
   if (req.method === "GET") {
-    return requirePermission("read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+    return requirePermission("metadata", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         const { licenseId } = req.query;
         const files = await storage.getAllMetadataFiles(
@@ -23,7 +23,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
 
   // POST /api/metadata - Create new metadata file
   if (req.method === "POST") {
-    return requirePermission("write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+    return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         const userId = req.user!.id;
         const permissions = req.permissions!;

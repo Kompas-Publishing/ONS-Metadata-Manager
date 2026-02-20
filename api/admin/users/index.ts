@@ -37,11 +37,23 @@ export default apiHandler(
           if (data.isAdmin !== undefined) {
             await storage.updateUserAdminStatus(id, !!data.isAdmin);
           }
-          if (data.canRead !== undefined || data.canWrite !== undefined || data.canEdit !== undefined) {
+          if (
+            data.canReadMetadata !== undefined || 
+            data.canWriteMetadata !== undefined || 
+            data.canReadLicenses !== undefined || 
+            data.canWriteLicenses !== undefined || 
+            data.canReadTasks !== undefined || 
+            data.canWriteTasks !== undefined || 
+            data.canUseAI !== undefined
+          ) {
             const permissions = {
-              canRead: data.canRead !== undefined ? (data.canRead ? 1 : 0) : 0,
-              canWrite: data.canWrite !== undefined ? (data.canWrite ? 1 : 0) : 0,
-              canEdit: data.canEdit !== undefined ? (data.canEdit ? 1 : 0) : 0,
+              canReadMetadata: data.canReadMetadata !== undefined ? (data.canReadMetadata ? 1 : 0) : 0,
+              canWriteMetadata: data.canWriteMetadata !== undefined ? (data.canWriteMetadata ? 1 : 0) : 0,
+              canReadLicenses: data.canReadLicenses !== undefined ? (data.canReadLicenses ? 1 : 0) : 0,
+              canWriteLicenses: data.canWriteLicenses !== undefined ? (data.canWriteLicenses ? 1 : 0) : 0,
+              canReadTasks: data.canReadTasks !== undefined ? (data.canReadTasks ? 1 : 0) : 0,
+              canWriteTasks: data.canWriteTasks !== undefined ? (data.canWriteTasks ? 1 : 0) : 0,
+              canUseAI: data.canUseAI !== undefined ? (data.canUseAI ? 1 : 0) : 0,
             };
             await storage.updateUserPermissions(id, permissions);
           }

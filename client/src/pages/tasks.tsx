@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
 export default function Tasks() {
+  const { canWriteTasks, canReadMetadata, canWriteMetadata } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -218,123 +219,125 @@ export default function Tasks() {
           </p>
         </div>
 
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" /> Add Tasks
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Assign Tasks</DialogTitle>
-              <DialogDescription>
-                Select existing metadata or create new assets with tasks attached.
-              </DialogDescription>
-            </DialogHeader>
+        {canWriteTasks && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" /> Add Tasks
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Assign Tasks</DialogTitle>
+                <DialogDescription>
+                  Select existing metadata or create new assets with tasks attached.
+                </DialogDescription>
+              </DialogHeader>
 
-            <Tabs value={activeAddTab} onValueChange={(v: any) => setActiveAddTab(v)} className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="existing" className="gap-2">
-                  <Database className="w-4 h-4" /> Existing Content
-                </TabsTrigger>
-                <TabsTrigger value="new" className="gap-2">
-                  <Layers className="w-4 h-4" /> Create New Assets
-                </TabsTrigger>
-              </TabsList>
+              <Tabs value={activeAddTab} onValueChange={(v: any) => setActiveAddTab(v)} className="flex-1 overflow-hidden flex flex-col">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="existing" className="gap-2">
+                    <Database className="w-4 h-4" /> Existing Content
+                  </TabsTrigger>
+                  <TabsTrigger value="new" className="gap-2">
+                    <Layers className="w-4 h-4" /> Create New Assets
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
-                <div className="space-y-2">
-                  <Label>Task Description</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="e.g., heeft meta nodig" 
-                      value={taskDescription}
-                      onChange={(e) => setTaskDescription(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft meta nodig")}>
-                      heeft meta nodig
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft subs nodig")}>
-                      heeft subs nodig
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <Label className="mb-2 block">Select Files</Label>
-                  <ExistingContentSelector
-                    selectedIds={selectedExistingIds}
-                    onSelect={setSelectedExistingIds}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="new" className="flex-1 overflow-y-auto space-y-6 px-1">
-                <Form {...batchForm}>
-                  <div className="space-y-6">
-                    <FormField
-                      control={batchForm.control}
-                      name="taskDescription"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Task for these assets</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., heeft meta nodig" {...field} />
-                          </FormControl>
-                          <div className="flex gap-2 mt-2">
-                            <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft meta nodig")}>
-                              heeft meta nodig
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft subs nodig")}>
-                              heeft subs nodig
-                            </Button>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="space-y-4">
-                      {fields.map((field, index) => (
-                        <BatchCreateForm
-                          key={field.id}
-                          index={index}
-                          form={batchForm}
-                          onRemove={() => remove(index)}
-                        />
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full border-dashed"
-                        onClick={() => append({
-                          title: "",
-                          category: "Series",
-                          seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
-                          channel: "ONS",
-                          draft: 1,
-                        })}
-                      >
-                        <Plus className="w-4 h-4 mr-2" /> Add Another Batch
+                <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
+                  <div className="space-y-2">
+                    <Label>Task Description</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="e.g., heeft meta nodig" 
+                        value={taskDescription}
+                        onChange={(e) => setTaskDescription(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft meta nodig")}>
+                        heeft meta nodig
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft subs nodig")}>
+                        heeft subs nodig
                       </Button>
                     </div>
                   </div>
-                </Form>
-              </TabsContent>
-            </Tabs>
+                  <div className="flex-1 overflow-hidden">
+                    <Label className="mb-2 block">Select Files</Label>
+                    <ExistingContentSelector
+                      selectedIds={selectedExistingIds}
+                      onSelect={setSelectedExistingIds}
+                    />
+                  </div>
+                </TabsContent>
 
-            <DialogFooter className="pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-              <Button 
-                onClick={handleBulkAdd} 
-                disabled={bulkAddMutation.isPending || createBatchWithTaskMutation.isPending}
-              >
-                {(bulkAddMutation.isPending || createBatchWithTaskMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {activeAddTab === "existing" ? `Assign to ${selectedExistingIds.length} Files` : "Create & Assign Tasks"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <TabsContent value="new" className="flex-1 overflow-y-auto space-y-6 px-1">
+                  <Form {...batchForm}>
+                    <div className="space-y-6">
+                      <FormField
+                        control={batchForm.control}
+                        name="taskDescription"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Task for these assets</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., heeft meta nodig" {...field} />
+                            </FormControl>
+                            <div className="flex gap-2 mt-2">
+                              <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft meta nodig")}>
+                                heeft meta nodig
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft subs nodig")}>
+                                heeft subs nodig
+                              </Button>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="space-y-4">
+                        {fields.map((field, index) => (
+                          <BatchCreateForm
+                            key={field.id}
+                            index={index}
+                            form={batchForm}
+                            onRemove={() => remove(index)}
+                          />
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full border-dashed"
+                          onClick={() => append({
+                            title: "",
+                            category: "Series",
+                            seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
+                            channel: "ONS",
+                            draft: 1,
+                          })}
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> Add Another Batch
+                        </Button>
+                      </div>
+                    </div>
+                  </Form>
+                </TabsContent>
+              </Tabs>
+
+              <DialogFooter className="pt-4 border-t">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                <Button 
+                  onClick={handleBulkAdd} 
+                  disabled={bulkAddMutation.isPending || createBatchWithTaskMutation.isPending}
+                >
+                  {(bulkAddMutation.isPending || createBatchWithTaskMutation.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {activeAddTab === "existing" ? `Assign to ${selectedExistingIds.length} Files` : "Create & Assign Tasks"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card>
@@ -400,6 +403,7 @@ export default function Tasks() {
                       });
                     }}
                     className="h-5 w-5"
+                    disabled={!canWriteTasks}
                   />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -434,22 +438,26 @@ export default function Tasks() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button variant="ghost" size="icon" asChild title="View File">
-                    <Link href={`/view/${task.metadataFileId}`}>
-                      <ExternalLink className="w-4 h-4" />
-                    </Link>
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-destructive hover:bg-destructive/10"
-                    title="Delete Task"
-                    onClick={() => {
-                      if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {canReadMetadata && (
+                    <Button variant="ghost" size="icon" asChild title="View File">
+                      <Link href={`/view/${task.metadataFileId}`}>
+                        <ExternalLink className="w-4 h-4" />
+                      </Link>
+                    </Button>
+                  )}
+                  {canWriteTasks && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-destructive hover:bg-destructive/10"
+                      title="Delete Task"
+                      onClick={() => {
+                        if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

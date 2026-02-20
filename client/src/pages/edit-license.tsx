@@ -19,6 +19,7 @@ import { CalendarIcon, Loader2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
+import { useAuth } from "@/hooks/use-auth";
 
 const CURRENCIES = [
   { label: "EUR (€)", value: "EUR" },
@@ -33,16 +34,28 @@ export default function EditLicense() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canWriteLicenses, canReadLicenses } = useAuth();
   const id = params?.id;
 
   console.log("EditLicense: id =", id);
 
   const { data: license, isLoading, isError, error: queryError } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
-    enabled: !!id,
+    enabled: !!id && (canReadLicenses || canWriteLicenses),
   });
 
   if (queryError) console.error("EditLicense: Query error =", queryError);
+
+  useEffect(() => {
+    if (!isLoading && !canWriteLicenses) {
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to edit licenses.",
+        variant: "destructive",
+      });
+      setLocation(id ? `/licenses/${id}` : "/licenses");
+    }
+  }, [canWriteLicenses, isLoading, id, setLocation, toast]);
 
   const form = useForm<InsertLicense>({
     resolver: zodResolver(insertLicenseSchema),

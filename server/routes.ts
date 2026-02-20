@@ -416,9 +416,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: lastName || null,
         authProvider: "local",
         status: "pending",
-        canRead: 0,
-        canWrite: 0,
-        canEdit: 0,
+        canReadMetadata: 1,
+        canWriteMetadata: 0,
+        canReadLicenses: 1,
+        canWriteLicenses: 0,
+        canReadTasks: 1,
+        canWriteTasks: 0,
+        canUseAI: 0,
         fileVisibility: "own",
         isAdmin: 0,
       });
@@ -502,6 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "write",
       );
 
@@ -527,6 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "read",
       );
 
@@ -556,6 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "read",
       );
 
@@ -623,6 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "read",
       );
 
@@ -651,6 +659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "write",
       );
 
@@ -899,6 +908,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "write",
       );
 
@@ -941,6 +951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "write",
       );
 
@@ -1394,6 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
+        "metadata",
         "read",
       );
 
@@ -1605,9 +1617,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { userId } = req.params;
 
         const updatePermissionsSchema = z.object({
-          canRead: z.number().int().min(0).max(1),
-          canWrite: z.number().int().min(0).max(1),
-          canEdit: z.number().int().min(0).max(1),
+          canReadMetadata: z.number().int().min(0).max(1),
+          canWriteMetadata: z.number().int().min(0).max(1),
+          canReadLicenses: z.number().int().min(0).max(1),
+          canWriteLicenses: z.number().int().min(0).max(1),
+          canReadTasks: z.number().int().min(0).max(1),
+          canWriteTasks: z.number().int().min(0).max(1),
+          canUseAI: z.number().int().min(0).max(1),
         });
 
         const validation = updatePermissionsSchema.safeParse(req.body);
@@ -1634,6 +1650,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ message: "Failed to update user permissions" });
       }
     },
+  );
+
+  app.post(
+    "/api/admin/users/:userId/reset-password",
+    isAuthenticated,
+    isAdminUser,
+    async (req: any, res) => {
+      try {
+        const { userId } = req.params;
+        
+        // Generate a random 12-character password
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+        let newPassword = "";
+        for (let i = 0; i < 12; i++) {
+          newPassword += charset.charAt(Math.floor(Math.random() * charset.length));
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        const updatedUser = await storage.updateUserPassword(userId, hashedPassword);
+
+        if (!updatedUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        res.json({ 
+          message: "Password reset successful", 
+          newPassword // Send the plain text password back once so the admin can give it to the user
+        });
+      } catch (error) {
+        console.error("Error resetting password:", error);
+        res.status(500).json({ message: "Failed to reset password" });
+      }
+    }
   );
 
   app.patch(
@@ -1878,9 +1927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const userId = (req.user as any)?.id;
-        const permissions = await getUserPermissions(userId);
-        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
-          return res.status(403).json({ message: "Write permission required" });
+        const { allowed, permissions, reason } = await requirePermission(userId, "ai");
+        if (!allowed) {
+          return res.status(403).json({ message: reason });
         }
 
         if (!req.file) {
@@ -1913,9 +1962,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const userId = (req.user as any)?.id;
-        const permissions = await getUserPermissions(userId);
-        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
-          return res.status(403).json({ message: "Write permission required" });
+        const { allowed, permissions, reason } = await requirePermission(userId, "ai");
+        if (!allowed) {
+          return res.status(403).json({ message: reason });
         }
 
         if (!req.file) {
@@ -1953,9 +2002,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         const userId = (req.user as any)?.id;
-        const permissions = await getUserPermissions(userId);
-        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
-          return res.status(403).json({ message: "Write permission required" });
+        const { allowed, permissions, reason } = await requirePermission(userId, "ai");
+        if (!allowed) {
+          return res.status(403).json({ message: reason });
         }
 
         const proposal = req.body;
@@ -2023,6 +2072,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // License Management Routes
   app.get("/api/licenses", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "licenses", "read");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const licenses = await storage.listLicenses();
       res.json(licenses);
     } catch (error) {
@@ -2033,6 +2086,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/licenses", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, permissions, reason } = await requirePermission(userId, "licenses", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const createLicenseWithMetadataSchema = insertLicenseSchema.extend({
         metadataIds: z.array(z.string()).optional(),
         newBatches: z.array(z.any()).optional(),
@@ -2049,9 +2106,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { metadataIds, newBatches, ...licenseData } = validation.data;
       const license = await storage.createLicense(licenseData);
       
-      const userId = (req.user as any)?.id;
-      const permissions = await getUserPermissions(userId);
-
       if (permissions) {
         // Link existing metadata
         if (metadataIds && metadataIds.length > 0) {
@@ -2084,6 +2138,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "licenses", "read");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const license = await storage.getLicense(req.params.id);
       if (!license) {
         return res.status(404).json({ message: "License not found" });
@@ -2097,6 +2155,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "licenses", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const validation = insertLicenseSchema.partial().safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
@@ -2118,6 +2180,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/licenses/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "licenses", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const success = await storage.deleteLicense(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "License not found" });
@@ -2132,6 +2198,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/licenses/batch-generate", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "licenses", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const validation = licenseBatchGenerateSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -2153,11 +2222,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
-      const permissions = await getUserPermissions(userId);
-      if (!permissions) return res.status(403).json({ message: "Unauthorized" });
+      const { allowed, permissions, reason } = await requirePermission(userId, "tasks", "read");
+      if (!allowed) return res.status(403).json({ message: reason });
 
       const { status } = req.query;
-      const tasksList = await storage.listTasks(permissions, typeof status === "string" ? status : undefined);
+      const tasksList = await storage.listTasks(permissions!, typeof status === "string" ? status : undefined);
       res.json(tasksList);
     } catch (error) {
       console.error("Error fetching tasks:", error);
@@ -2168,10 +2237,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/metadata/:id/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
-      const permissions = await getUserPermissions(userId);
-      if (!permissions) return res.status(403).json({ message: "Unauthorized" });
+      const { allowed, permissions, reason } = await requirePermission(userId, "tasks", "read");
+      if (!allowed) return res.status(403).json({ message: reason });
 
-      const fileTasks = await storage.getTasksByFileId(req.params.id, permissions);
+      const fileTasks = await storage.getTasksByFileId(req.params.id, permissions!);
       res.json(fileTasks);
     } catch (error) {
       console.error("Error fetching file tasks:", error);
@@ -2182,6 +2251,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "tasks", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const validation = insertTaskSchema.safeParse(req.body);
       
       if (!validation.success) {
@@ -2205,6 +2277,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/tasks/bulk", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "tasks", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const schema = z.object({
         metadataFileIds: z.array(z.string()).min(1),
         description: z.string().min(1),
@@ -2231,6 +2306,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "tasks", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const taskId = parseInt(req.params.id);
       if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
 
@@ -2255,6 +2334,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "tasks", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
       const taskId = parseInt(req.params.id);
       if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
 

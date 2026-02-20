@@ -20,7 +20,7 @@ export default function ViewFile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, canReadMetadata, canWriteMetadata } = useAuth();
   const [newTaskDesc, setNewTaskDesc] = useState("");
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function ViewFile() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (!authLoading && user && user.canRead !== 1 && user.canWrite !== 1) {
+    if (!authLoading && !canReadMetadata && !canWriteMetadata) {
       toast({
         title: "Permission Denied",
         description: "You don't have permission to view files.",
@@ -45,11 +45,11 @@ export default function ViewFile() {
       });
       setLocation("/");
     }
-  }, [authLoading, user, toast, setLocation]);
+  }, [authLoading, canReadMetadata, canWriteMetadata, toast, setLocation]);
 
   const { data: file, isLoading } = useQuery<MetadataFile>({
     queryKey: ["/api/metadata", params?.id],
-    enabled: !!params?.id && (user?.canRead === 1 || user?.canWrite === 1),
+    enabled: !!params?.id && (canReadMetadata || canWriteMetadata),
   });
 
   const { data: tasks, isLoading: tasksLoading } = useQuery<Task[]>({
@@ -174,6 +174,14 @@ export default function ViewFile() {
             <Download className="w-4 h-4 mr-2" />
             Download XLSX
           </Button>
+          {canWriteMetadata && (
+            <Button
+              onClick={() => setLocation(`/edit/${file.id}`)}
+              data-testid="button-edit"
+            >
+              Edit File
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => setLocation("/all-files")}

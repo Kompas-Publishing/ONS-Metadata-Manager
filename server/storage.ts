@@ -57,7 +57,16 @@ export interface IStorage {
   listAllUsers(): Promise<User[]>;
   updateUserAdminStatus(userId: string, isAdmin: boolean): Promise<User | undefined>;
   updateUserStatus(userId: string, status: string): Promise<User | undefined>;
-  updateUserPermissions(userId: string, permissions: {canRead: number, canWrite: number, canEdit: number}): Promise<User | undefined>;
+  updateUserPermissions(userId: string, permissions: {
+    canReadMetadata: number, 
+    canWriteMetadata: number,
+    canReadLicenses: number,
+    canWriteLicenses: number,
+    canReadTasks: number,
+    canWriteTasks: number,
+    canUseAI: number
+  }): Promise<User | undefined>;
+  updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined>;
   updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined>;
   updateUserGroups(userId: string, groupIds: string[]): Promise<User | undefined>;
   deleteUser(userId: string): Promise<boolean>;
@@ -865,13 +874,31 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async updateUserPermissions(userId: string, permissions: {canRead: number, canWrite: number, canEdit: number}): Promise<User | undefined> {
+  async updateUserPermissions(userId: string, permissions: {
+    canReadMetadata: number, 
+    canWriteMetadata: number,
+    canReadLicenses: number,
+    canWriteLicenses: number,
+    canReadTasks: number,
+    canWriteTasks: number,
+    canUseAI: number
+  }): Promise<User | undefined> {
     const [updated] = await db
       .update(users)
       .set({
-        canRead: permissions.canRead,
-        canWrite: permissions.canWrite,
-        canEdit: permissions.canEdit,
+        ...permissions,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        password: passwordHash,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))

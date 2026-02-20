@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,6 +28,17 @@ import Tasks from "@/pages/tasks";
 import AiUpload from "@/pages/ai-upload";
 
 function Router() {
+  const { 
+    canReadMetadata, 
+    canWriteMetadata, 
+    canReadLicenses, 
+    canWriteLicenses, 
+    canReadTasks, 
+    canWriteTasks, 
+    canUseAI,
+    isAdmin
+  } = useAuth();
+
   return (
     <Switch>
       <Route path="/login" component={Login} />
@@ -36,121 +47,151 @@ function Router() {
       
       <Route path="/">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <Dashboard />
-          </ProtectedLayout>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <Dashboard />
+            </ProtectedLayout>
+          ) : (canReadTasks || canWriteTasks ? <Redirect to="/tasks" /> : <Redirect to="/pending" />)}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/create">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <CreateFile />
-          </ProtectedLayout>
+          {canWriteMetadata ? (
+            <ProtectedLayout>
+              <CreateFile />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/batch">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <BatchCreate />
-          </ProtectedLayout>
+          {canWriteMetadata ? (
+            <ProtectedLayout>
+              <BatchCreate />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/browse">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <Browse />
-          </ProtectedLayout>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <Browse />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/all-files">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <AllFiles />
-          </ProtectedLayout>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <AllFiles />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/edit/:id">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <EditFile />
-          </ProtectedLayout>
+          {canWriteMetadata ? (
+            <ProtectedLayout>
+              <EditFile />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/view/:id">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <ViewFile />
-          </ProtectedLayout>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <ViewFile />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/edit-season/:title/:season">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <EditSeason />
-          </ProtectedLayout>
+          {canWriteMetadata ? (
+            <ProtectedLayout>
+              <EditSeason />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
 
       <Route path="/licenses">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <Licenses />
-          </ProtectedLayout>
+          {canReadLicenses || canWriteLicenses ? (
+            <ProtectedLayout>
+              <Licenses />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/create-license">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <CreateLicense />
-          </ProtectedLayout>
+          {canWriteLicenses ? (
+            <ProtectedLayout>
+              <CreateLicense />
+            </ProtectedLayout>
+          ) : <Redirect to="/licenses" />}
         </AuthenticatedRoute>
       </Route>
 
       <Route path="/licenses/:id">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <ViewLicense />
-          </ProtectedLayout>
+          {canReadLicenses || canWriteLicenses ? (
+            <ProtectedLayout>
+              <ViewLicense />
+            </ProtectedLayout>
+          ) : <Redirect to="/licenses" />}
         </AuthenticatedRoute>
       </Route>
 
       <Route path="/licenses/:id/edit">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <EditLicense />
-          </ProtectedLayout>
+          {canWriteLicenses ? (
+            <ProtectedLayout>
+              <EditLicense />
+            </ProtectedLayout>
+          ) : <Redirect to="/licenses" />}
         </AuthenticatedRoute>
       </Route>
 
       <Route path="/tasks">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <Tasks />
-          </ProtectedLayout>
+          {canReadTasks || canWriteTasks ? (
+            <ProtectedLayout>
+              <Tasks />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
 
       <Route path="/ai-upload">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <AiUpload />
-          </ProtectedLayout>
+          {canUseAI ? (
+            <ProtectedLayout>
+              <AiUpload />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       
       <Route path="/admin">
         <AuthenticatedRoute>
-          <ProtectedLayout>
-            <Admin />
-          </ProtectedLayout>
+          {isAdmin ? (
+            <ProtectedLayout>
+              <Admin />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
       

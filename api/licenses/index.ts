@@ -6,7 +6,15 @@ import { z } from "zod";
 import { getUserPermissions } from "../_server/permissions.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const permissions = await getUserPermissions(userId);
+  if (!permissions) return res.status(403).json({ message: "Unauthorized" });
+
   if (req.method === "GET") {
+    if (!permissions.permissions.licenses.read) {
+      return res.status(403).json({ message: "No read permission for licenses" });
+    }
     try {
       const licenses = await storage.listLicenses();
       return res.json(licenses);
@@ -17,6 +25,9 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   }
 
   if (req.method === "POST") {
+    if (!permissions.permissions.licenses.write) {
+      return res.status(403).json({ message: "No write permission for licenses" });
+    }
     try {
       const createLicenseWithMetadataSchema = insertLicenseSchema.extend({
         metadataIds: z.array(z.string()).optional(),
@@ -34,31 +45,25 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
       const { metadataIds, newBatches, ...licenseData } = validation.data;
       const license = await storage.createLicense(licenseData);
       
-      const userId = req.user?.id;
-      if (userId) {
-        const permissions = await getUserPermissions(userId);
-        if (permissions) {
-          // Link existing metadata
-          if (metadataIds && metadataIds.length > 0) {
-            await storage.bulkUpdateMetadata(
-              metadataIds.map(id => ({ id, data: { licenseId: license.id } })),
-              permissions
-            );
-          }
+      // Link existing metadata
+      if (metadataIds && metadataIds.length > 0) {
+        await storage.bulkUpdateMetadata(
+          metadataIds.map(id => ({ id, data: { licenseId: license.id } })),
+          permissions
+        );
+      }
 
-          // Create new batches
-          if (newBatches && newBatches.length > 0) {
-            await storage.createMultiBatchMetadataFiles(
-              {
-                batches: newBatches.map(batch => ({
-                  ...batch,
-                  licenseId: license.id
-                }))
-              },
-              permissions
-            );
-          }
-        }
+      // Create new batches
+      if (newBatches && newBatches.length > 0) {
+        await storage.createMultiBatchMetadataFiles(
+          {
+            batches: newBatches.map(batch => ({
+              ...batch,
+              licenseId: license.id
+            }))
+          },
+          permissions
+        );
       }
 
       return res.json(license);

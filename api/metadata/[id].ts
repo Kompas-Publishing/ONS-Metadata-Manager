@@ -12,7 +12,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
 
   // GET /api/metadata/:id - Get single metadata file
   if (req.method === "GET") {
-    return requirePermission("read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+    return requirePermission("metadata", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.permissions);
         const file = await storage.getMetadataFile(id, req.permissions!);
@@ -30,7 +30,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
 
   // PATCH /api/metadata/:id - Update metadata file
   if (req.method === "PATCH") {
-    return requirePermission("edit")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+    return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         const permissions = req.permissions!;
 
@@ -79,7 +79,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
 
   // DELETE /api/metadata/:id - Delete metadata file
   if (req.method === "DELETE") {
-    return requirePermission("edit")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+    return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         const permissions = req.permissions!;
 

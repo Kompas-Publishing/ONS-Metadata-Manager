@@ -22,6 +22,7 @@ import { LicenseContentManager } from "@/components/license-content-manager";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
 import { BatchCreateForm } from "@/components/batch-create-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/use-auth";
 
 import { z } from "zod";
 
@@ -45,6 +46,7 @@ export default function CreateLicense() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canWriteLicenses } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMetadataIds, setSelectedMetadataIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
@@ -77,6 +79,7 @@ export default function CreateLicense() {
   const [createdId, setCreatedId] = useState<string | null>(null);
 
   const onSubmit = async (data: CreateLicenseFormValues, redirect: boolean = true) => {
+    if (!canWriteLicenses) return;
     setIsSubmitting(true);
     try {
       const payload = {

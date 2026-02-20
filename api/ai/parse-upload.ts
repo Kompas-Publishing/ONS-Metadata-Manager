@@ -61,4 +61,4 @@ export const config = {
   maxDuration: 300,
 };
 
-export default withCors(requirePermission("write")(handler));
+export default withCors(requirePermission("ai")(handler));

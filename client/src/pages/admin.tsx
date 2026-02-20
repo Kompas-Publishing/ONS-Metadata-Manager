@@ -232,10 +232,19 @@ export default function Admin() {
 
   // User permissions mutation
   const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, permissions }: { userId: string; permissions: { canRead: number; canWrite: number } }) => {
-      // Sync canEdit with canWrite for backward compatibility
-      const fullPermissions = { ...permissions, canEdit: permissions.canWrite };
-      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, fullPermissions);
+    mutationFn: async ({ userId, permissions }: { 
+      userId: string; 
+      permissions: { 
+        canReadMetadata: number; 
+        canWriteMetadata: number;
+        canReadLicenses: number;
+        canWriteLicenses: number;
+        canReadTasks: number;
+        canWriteTasks: number;
+        canUseAI: number;
+      } 
+    }) => {
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, permissions);
       return await res.json();
     },
     onSuccess: () => {
@@ -246,6 +255,30 @@ export default function Admin() {
       toast({
         title: "Error",
         description: error.message || "Failed to update permissions",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Password reset mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest('POST', `/api/admin/users/${userId}/reset-password`, {});
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      // Create a temporary element to show the new password that can be copied
+      const password = data.newPassword;
+      toast({ 
+        title: "Password Reset Successful", 
+        description: `New password: ${password} (Please copy this now!)`,
+        duration: 10000,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset password",
         variant: "destructive",
       });
     },
@@ -519,18 +552,27 @@ export default function Admin() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
-                              {user.canRead === 1 && (
-                                <Badge variant="secondary" data-testid={`badge-read-${user.id}`}>
-                                  <Eye className="w-3 h-3 mr-1" />
-                                  Read
-                                </Badge>
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {user.canReadMetadata === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:R</Badge>
                               )}
-                              {user.canWrite === 1 && (
-                                <Badge variant="secondary" data-testid={`badge-write-${user.id}`}>
-                                  <FileText className="w-3 h-3 mr-1" />
-                                  Write
-                                </Badge>
+                              {user.canWriteMetadata === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:W</Badge>
+                              )}
+                              {user.canReadLicenses === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:R</Badge>
+                              )}
+                              {user.canWriteLicenses === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:W</Badge>
+                              )}
+                              {user.canReadTasks === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:R</Badge>
+                              )}
+                              {user.canWriteTasks === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:W</Badge>
+                              )}
+                              {user.canUseAI === 1 && (
+                                <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
                               )}
                             </div>
                           </TableCell>
@@ -628,25 +670,45 @@ export default function Admin() {
                                     </div>
                                   </div>
 
-                                  {/* Admin Status */}
+                                  {/* Admin & Security */}
                                   <div className="space-y-4">
                                     <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Admin Status
+                                      Admin & Security
                                     </h3>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() =>
-                                        toggleAdminMutation.mutate({
-                                          userId: user.id,
-                                          isAdmin: !isAdmin,
-                                        })
-                                      }
-                                      disabled={isCurrentUser || toggleAdminMutation.isPending}
-                                      data-testid={`button-toggle-admin-${user.id}`}
-                                    >
-                                      {isAdmin ? "Remove Admin" : "Make Admin"}
-                                    </Button>
+                                    <div className="flex flex-col gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          toggleAdminMutation.mutate({
+                                            userId: user.id,
+                                            isAdmin: !isAdmin,
+                                          })
+                                        }
+                                        disabled={isCurrentUser || toggleAdminMutation.isPending}
+                                        data-testid={`button-toggle-admin-${user.id}`}
+                                        className="justify-start"
+                                      >
+                                        <Shield className="w-4 h-4 mr-2" />
+                                        {isAdmin ? "Remove Admin Privileges" : "Grant Admin Privileges"}
+                                      </Button>
+                                      
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          if (window.confirm(`Are you sure you want to reset the password for ${user.email}?`)) {
+                                            resetPasswordMutation.mutate(user.id);
+                                          }
+                                        }}
+                                        disabled={resetPasswordMutation.isPending}
+                                        data-testid={`button-reset-password-${user.id}`}
+                                        className="justify-start"
+                                      >
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        Reset Password
+                                      </Button>
+                                    </div>
                                   </div>
 
                                   {/* Permissions */}
@@ -654,52 +716,144 @@ export default function Admin() {
                                     <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                                       Permissions
                                     </h3>
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <Label
-                                          htmlFor={`canRead-${user.id}`}
-                                          className="text-sm"
-                                        >
-                                          Can Read
-                                        </Label>
-                                        <Switch
-                                          id={`canRead-${user.id}`}
-                                          checked={user.canRead === 1}
-                                          onCheckedChange={(checked) =>
-                                            updatePermissionsMutation.mutate({
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                      <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`meta-read-${user.id}`} className="text-sm">Metadata Read</Label>
+                                          <Switch
+                                            id={`meta-read-${user.id}`}
+                                            checked={user.canReadMetadata === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                               userId: user.id,
                                               permissions: {
-                                                canRead: checked ? 1 : 0,
-                                                canWrite: user.canWrite,
-                                              },
-                                            })
-                                          }
-                                          disabled={updatePermissionsMutation.isPending}
-                                          data-testid={`switch-read-${user.id}`}
-                                        />
+                                                canReadMetadata: checked ? 1 : 0,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`meta-write-${user.id}`} className="text-sm">Metadata Write</Label>
+                                          <Switch
+                                            id={`meta-write-${user.id}`}
+                                            checked={user.canWriteMetadata === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: checked ? 1 : 0,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`ai-toggle-${user.id}`} className="text-sm">AI Access</Label>
+                                          <Switch
+                                            id={`ai-toggle-${user.id}`}
+                                            checked={user.canUseAI === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: checked ? 1 : 0,
+                                              }
+                                            })}
+                                          />
+                                        </div>
                                       </div>
-                                      <div className="flex items-center justify-between">
-                                        <Label
-                                          htmlFor={`canWrite-${user.id}`}
-                                          className="text-sm"
-                                        >
-                                          Can Write
-                                        </Label>
-                                        <Switch
-                                          id={`canWrite-${user.id}`}
-                                          checked={user.canWrite === 1}
-                                          onCheckedChange={(checked) =>
-                                            updatePermissionsMutation.mutate({
+                                      
+                                      <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`lic-read-${user.id}`} className="text-sm">Licenses Read</Label>
+                                          <Switch
+                                            id={`lic-read-${user.id}`}
+                                            checked={user.canReadLicenses === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                               userId: user.id,
                                               permissions: {
-                                                canRead: user.canRead,
-                                                canWrite: checked ? 1 : 0,
-                                              },
-                                            })
-                                          }
-                                          disabled={updatePermissionsMutation.isPending}
-                                          data-testid={`switch-write-${user.id}`}
-                                        />
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: checked ? 1 : 0,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`lic-write-${user.id}`} className="text-sm">Licenses Write</Label>
+                                          <Switch
+                                            id={`lic-write-${user.id}`}
+                                            checked={user.canWriteLicenses === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: checked ? 1 : 0,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`task-read-${user.id}`} className="text-sm">Tasks Read</Label>
+                                          <Switch
+                                            id={`task-read-${user.id}`}
+                                            checked={user.canReadTasks === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: checked ? 1 : 0,
+                                                canWriteTasks: user.canWriteTasks,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                          <Label htmlFor={`task-write-${user.id}`} className="text-sm">Tasks Write</Label>
+                                          <Switch
+                                            id={`task-write-${user.id}`}
+                                            checked={user.canWriteTasks === 1}
+                                            onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                              userId: user.id,
+                                              permissions: {
+                                                canReadMetadata: user.canReadMetadata,
+                                                canWriteMetadata: user.canWriteMetadata,
+                                                canReadLicenses: user.canReadLicenses,
+                                                canWriteLicenses: user.canWriteLicenses,
+                                                canReadTasks: user.canReadTasks,
+                                                canWriteTasks: checked ? 1 : 0,
+                                                canUseAI: user.canUseAI,
+                                              }
+                                            })}
+                                          />
+                                        </div>
                                       </div>
                                     </div>
                                   </div>

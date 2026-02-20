@@ -3,7 +3,7 @@ import { storage } from "../_server/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
-  requirePermission("edit")(async (req: AuthenticatedRequest, res: VercelResponse) => {
+  requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method !== "PATCH") {
       return res.status(405).json({ message: "Method not allowed" });
     }

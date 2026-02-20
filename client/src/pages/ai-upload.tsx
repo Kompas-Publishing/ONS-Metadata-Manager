@@ -22,7 +22,7 @@ type Proposal = {
 };
 
 export default function AiUpload() {
-  const { user } = useAuth();
+  const { canUseAI } = useAuth();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [uploadType, setUploadType] = useState<"license" | "metadata">("license");
@@ -132,6 +132,16 @@ export default function AiUpload() {
       setFile(selectedFile);
     }
   };
+
+  if (!canUseAI) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <Card className="p-12 text-center">
+          <p className="text-muted-foreground">You don't have permission to use the AI Uploader.</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

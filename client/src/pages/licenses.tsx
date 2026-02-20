@@ -41,6 +41,7 @@ type SortConfig = {
 };
 
 export default function Licenses() {
+  const { canWriteLicenses } = useAuth();
   const { data: licenses, isLoading } = useQuery<License[]>({
     queryKey: ["/api/licenses"],
   });
@@ -142,12 +143,14 @@ export default function Licenses() {
             Manage content licenses and contracts
           </p>
         </div>
-        <Link href="/create-license">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Create License
-          </Button>
-        </Link>
+        {canWriteLicenses && (
+          <Link href="/create-license">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create License
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row gap-4">

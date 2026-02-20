@@ -10,16 +10,28 @@ export default apiHandler(
 
     try {
       const { id } = req.query;
-      const { canRead, canWrite, canEdit } = req.body;
+      const { 
+        canReadMetadata, 
+        canWriteMetadata, 
+        canReadLicenses, 
+        canWriteLicenses, 
+        canReadTasks, 
+        canWriteTasks, 
+        canUseAI 
+      } = req.body;
 
       if (!id || typeof id !== "string") {
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
       const updates = {
-        canRead: canRead !== undefined ? (canRead ? 1 : 0) : 0,
-        canWrite: canWrite !== undefined ? (canWrite ? 1 : 0) : 0,
-        canEdit: canEdit !== undefined ? (canEdit ? 1 : 0) : 0,
+        canReadMetadata: canReadMetadata !== undefined ? (canReadMetadata ? 1 : 0) : 0,
+        canWriteMetadata: canWriteMetadata !== undefined ? (canWriteMetadata ? 1 : 0) : 0,
+        canReadLicenses: canReadLicenses !== undefined ? (canReadLicenses ? 1 : 0) : 0,
+        canWriteLicenses: canWriteLicenses !== undefined ? (canWriteLicenses ? 1 : 0) : 0,
+        canReadTasks: canReadTasks !== undefined ? (canReadTasks ? 1 : 0) : 0,
+        canWriteTasks: canWriteTasks !== undefined ? (canWriteTasks ? 1 : 0) : 0,
+        canUseAI: canUseAI !== undefined ? (canUseAI ? 1 : 0) : 0,
       };
 
       await storage.updateUserPermissions(id, updates);

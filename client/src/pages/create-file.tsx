@@ -6,14 +6,17 @@ import { MetadataForm } from "@/components/metadata-form";
 import { Card } from "@/components/ui/card";
 import type { InsertMetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function CreateFile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canWriteMetadata } = useAuth();
 
   const { data: nextId } = useQuery<string>({
     queryKey: ["/api/metadata/next-id"],
+    enabled: canWriteMetadata,
   });
 
   const createMutation = useMutation({
