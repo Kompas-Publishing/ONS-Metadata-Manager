@@ -69,6 +69,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   CheckSquare,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
