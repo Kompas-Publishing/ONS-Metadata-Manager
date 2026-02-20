@@ -497,6 +497,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/auth/user", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req.user as any).id;
+      const { firstName, lastName, profileImageUrl, currentPassword, newPassword } = req.body;
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {};
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+      if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
+
+      if (newPassword) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required to set a new password" });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password || "");
+        if (!isMatch) {
+          return res.status(400).json({ message: "Incorrect current password" });
+        }
+
+        updateData.password = await bcrypt.hash(newPassword, 12);
+      }
+
+      const updatedUser = await storage.updateUserProfile(userId, updateData);
+      const { password, ...userWithoutPassword } = updatedUser as any;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   app.get("/api/metadata/next-id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;

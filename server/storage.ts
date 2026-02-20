@@ -69,6 +69,7 @@ export interface IStorage {
   updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined>;
   updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined>;
   updateUserGroups(userId: string, groupIds: string[]): Promise<User | undefined>;
+  updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined>;
   deleteUser(userId: string): Promise<boolean>;
   getUsersByGroupId(groupId: string): Promise<User[]>;
   
@@ -923,6 +924,18 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         groupIds,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...data,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))

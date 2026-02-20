@@ -46,6 +46,22 @@ export function useAuth() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: {
+      firstName?: string;
+      lastName?: string;
+      profileImageUrl?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    }) => {
+      const response = await apiRequest("PATCH", "/api/auth/user", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+  });
+
   const login = async (email: string, password: string) => {
     return loginMutation.mutateAsync({ email, password });
   };
@@ -61,6 +77,10 @@ export function useAuth() {
     lastName: string;
   }) => {
     return registerMutation.mutateAsync(data);
+  };
+
+  const updateProfile = async (data: Parameters<typeof updateProfileMutation.mutateAsync>[0]) => {
+    return updateProfileMutation.mutateAsync(data);
   };
 
   const isPending = user?.status === "pending";
@@ -92,5 +112,7 @@ export function useAuth() {
     login,
     logout,
     register,
+    updateProfile,
+    isUpdatingProfile: updateProfileMutation.isPending,
   };
 }
