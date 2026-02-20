@@ -137,6 +137,83 @@ Only return the JSON object.`;
     return resultJson;
   }
 
+  async refineParsing(
+    fileBuffer: Buffer,
+    mimeType: string,
+    type: "license" | "metadata",
+    previousProposals: any[],
+    userFeedback: string,
+    permissions?: UserPermissions
+  ): Promise<any> {
+    await this.initialize();
+    if (!this.genAI) throw new Error("AI not initialized");
+
+    const model = this.genAI.getGenerativeModel({ model: this.model });
+    const isPdf = mimeType === "application/pdf";
+    const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
+
+    const refinementPrompt = `Role: Expert Data Analyst.
+Task: You previously parsed the attached document and generated some proposals. The user has provided feedback because something was incorrect.
+
+Upload Type: ${type}
+User Feedback: "${userFeedback}"
+
+Previous Proposals:
+${JSON.stringify(previousProposals, null, 2)}
+
+Instructions:
+1. Re-analyze the document based on the user feedback.
+2. Provide a new, corrected set of proposals following the exact same JSON schema as before.
+3. If the user feedback indicates grouping issues, adjust the number of objects accordingly.
+4. If the user feedback corrects specific values, ensure those are updated.
+5. If you need to re-match against the database, use the information from the previous proposals.
+
+JSON Schema:
+{
+  "proposals": [
+    {
+      "type": "${type}",
+      "action": "create" | "update",
+      "explanation": "string explaining why it changed or why it matched",
+      "data": { ... fields appropriate for ${type} ... }
+    }
+  ]
+}
+
+${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
+
+Only return the JSON object. Do not include markdown formatting.`;
+
+    const content: any[] = [refinementPrompt];
+    if (isPdf) content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const result = await model.generateContent(content);
+    const resultJson = JSON.parse(result.response.text().replace(/```json|```/g, "").trim());
+
+    // Normalize results as in original methods
+    for (const p of resultJson.proposals || []) {
+      if (type === "license" && p.data.content_items) {
+        for (const item of p.data.content_items) {
+          if (!item.season || item.season === 0) item.season = 1;
+        }
+      } else if (type === "metadata") {
+        if (p.data.season === 0 || p.data.season === null) {
+          p.data.season = 1;
+        }
+      }
+      
+      // Try to restore existingData from previous proposals if the ID matches
+      if (p.action === "update" && p.data.id) {
+        const prev = previousProposals.find(pp => pp.data?.id === p.data.id);
+        if (prev) {
+          p.existingData = prev.existingData;
+        }
+      }
+    }
+
+    return resultJson;
+  }
+
   async parseMetadataDocument(fileBuffer: Buffer, mimeType: string, permissions: UserPermissions): Promise<any> {
     await this.initialize();
     if (!this.genAI) throw new Error("AI not initialized");

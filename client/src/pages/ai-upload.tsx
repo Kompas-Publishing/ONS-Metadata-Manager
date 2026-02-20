@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, Upload, FileText, Check, X, Loader2, AlertCircle, Plus } from "lucide-react";
+import { Sparkles, Upload, FileText, Check, X, Loader2, AlertCircle, Plus, MessageSquare, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMutation } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
 
 type Proposal = {
   type: "license" | "metadata";
@@ -26,6 +27,7 @@ export default function AiUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadType, setUploadType] = useState<"license" | "metadata">("license");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [userFeedback, setUserFeedback] = useState("");
 
   const parseMutation = useMutation({
     mutationFn: async () => {
@@ -53,6 +55,38 @@ export default function AiUpload() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const refineMutation = useMutation({
+    mutationFn: async () => {
+      if (!file || !userFeedback || !proposals) throw new Error("Missing data for refinement");
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", uploadType);
+      formData.append("feedback", userFeedback);
+      formData.append("previousProposals", JSON.stringify(proposals));
+      
+      const res = await fetch("/api/ai/refine-upload", {
+        method: "POST",
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to refine proposals");
+      }
+      
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setProposals(data.proposals);
+      setUserFeedback("");
+      toast({ title: "Updated", description: "AI has refined the proposals based on your feedback" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Refinement Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -301,6 +335,45 @@ export default function AiUpload() {
                     </CardContent>
                   </Card>
                 ))}
+
+                {proposals.length > 0 && (
+                  <Card className="border-primary bg-primary/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-primary" />
+                        Suggest Changes
+                      </CardTitle>
+                      <CardDescription>
+                        Is something incorrect? Tell Gemini what to fix (e.g., "group these by season" or "the price is $500").
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Textarea 
+                        placeholder="Type your feedback here..."
+                        value={userFeedback}
+                        onChange={(e) => setUserFeedback(e.target.value)}
+                        className="bg-background min-h-[80px]"
+                      />
+                      <Button 
+                        className="w-full" 
+                        disabled={!userFeedback.trim() || refineMutation.isPending}
+                        onClick={() => refineMutation.mutate()}
+                      >
+                        {refineMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Refining proposals...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Send Feedback to AI
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </ScrollArea>
           )}

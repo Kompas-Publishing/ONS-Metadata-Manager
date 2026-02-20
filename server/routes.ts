@@ -1907,6 +1907,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.post(
+    "/api/ai/refine-upload",
+    isAuthenticated,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        const permissions = await getUserPermissions(userId);
+        if (!permissions || (permissions.user.canWrite === 0 && permissions.user.isAdmin === 0)) {
+          return res.status(403).json({ message: "Write permission required" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const type = req.body.type || "license";
+        const feedback = req.body.feedback;
+        const previousProposals = JSON.parse(req.body.previousProposals || "[]");
+
+        if (!feedback) {
+          return res.status(400).json({ message: "Feedback is required for refinement" });
+        }
+
+        const result = await aiService.refineParsing(
+          req.file.buffer,
+          req.file.mimetype,
+          type,
+          previousProposals,
+          feedback,
+          permissions
+        );
+
+        res.json({ proposals: result.proposals });
+      } catch (error: any) {
+        console.error("Error in AI refine upload:", error);
+        res.status(500).json({ message: error.message || "AI refinement failed" });
+      }
+    },
+  );
+
+  app.post(
     "/api/ai/execute-proposal",
     isAuthenticated,
     async (req: any, res) => {
