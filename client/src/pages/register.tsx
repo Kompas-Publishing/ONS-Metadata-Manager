@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { Link, useLocation } from "wouter";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -34,6 +34,10 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    document.title = "Register | ONS Broadcast Portal";
+  }, []);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),

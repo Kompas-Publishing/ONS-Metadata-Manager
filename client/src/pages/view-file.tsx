@@ -24,6 +24,10 @@ export default function ViewFile() {
   const [newTaskDesc, setNewTaskDesc] = useState("");
 
   useEffect(() => {
+    document.title = `View File ${params?.id || ''} | ONS Broadcast Portal`;
+  }, [params?.id]);
+
+  useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",

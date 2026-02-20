@@ -37,6 +37,10 @@ export default function EditLicense() {
   const { canWriteLicenses, canReadLicenses } = useAuth();
   const id = params?.id;
 
+  useEffect(() => {
+    document.title = "Edit License | ONS Broadcast Portal";
+  }, []);
+
   console.log("EditLicense: id =", id);
 
   const { data: license, isLoading, isError, error: queryError } = useQuery<License>({

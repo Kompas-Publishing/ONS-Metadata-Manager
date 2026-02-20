@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 
 type Proposal = {
   type: "license" | "metadata";
@@ -25,6 +26,11 @@ type Proposal = {
 export default function AiUpload() {
   const { canUseAI } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    document.title = "AI Assistant | ONS Broadcast Portal";
+  }, []);
+
   const [file, setFile] = useState<File | null>(null);
   const [uploadType, setUploadType] = useState<"license" | "metadata">("license");
   const [proposals, setProposals] = useState<Proposal[] | null>(null);

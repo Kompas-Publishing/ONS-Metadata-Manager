@@ -8,6 +8,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 interface Stats {
   totalFiles: number;
@@ -17,6 +18,10 @@ interface Stats {
 
 export default function Dashboard() {
   const { isAdmin, canWriteMetadata, canReadMetadata } = useAuth();
+
+  useEffect(() => {
+    document.title = "Dashboard | ONS Broadcast Portal";
+  }, []);
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ["/api/stats"],

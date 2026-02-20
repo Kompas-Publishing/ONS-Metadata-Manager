@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 type SortConfig = {
   key: keyof License | "status";
@@ -43,6 +44,11 @@ type SortConfig = {
 
 export default function Licenses() {
   const { canWriteLicenses, canReadLicenses } = useAuth();
+
+  useEffect(() => {
+    document.title = "License Manager | ONS Broadcast Portal";
+  }, []);
+
   const { data: licenses, isLoading } = useQuery<License[]>({
     queryKey: ["/api/licenses"],
     enabled: canReadLicenses || canWriteLicenses,

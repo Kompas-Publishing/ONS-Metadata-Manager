@@ -40,6 +40,10 @@ export default function EditSeason() {
   const title = params?.title ? decodeURIComponent(params.title) : "";
   const seasonNum = params?.season ? parseInt(params.season) : 0;
 
+  useEffect(() => {
+    document.title = `Edit ${title} Season ${seasonNum} | ONS Broadcast Portal`;
+  }, [title, seasonNum]);
+
   const [episodes, setEpisodes] = useState<EpisodeEdit[]>([]);
 
   const { data: seasonData, isLoading } = useQuery<MetadataFile[]>({

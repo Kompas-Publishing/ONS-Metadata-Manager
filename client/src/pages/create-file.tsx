@@ -7,12 +7,17 @@ import { Card } from "@/components/ui/card";
 import type { InsertMetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 export default function CreateFile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canWriteMetadata } = useAuth();
+
+  useEffect(() => {
+    document.title = "Create Metadata | ONS Broadcast Portal";
+  }, []);
 
   const { data: nextId } = useQuery<string>({
     queryKey: ["/api/metadata/next-id"],

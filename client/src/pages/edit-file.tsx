@@ -20,6 +20,10 @@ export default function EditFile() {
   const { isAuthenticated, isLoading: authLoading, canWriteMetadata } = useAuth();
 
   useEffect(() => {
+    document.title = `Edit File ${params?.id || ''} | ONS Broadcast Portal`;
+  }, [params?.id]);
+
+  useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       toast({
         title: "Unauthorized",

@@ -38,6 +38,10 @@ export default function ViewLicense() {
   const { canWriteLicenses, canReadLicenses } = useAuth();
   const id = params?.id;
 
+  useEffect(() => {
+    document.title = "View License | ONS Broadcast Portal";
+  }, []);
+
   const { data: license, isLoading: isLicenseLoading } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
     enabled: !!id && (canReadLicenses || canWriteLicenses),

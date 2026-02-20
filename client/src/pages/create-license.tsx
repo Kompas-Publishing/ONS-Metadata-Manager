@@ -23,6 +23,7 @@ import { ExistingContentSelector } from "@/components/existing-content-selector"
 import { BatchCreateForm } from "@/components/batch-create-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 import { z } from "zod";
 
@@ -47,6 +48,11 @@ export default function CreateLicense() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canWriteLicenses } = useAuth();
+
+  useEffect(() => {
+    document.title = "Create License | ONS Broadcast Portal";
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMetadataIds, setSelectedMetadataIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");

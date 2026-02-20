@@ -10,6 +10,7 @@ import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 const handleDownload = (url: string) => {
   const link = document.createElement('a');
@@ -31,6 +32,10 @@ export default function Browse() {
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const { canWriteMetadata, canReadMetadata } = useAuth();
+
+  useEffect(() => {
+    document.title = "Browse Series | ONS Broadcast Portal";
+  }, []);
 
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],

@@ -25,6 +25,7 @@ import { TagInput } from "@/components/tag-input";
 import { CountrySelect } from "@/components/country-select";
 import { TimeInput } from "@/components/time-input";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 function parseFormattedId(formattedId: string): number {
   return parseInt(formattedId.replace(/-/g, ''), 10);
@@ -44,6 +45,10 @@ export default function BatchCreate() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdCount, setCreatedCount] = useState(0);
   const { canWriteMetadata } = useAuth();
+
+  useEffect(() => {
+    document.title = "Batch Create | ONS Broadcast Portal";
+  }, []);
 
   const { data: nextId } = useQuery<string>({
     queryKey: ["/api/metadata/next-id"],

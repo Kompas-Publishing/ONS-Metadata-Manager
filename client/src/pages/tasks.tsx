@@ -49,11 +49,17 @@ import { BatchCreateForm } from "@/components/batch-create-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
 export default function Tasks() {
   const { canReadTasks, canWriteTasks, canReadMetadata, canWriteMetadata } = useAuth();
+
+  useEffect(() => {
+    document.title = "Task List | ONS Broadcast Portal";
+  }, []);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");

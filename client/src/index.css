@@ -3,9 +3,25 @@
 @tailwind utilities;
 
 @font-face {
-  font-family: 'Roboto';
-  src: url('/fonts/Roboto-Medium.ttf') format('truetype');
+  font-family: 'Lexend Exa';
+  src: url('/fonts/LexendExa-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lexend Deca';
+  src: url('/fonts/LexendDeca-Medium.ttf') format('truetype');
   font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Lexend Deca';
+  src: url('/fonts/LexendDeca-Regular.ttf') format('truetype');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -51,8 +67,10 @@
   --chart-3: 42.0290 92.8251% 56.2745%;
   --chart-4: 234.35deg 35.86% 46.47%;
   --chart-5: 341.4894 75.2000% 50.9804%;
-  --font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Roboto', serif;
+  --font-heading: 'Lexend Exa', sans-serif;
+  --font-subheading: 'Lexend Deca', sans-serif;
+  --font-sans: 'Lexend Deca', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'Lexend Deca', serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius: 1.3rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
@@ -173,9 +191,11 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --radius: 1.3rem;
   --spacing: 0.25rem;
+  --font-heading: 'Lexend Exa', sans-serif;
+  --font-subheading: 'Lexend Deca', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Roboto', serif;
+  --font-sans: 'Lexend Deca', sans-serif;
+  --font-serif: 'Lexend Deca', serif;
   --tracking-normal: 0em;
 }
 
@@ -192,6 +212,18 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+  }
+
+  h1 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: -0.1em; /* -100 in Font Instructions usually means -10% tracking */
+  }
+
+  h2, h3, h4 {
+    font-family: var(--font-subheading);
+    font-weight: 500;
+    letter-spacing: 0em;
   }
 }
 

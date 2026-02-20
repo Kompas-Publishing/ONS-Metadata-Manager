@@ -30,6 +30,7 @@ import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 export default function AllFiles() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +40,10 @@ export default function AllFiles() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canReadMetadata, canWriteMetadata, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    document.title = "All Files | ONS Broadcast Portal";
+  }, []);
 
   const { data: files, isLoading, error } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
