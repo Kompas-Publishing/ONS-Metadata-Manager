@@ -1,11 +1,12 @@
 import type { VercelResponse } from "@vercel/node";
 import { storage } from "../_server/storage.js";
-import { apiHandler, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import { apiHandler, type AuthenticatedRequest, authenticate } from "../_lib/apiHandler.js";
 import { insertLicenseSchema } from "../_shared/schema.js";
 import { z } from "zod";
 import { getUserPermissions } from "../_server/permissions.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
+  await authenticate(req);
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const permissions = await getUserPermissions(userId);

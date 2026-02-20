@@ -53,7 +53,7 @@ import { useAuth } from "@/hooks/use-auth";
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
 export default function Tasks() {
-  const { canWriteTasks, canReadMetadata, canWriteMetadata } = useAuth();
+  const { canReadTasks, canWriteTasks, canReadMetadata, canWriteMetadata } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");

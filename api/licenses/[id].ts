@@ -3,6 +3,7 @@ import { storage } from "../_server/storage.js";
 import { apiHandler, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import { insertLicenseSchema } from "../_shared/schema.js";
 import { getUserPermissions } from "../_server/permissions.js";
+import { authenticate } from "../_lib/apiHandler.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   const { id } = req.query;
@@ -12,6 +13,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
     return res.status(400).json({ message: "License ID is required" });
   }
 
+  await authenticate(req);
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const permissions = await getUserPermissions(userId);
