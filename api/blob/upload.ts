@@ -58,6 +58,7 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
             "image/jpeg", "image/png", "image/gif", "image/webp",
             "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"
           ],
+          addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             userId: user.id,
             uploadType,

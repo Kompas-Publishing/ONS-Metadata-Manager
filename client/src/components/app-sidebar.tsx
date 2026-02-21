@@ -152,7 +152,6 @@ export function AppSidebar() {
         access: 'private',
         handleUploadUrl: '/api/blob/upload',
         clientPayload: JSON.stringify({ type: 'avatar' }),
-        addRandomSuffix: true,
       });
 
       setProfileImageUrl(newBlob.url);
