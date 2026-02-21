@@ -2415,7 +2415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vercel Blob upload handshake
   app.post("/api/blob/upload", isAuthenticated, async (req, res) => {
     try {
-      const { handleUpload } = await import("@vercel/blob/client");
+      const { handleUpload } = await import("@vercel/blob");
       const jsonResponse = await handleUpload({
         body: req.body,
         request: req as any,
