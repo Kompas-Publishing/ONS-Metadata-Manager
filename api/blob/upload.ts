@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { corsMiddleware, authenticate, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import { storage } from "../_server/storage.js";
 import { requirePermission as checkPermission } from "../_server/permissions.js";
