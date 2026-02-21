@@ -186,7 +186,7 @@ function AiConfigSection() {
   );
 }
 
-export default function Admin() {
+export default function Admin({ tab = "users" }: { tab?: "users" | "settings" }) {
   const { user: currentUser, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -201,8 +201,8 @@ export default function Admin() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    document.title = "Admin Panel";
-  }, []);
+    document.title = tab === "users" ? "Users & Groups | Admin" : "System Settings | Admin";
+  }, [tab]);
 
   useEffect(() => {
     if (!authLoading && (!currentUser || currentUser.isAdmin !== 1)) {
@@ -503,644 +503,651 @@ export default function Admin() {
   const groups = groupsData?.groups || [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       <div>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Shield className="w-6 h-6 text-primary" />
+            {tab === "users" ? <Shield className="w-6 h-6 text-primary" /> : <Settings className="w-6 h-6 text-primary" />}
           </div>
-          <h1 className="text-3xl font-semibold text-foreground">Admin Panel</h1>
+          <h1 className="text-3xl font-semibold text-foreground">
+            {tab === "users" ? "Users & Groups" : "System Settings"}
+          </h1>
         </div>
         <p className="text-muted-foreground">
-          Manage users, permissions, and groups
+          {tab === "users" 
+            ? "Manage user access, permissions, and organizational groups" 
+            : "Configure global system parameters and AI settings"}
         </p>
       </div>
 
-      {/* User Management Section */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-foreground">User Management</h2>
-        {users.length === 0 ? (
-          <Card className="p-12 text-center">
-            <UserCog className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No users found</p>
-          </Card>
-        ) : (
-          <Card className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Permissions</TableHead>
-                  <TableHead>Visibility</TableHead>
-                  <TableHead>Group</TableHead>
-                  <TableHead>Admin</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => {
-                  const isCurrentUser = currentUser?.id === user.id;
-                  const isAdmin = user.isAdmin === 1;
-                  const isExpanded = expandedUsers.has(user.id);
+      {tab === "users" ? (
+        <>
+          {/* User Management Section */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-foreground">User Management</h2>
+            {users.length === 0 ? (
+              <Card className="p-12 text-center">
+                <UserCog className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No users found</p>
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Permissions</TableHead>
+                      <TableHead>Visibility</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead>Admin</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => {
+                      const isCurrentUser = currentUser?.id === user.id;
+                      const isAdmin = user.isAdmin === 1;
+                      const isExpanded = expandedUsers.has(user.id);
 
-                  return (
-                    <Collapsible
-                      key={user.id}
-                      open={isExpanded}
-                      onOpenChange={() => toggleUserExpanded(user.id)}
-                      asChild
-                    >
-                      <>
-                        <TableRow data-testid={`row-user-${user.id}`}>
-                          <TableCell>
-                            <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                data-testid={`button-expand-${user.id}`}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
+                      return (
+                        <Collapsible
+                          key={user.id}
+                          open={isExpanded}
+                          onOpenChange={() => toggleUserExpanded(user.id)}
+                          asChild
+                        >
+                          <>
+                            <TableRow data-testid={`row-user-${user.id}`}>
+                              <TableCell>
+                                <CollapsibleTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    data-testid={`button-expand-${user.id}`}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4" />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              </TableCell>
+                              <TableCell className="font-medium" data-testid={`text-email-${user.id}`}>
+                                {user.email || "N/A"}
+                              </TableCell>
+                              <TableCell data-testid={`text-name-${user.id}`}>
+                                {user.firstName && user.lastName
+                                  ? `${user.firstName} ${user.lastName}`
+                                  : "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={getStatusBadgeVariant(user.status)}
+                                  data-testid={`badge-status-${user.id}`}
+                                >
+                                  {user.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                  {user.canReadMetadata === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:R</Badge>
+                                  )}
+                                  {user.canWriteMetadata === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:W</Badge>
+                                  )}
+                                  {user.canReadLicenses === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:R</Badge>
+                                  )}
+                                  {user.canWriteLicenses === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:W</Badge>
+                                  )}
+                                  {user.canReadTasks === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:R</Badge>
+                                  )}
+                                  {user.canWriteTasks === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:W</Badge>
+                                  )}
+                                  {user.canUseAI === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell data-testid={`text-visibility-${user.id}`}>
+                                {user.fileVisibility}
+                              </TableCell>
+                              <TableCell data-testid={`text-group-${user.id}`}>
+                                {user.groupIds && user.groupIds.length > 0 
+                                  ? user.groupIds.map(gid => getGroupName(gid)).join(", ")
+                                  : "None"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={isAdmin ? "default" : "secondary"}
+                                  data-testid={`badge-admin-${user.id}`}
+                                >
+                                  {isAdmin ? "Admin" : "User"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                            <TableRow>
+                              <TableCell colSpan={8} className="p-0">
+                                <CollapsibleContent>
+                                  <div className="p-6 border-t bg-muted/20">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Status Management */}
+                                      <div className="space-y-4">
+                                        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                          Status Management
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2">
+                                          {user.status === "pending" && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                updateStatusMutation.mutate({
+                                                  userId: user.id,
+                                                  status: "active",
+                                                })
+                                              }
+                                              disabled={updateStatusMutation.isPending}
+                                              data-testid={`button-approve-${user.id}`}
+                                            >
+                                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                                              Approve
+                                            </Button>
+                                          )}
+                                          {user.status === "active" && !isCurrentUser && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                updateStatusMutation.mutate({
+                                                  userId: user.id,
+                                                  status: "archived",
+                                                })
+                                              }
+                                              disabled={updateStatusMutation.isPending}
+                                              data-testid={`button-archive-${user.id}`}
+                                            >
+                                              <Archive className="w-4 h-4 mr-2" />
+                                              Archive
+                                            </Button>
+                                          )}
+                                          {user.status === "archived" && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() =>
+                                                updateStatusMutation.mutate({
+                                                  userId: user.id,
+                                                  status: "active",
+                                                })
+                                              }
+                                              disabled={updateStatusMutation.isPending}
+                                              data-testid={`button-unarchive-${user.id}`}
+                                            >
+                                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                                              Unarchive
+                                            </Button>
+                                          )}
+                                          {!isCurrentUser && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setDeleteUserConfirm(user.id)}
+                                              disabled={deleteUserMutation.isPending}
+                                              data-testid={`button-delete-${user.id}`}
+                                            >
+                                              <Trash2 className="w-4 h-4 mr-2" />
+                                              Delete
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Admin & Security */}
+                                      <div className="space-y-4">
+                                        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                          Admin & Security
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center justify-between mb-4">
+                                              <div className="flex items-center gap-2">
+                                                <Shield className="w-4 h-4 text-primary" />
+                                                <span className="font-semibold text-sm">Administrator</span>
+                                              </div>
+                                              <Switch
+                                                checked={isAdmin}
+                                                onCheckedChange={(checked) =>
+                                                  toggleAdminMutation.mutate({
+                                                    userId: user.id,
+                                                    isAdmin: checked,
+                                                  })
+                                                }
+                                                disabled={isCurrentUser || toggleAdminMutation.isPending}
+                                              />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                              Admins bypass all permission checks and have full access to the system.
+                                            </p>
+                                          </Card>
+
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <Lock className="w-4 h-4 text-primary" />
+                                              <span className="font-semibold text-sm">Account Security</span>
+                                            </div>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => setResetConfirmUser(user)}
+                                              disabled={resetPasswordMutation.isPending}
+                                              className="w-full justify-start"
+                                            >
+                                              <Lock className="w-4 h-4 mr-2" />
+                                              Reset User Password
+                                            </Button>
+                                          </Card>
+                                        </div>
+                                      </div>
+
+                                      {/* Permissions Sections */}
+                                      <div className="space-y-4 md:col-span-2">
+                                        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                          Feature Permissions
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                          {/* Metadata Card */}
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <FileText className="w-4 h-4 text-blue-500" />
+                                              <span className="font-semibold text-sm">Metadata</span>
+                                            </div>
+                                            <div className="space-y-3">
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Read Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canReadMetadata === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: checked ? 1 : 0,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Write Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canWriteMetadata === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: checked ? 1 : 0,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                            </div>
+                                          </Card>
+
+                                          {/* Licenses Card */}
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <ShieldCheck className="w-4 h-4 text-green-500" />
+                                              <span className="font-semibold text-sm">Licenses</span>
+                                            </div>
+                                            <div className="space-y-3">
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Read Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canReadLicenses === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: checked ? 1 : 0,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Write Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canWriteLicenses === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: checked ? 1 : 0,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                            </div>
+                                          </Card>
+
+                                          {/* Tasks Card */}
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <CheckSquare className="w-4 h-4 text-orange-500" />
+                                              <span className="font-semibold text-sm">Tasks</span>
+                                            </div>
+                                            <div className="space-y-3">
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Read Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canReadTasks === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: checked ? 1 : 0,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Write Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canWriteTasks === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: checked ? 1 : 0,
+                                                      canUseAI: user.canUseAI,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                            </div>
+                                          </Card>
+
+                                          {/* AI Card */}
+                                          <Card className="p-4 bg-background/50">
+                                            <div className="flex items-center gap-2 mb-4">
+                                              <Sparkles className="w-4 h-4 text-purple-500" />
+                                              <span className="font-semibold text-sm">AI Tools</span>
+                                            </div>
+                                            <div className="space-y-3">
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Full Access</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canUseAI === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: checked ? 1 : 0,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <p className="text-[10px] text-muted-foreground leading-tight pt-1">
+                                                Allows document parsing and automated importing.
+                                              </p>
+                                            </div>
+                                          </Card>
+                                        </div>
+                                      </div>
+
+                                      {/* Visibility Settings */}
+                                      <div className="space-y-4">
+                                        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                          Visibility Settings
+                                        </h3>
+                                        <div className="space-y-2">
+                                          <div>
+                                            <Label htmlFor={`visibility-${user.id}`} className="text-sm">
+                                              File Visibility
+                                            </Label>
+                                            <Select
+                                              value={user.fileVisibility}
+                                              onValueChange={(value) => {
+                                                // Validate before allowing group visibility
+                                                if (value === 'group' && (!user.groupIds || user.groupIds.length === 0)) {
+                                                  toast({
+                                                    title: "Cannot Set Group Visibility",
+                                                    description: "Please assign the user to at least one group first",
+                                                    variant: "destructive",
+                                                  });
+                                                  return;
+                                                }
+                                                
+                                                updateVisibilityMutation.mutate({
+                                                  userId: user.id,
+                                                  fileVisibility: value,
+                                                });
+                                              }}
+                                              disabled={updateVisibilityMutation.isPending}
+                                            >
+                                              <SelectTrigger
+                                                id={`visibility-${user.id}`}
+                                                data-testid={`select-visibility-${user.id}`}
+                                              >
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="own">Own Files Only</SelectItem>
+                                                <SelectItem value="all">All Files</SelectItem>
+                                                <SelectItem value="group">Group Files</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Group Assignment - Always visible, multi-select */}
+                                      <div className="space-y-4">
+                                        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                          Group Assignment
+                                        </h3>
+                                        <div className="space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Label htmlFor={`groups-${user.id}`} className="text-sm">
+                                              Groups
+                                            </Label>
+                                            {user.fileVisibility === 'group' && (!user.groupIds || user.groupIds.length === 0) && (
+                                              <Badge variant="destructive" className="text-xs">
+                                                Required for group visibility
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          <div className="flex flex-wrap gap-2 mb-2">
+                                            {(user.groupIds || []).map((groupId) => {
+                                              const group = groups.find(g => g.id === groupId);
+                                              return group ? (
+                                                <Badge key={groupId} variant="secondary" data-testid={`badge-group-${groupId}-${user.id}`}>
+                                                  {group.name}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const newGroupIds = (user.groupIds || []).filter(id => id !== groupId);
+                                                      updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
+                                                    }}
+                                                    className="ml-1 hover:text-destructive"
+                                                    data-testid={`button-remove-group-${groupId}-${user.id}`}
+                                                  >
+                                                    <X className="w-3 h-3" />
+                                                  </button>
+                                                </Badge>
+                                              ) : null;
+                                            })}
+                                            {(!user.groupIds || user.groupIds.length === 0) && (
+                                              <span className="text-sm text-muted-foreground">No groups assigned</span>
+                                            )}
+                                          </div>
+                                          <Select
+                                            value=""
+                                            onValueChange={(groupId) => {
+                                              if (groupId && !user.groupIds?.includes(groupId)) {
+                                                const newGroupIds = [...(user.groupIds || []), groupId];
+                                                updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
+                                              }
+                                            }}
+                                            disabled={updateGroupsMutation.isPending}
+                                          >
+                                            <SelectTrigger
+                                              id={`groups-${user.id}`}
+                                              data-testid={`select-add-group-${user.id}`}
+                                            >
+                                              <SelectValue placeholder="Add to group..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {groups
+                                                .filter(group => !user.groupIds?.includes(group.id))
+                                                .map((group) => (
+                                                  <SelectItem key={group.id} value={group.id}>
+                                                    {group.name}
+                                                  </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CollapsibleContent>
+                              </TableCell>
+                            </TableRow>
+                          </>
+                        </Collapsible>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </div>
+
+          {/* Group Management Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">Group Management</h2>
+              <Button
+                onClick={() => setCreateGroupOpen(true)}
+                data-testid="button-create-group"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Group
+              </Button>
+            </div>
+            {groups.length === 0 ? (
+              <Card className="p-12 text-center">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No groups found</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Create groups to organize users and manage file visibility
+                </p>
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>User Count</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groups.map((group) => {
+                      const userCount = getUserCountForGroup(group.id);
+                      return (
+                        <TableRow key={group.id} data-testid={`row-group-${group.id}`}>
+                          <TableCell className="font-medium" data-testid={`text-group-name-${group.id}`}>
+                            {group.name}
                           </TableCell>
-                          <TableCell className="font-medium" data-testid={`text-email-${user.id}`}>
-                            {user.email || "N/A"}
+                          <TableCell
+                            className="text-muted-foreground"
+                            data-testid={`text-group-description-${group.id}`}
+                          >
+                            {group.description || "No description"}
                           </TableCell>
-                          <TableCell data-testid={`text-name-${user.id}`}>
-                            {user.firstName && user.lastName
-                              ? `${user.firstName} ${user.lastName}`
+                          <TableCell data-testid={`text-group-users-${group.id}`}>
+                            <Badge variant="secondary">{userCount} users</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {group.createdAt
+                              ? format(new Date(group.createdAt), "MMM d, yyyy")
                               : "N/A"}
                           </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={getStatusBadgeVariant(user.status)}
-                              data-testid={`badge-status-${user.id}`}
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteGroupConfirm(group.id)}
+                              disabled={deleteGroupMutation.isPending}
+                              data-testid={`button-delete-group-${group.id}`}
                             >
-                              {user.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {user.canReadMetadata === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:R</Badge>
-                              )}
-                              {user.canWriteMetadata === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:W</Badge>
-                              )}
-                              {user.canReadLicenses === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:R</Badge>
-                              )}
-                              {user.canWriteLicenses === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:W</Badge>
-                              )}
-                              {user.canReadTasks === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:R</Badge>
-                              )}
-                              {user.canWriteTasks === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:W</Badge>
-                              )}
-                              {user.canUseAI === 1 && (
-                                <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell data-testid={`text-visibility-${user.id}`}>
-                            {user.fileVisibility}
-                          </TableCell>
-                          <TableCell data-testid={`text-group-${user.id}`}>
-                            {user.groupIds && user.groupIds.length > 0 
-                              ? user.groupIds.map(gid => getGroupName(gid)).join(", ")
-                              : "None"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={isAdmin ? "default" : "secondary"}
-                              data-testid={`badge-admin-${user.id}`}
-                            >
-                              {isAdmin ? "Admin" : "User"}
-                            </Badge>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </Button>
                           </TableCell>
                         </TableRow>
-                        <TableRow>
-                          <TableCell colSpan={8} className="p-0">
-                            <CollapsibleContent>
-                              <div className="p-6 border-t bg-muted/20">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {/* Status Management */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Status Management
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                      {user.status === "pending" && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            updateStatusMutation.mutate({
-                                              userId: user.id,
-                                              status: "active",
-                                            })
-                                          }
-                                          disabled={updateStatusMutation.isPending}
-                                          data-testid={`button-approve-${user.id}`}
-                                        >
-                                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                                          Approve
-                                        </Button>
-                                      )}
-                                      {user.status === "active" && !isCurrentUser && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            updateStatusMutation.mutate({
-                                              userId: user.id,
-                                              status: "archived",
-                                            })
-                                          }
-                                          disabled={updateStatusMutation.isPending}
-                                          data-testid={`button-archive-${user.id}`}
-                                        >
-                                          <Archive className="w-4 h-4 mr-2" />
-                                          Archive
-                                        </Button>
-                                      )}
-                                      {user.status === "archived" && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() =>
-                                            updateStatusMutation.mutate({
-                                              userId: user.id,
-                                              status: "active",
-                                            })
-                                          }
-                                          disabled={updateStatusMutation.isPending}
-                                          data-testid={`button-unarchive-${user.id}`}
-                                        >
-                                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                                          Unarchive
-                                        </Button>
-                                      )}
-                                      {!isCurrentUser && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => setDeleteUserConfirm(user.id)}
-                                          disabled={deleteUserMutation.isPending}
-                                          data-testid={`button-delete-${user.id}`}
-                                        >
-                                          <Trash2 className="w-4 h-4 mr-2" />
-                                          Delete
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Admin & Security */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Admin & Security
-                                    </h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center justify-between mb-4">
-                                          <div className="flex items-center gap-2">
-                                            <Shield className="w-4 h-4 text-primary" />
-                                            <span className="font-semibold text-sm">Administrator</span>
-                                          </div>
-                                          <Switch
-                                            checked={isAdmin}
-                                            onCheckedChange={(checked) =>
-                                              toggleAdminMutation.mutate({
-                                                userId: user.id,
-                                                isAdmin: checked,
-                                              })
-                                            }
-                                            disabled={isCurrentUser || toggleAdminMutation.isPending}
-                                          />
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                          Admins bypass all permission checks and have full access to the system.
-                                        </p>
-                                      </Card>
-
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <Lock className="w-4 h-4 text-primary" />
-                                          <span className="font-semibold text-sm">Account Security</span>
-                                        </div>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => setResetConfirmUser(user)}
-                                          disabled={resetPasswordMutation.isPending}
-                                          className="w-full justify-start"
-                                        >
-                                          <Lock className="w-4 h-4 mr-2" />
-                                          Reset User Password
-                                        </Button>
-                                      </Card>
-                                    </div>
-                                  </div>
-
-                                  {/* Permissions Sections */}
-                                  <div className="space-y-4 md:col-span-2">
-                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Feature Permissions
-                                    </h3>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                      {/* Metadata Card */}
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <FileText className="w-4 h-4 text-blue-500" />
-                                          <span className="font-semibold text-sm">Metadata</span>
-                                        </div>
-                                        <div className="space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Read Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canReadMetadata === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: checked ? 1 : 0,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Write Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canWriteMetadata === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: checked ? 1 : 0,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      {/* Licenses Card */}
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <ShieldCheck className="w-4 h-4 text-green-500" />
-                                          <span className="font-semibold text-sm">Licenses</span>
-                                        </div>
-                                        <div className="space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Read Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canReadLicenses === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: checked ? 1 : 0,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Write Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canWriteLicenses === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: checked ? 1 : 0,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      {/* Tasks Card */}
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <CheckSquare className="w-4 h-4 text-orange-500" />
-                                          <span className="font-semibold text-sm">Tasks</span>
-                                        </div>
-                                        <div className="space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Read Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canReadTasks === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: checked ? 1 : 0,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Write Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canWriteTasks === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: checked ? 1 : 0,
-                                                  canUseAI: user.canUseAI,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      {/* AI Card */}
-                                      <Card className="p-4 bg-background/50">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <Sparkles className="w-4 h-4 text-purple-500" />
-                                          <span className="font-semibold text-sm">AI Tools</span>
-                                        </div>
-                                        <div className="space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <Label className="text-xs">Full Access</Label>
-                                            <Switch
-                                              size="sm"
-                                              checked={user.canUseAI === 1}
-                                              onCheckedChange={(checked) => updatePermissionsMutation.mutate({
-                                                userId: user.id,
-                                                permissions: {
-                                                  canReadMetadata: user.canReadMetadata,
-                                                  canWriteMetadata: user.canWriteMetadata,
-                                                  canReadLicenses: user.canReadLicenses,
-                                                  canWriteLicenses: user.canWriteLicenses,
-                                                  canReadTasks: user.canReadTasks,
-                                                  canWriteTasks: user.canWriteTasks,
-                                                  canUseAI: checked ? 1 : 0,
-                                                }
-                                              })}
-                                            />
-                                          </div>
-                                          <p className="text-[10px] text-muted-foreground leading-tight pt-1">
-                                            Allows document parsing and automated importing.
-                                          </p>
-                                        </div>
-                                      </Card>
-                                    </div>
-                                  </div>
-
-                                  {/* Visibility Settings */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Visibility Settings
-                                    </h3>
-                                    <div className="space-y-2">
-                                      <div>
-                                        <Label htmlFor={`visibility-${user.id}`} className="text-sm">
-                                          File Visibility
-                                        </Label>
-                                        <Select
-                                          value={user.fileVisibility}
-                                          onValueChange={(value) => {
-                                            // Validate before allowing group visibility
-                                            if (value === 'group' && (!user.groupIds || user.groupIds.length === 0)) {
-                                              toast({
-                                                title: "Cannot Set Group Visibility",
-                                                description: "Please assign the user to at least one group first",
-                                                variant: "destructive",
-                                              });
-                                              return;
-                                            }
-                                            
-                                            updateVisibilityMutation.mutate({
-                                              userId: user.id,
-                                              fileVisibility: value,
-                                            });
-                                          }}
-                                          disabled={updateVisibilityMutation.isPending}
-                                        >
-                                          <SelectTrigger
-                                            id={`visibility-${user.id}`}
-                                            data-testid={`select-visibility-${user.id}`}
-                                          >
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="own">Own Files Only</SelectItem>
-                                            <SelectItem value="all">All Files</SelectItem>
-                                            <SelectItem value="group">Group Files</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Group Assignment - Always visible, multi-select */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                                      Group Assignment
-                                    </h3>
-                                    <div className="space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <Label htmlFor={`groups-${user.id}`} className="text-sm">
-                                          Groups
-                                        </Label>
-                                        {user.fileVisibility === 'group' && (!user.groupIds || user.groupIds.length === 0) && (
-                                          <Badge variant="destructive" className="text-xs">
-                                            Required for group visibility
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="flex flex-wrap gap-2 mb-2">
-                                        {(user.groupIds || []).map((groupId) => {
-                                          const group = groups.find(g => g.id === groupId);
-                                          return group ? (
-                                            <Badge key={groupId} variant="secondary" data-testid={`badge-group-${groupId}-${user.id}`}>
-                                              {group.name}
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const newGroupIds = (user.groupIds || []).filter(id => id !== groupId);
-                                                  updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
-                                                }}
-                                                className="ml-1 hover:text-destructive"
-                                                data-testid={`button-remove-group-${groupId}-${user.id}`}
-                                              >
-                                                <X className="w-3 h-3" />
-                                              </button>
-                                            </Badge>
-                                          ) : null;
-                                        })}
-                                        {(!user.groupIds || user.groupIds.length === 0) && (
-                                          <span className="text-sm text-muted-foreground">No groups assigned</span>
-                                        )}
-                                      </div>
-                                      <Select
-                                        value=""
-                                        onValueChange={(groupId) => {
-                                          if (groupId && !user.groupIds?.includes(groupId)) {
-                                            const newGroupIds = [...(user.groupIds || []), groupId];
-                                            updateGroupsMutation.mutate({ userId: user.id, groupIds: newGroupIds });
-                                          }
-                                        }}
-                                        disabled={updateGroupsMutation.isPending}
-                                      >
-                                        <SelectTrigger
-                                          id={`groups-${user.id}`}
-                                          data-testid={`select-add-group-${user.id}`}
-                                        >
-                                          <SelectValue placeholder="Add to group..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {groups
-                                            .filter(group => !user.groupIds?.includes(group.id))
-                                            .map((group) => (
-                                              <SelectItem key={group.id} value={group.id}>
-                                                {group.name}
-                                              </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </TableCell>
-                        </TableRow>
-                      </>
-                    </Collapsible>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
-      </div>
-
-      {/* Group Management Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">Group Management</h2>
-          <Button
-            onClick={() => setCreateGroupOpen(true)}
-            data-testid="button-create-group"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Group
-          </Button>
-        </div>
-        {groups.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No groups found</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Create groups to organize users and manage file visibility
-            </p>
-          </Card>
-        ) : (
-          <Card className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>User Count</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groups.map((group) => {
-                  const userCount = getUserCountForGroup(group.id);
-                  return (
-                    <TableRow key={group.id} data-testid={`row-group-${group.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-group-name-${group.id}`}>
-                        {group.name}
-                      </TableCell>
-                      <TableCell
-                        className="text-muted-foreground"
-                        data-testid={`text-group-description-${group.id}`}
-                      >
-                        {group.description || "No description"}
-                      </TableCell>
-                      <TableCell data-testid={`text-group-users-${group.id}`}>
-                        <Badge variant="secondary">{userCount} users</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {group.createdAt
-                          ? format(new Date(group.createdAt), "MMM d, yyyy")
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeleteGroupConfirm(group.id)}
-                          disabled={deleteGroupMutation.isPending}
-                          data-testid={`button-delete-group-${group.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
-      </div>
-
-      {/* AI Configuration Section */}
-      <AiConfigSection />
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </div>
+        </>
+      ) : (
+        <AiConfigSection />
+      )}
 
       {/* Create Group Dialog */}
       <Dialog open={createGroupOpen} onOpenChange={setCreateGroupOpen}>

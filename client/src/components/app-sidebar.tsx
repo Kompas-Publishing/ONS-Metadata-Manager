@@ -181,10 +181,18 @@ import { upload } from "@vercel/blob/client";
       label: "Admin Panel",
       items: [
         {
-          title: "Management",
-          url: "/admin",
+          title: "Users & Groups",
+          url: "/admin/users",
           icon: Shield,
-          testId: "link-admin",
+          testId: "link-admin-users",
+          adminOnly: true,
+          permissionKey: null,
+        },
+        {
+          title: "Settings",
+          url: "/admin/settings",
+          icon: Settings,
+          testId: "link-admin-settings",
           adminOnly: true,
           permissionKey: null,
         },
@@ -301,7 +309,7 @@ export function AppSidebar() {
       <SidebarContent>
         <div className="px-4 py-6">
           <h2 className="text-xl font-bold tracking-tight text-primary">ONS Portal</h2>
-          <p className="text-xs text-muted-foreground mt-1">Broadcast Metadata Management</p>
+          <p className="text-xs text-muted-foreground mt-1 font-medium">Broadcast Management System</p>
         </div>
         
         {filteredGroups.map((group) => (

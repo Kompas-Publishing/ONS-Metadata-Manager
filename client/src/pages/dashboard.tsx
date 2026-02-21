@@ -75,7 +75,7 @@ export default function Dashboard() {
             {getGreeting()}, {user?.firstName || 'User'}!
           </h1>
           <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
-            Welcome back to the ONS Broadcast Portal. Here's a snapshot of what's happening across your metadata and licenses today.
+            Welcome back here's what's going on across your metadata and licenses today.
           </p>
           <div className="flex gap-3 mt-6">
             {canWriteMetadata && (
@@ -285,27 +285,6 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground text-center py-4">No licenses found.</p>
               )}
             </CardContent>
-          </Card>
-
-          {/* AI Helper Quick Link */}
-          <Card className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg shadow-indigo-200 border-none overflow-hidden relative">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-200" />
-                AI Assistant
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-indigo-100 mb-4 opacity-90 leading-relaxed">
-                Need to import data? Use the AI Uploader to parse contracts and metadata files instantly.
-              </p>
-              <Link href="/ai-upload">
-                <Button variant="secondary" size="sm" className="w-full bg-white text-indigo-700 hover:bg-indigo-50 border-none shadow-sm rounded-lg font-bold">
-                  Start Upload
-                </Button>
-              </Link>
-            </CardContent>
-            <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
           </Card>
         </div>
       </div>
