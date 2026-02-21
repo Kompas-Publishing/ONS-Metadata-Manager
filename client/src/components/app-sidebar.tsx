@@ -46,79 +46,150 @@ import {
   } from "lucide-react";
 import { upload } from "@vercel/blob/client";
   
-  const allMenuItems = [
+  const menuGroups = [
     {
-      title: "Dashboard",
-      url: "/",
-      icon: LayoutDashboard,
-      testId: "nav-dashboard",
-      adminOnly: false,
-      permissionKey: "canReadMetadata",
+      label: "General",
+      items: [
+        {
+          title: "Dashboard",
+          url: "/",
+          icon: LayoutDashboard,
+          testId: "nav-dashboard",
+          adminOnly: false,
+          permissionKey: "canReadMetadata",
+        },
+      ]
     },
     {
-      title: "Task List",
-      url: "/tasks",
-      icon: CheckSquare,
-      testId: "nav-tasks",
-      adminOnly: false,
-      permissionKey: "canReadTasks",
+      label: "Metadata Manager",
+      items: [
+        {
+          title: "Browse Series",
+          url: "/browse",
+          icon: List,
+          testId: "nav-browse",
+          adminOnly: false,
+          permissionKey: "canReadMetadata",
+        },
+        {
+          title: "Create File",
+          url: "/create",
+          icon: FilePlus,
+          testId: "nav-create",
+          adminOnly: false,
+          permissionKey: "canWriteMetadata",
+        },
+        {
+          title: "Batch Create",
+          url: "/batch",
+          icon: Layers,
+          testId: "nav-batch",
+          adminOnly: false,
+          permissionKey: "canWriteMetadata",
+        },
+        {
+          title: "All Files",
+          url: "/all-files",
+          icon: FileText,
+          testId: "nav-all-files",
+          adminOnly: false,
+          permissionKey: "canReadMetadata",
+        },
+      ]
     },
     {
-      title: "AI Upload",
-      url: "/ai-upload",
-      icon: Sparkles,
-      testId: "nav-ai-upload",
-      adminOnly: false,
-      permissionKey: "canUseAI",
+      label: "License Manager",
+      items: [
+        {
+          title: "Licenses",
+          url: "/licenses",
+          icon: FileKey,
+          testId: "nav-licenses",
+          adminOnly: false,
+          permissionKey: "canReadLicenses",
+        },
+        {
+          title: "Create License",
+          url: "/create-license",
+          icon: FilePlus,
+          testId: "nav-create-license",
+          adminOnly: false,
+          permissionKey: "canWriteLicenses",
+        },
+      ]
     },
     {
-      title: "License Manager",    url: "/licenses",
-    icon: FileKey,
-    testId: "nav-licenses",
-    adminOnly: false,
-    permissionKey: "canReadLicenses",
-  },
-  {
-    title: "Create File",
-    url: "/create",
-    icon: FilePlus,
-    testId: "nav-create",
-    adminOnly: false,
-    permissionKey: "canWriteMetadata",
-  },
-  {
-    title: "Batch Create",
-    url: "/batch",
-    icon: Layers,
-    testId: "nav-batch",
-    adminOnly: false,
-    permissionKey: "canWriteMetadata",
-  },
-  {
-    title: "Browse Series",
-    url: "/browse",
-    icon: List,
-    testId: "nav-browse",
-    adminOnly: false,
-    permissionKey: "canReadMetadata",
-  },
-  {
-    title: "All Files",
-    url: "/all-files",
-    icon: FileText,
-    testId: "nav-all-files",
-    adminOnly: false,
-    permissionKey: "canReadMetadata",
-  },
-  {
-    title: "Admin Panel",
-    url: "/admin",
-    icon: Shield,
-    testId: "link-admin",
-    adminOnly: true,
-    permissionKey: null,
-  },
-];
+      label: "Operations",
+      items: [
+        {
+          title: "Tasks",
+          url: "/tasks",
+          icon: CheckSquare,
+          testId: "nav-tasks",
+          adminOnly: false,
+          permissionKey: "canReadTasks",
+        },
+      ]
+    },
+    {
+      label: "AI",
+      items: [
+        {
+          title: "AI Chat",
+          url: "#",
+          icon: Sparkles,
+          testId: "nav-ai-chat",
+          adminOnly: false,
+          permissionKey: "canUseAI",
+          disabled: true,
+        },
+        {
+          title: "AI Uploader",
+          url: "/ai-upload",
+          icon: Upload,
+          testId: "nav-ai-upload",
+          adminOnly: false,
+          permissionKey: "canUseAI",
+        },
+      ]
+    },
+    {
+      label: "KijkCijfers",
+      items: [
+        {
+          title: "Statistics",
+          url: "#",
+          icon: LayoutDashboard,
+          testId: "nav-stats",
+          adminOnly: false,
+          permissionKey: null,
+          disabled: true,
+        },
+        {
+          title: "Graphs",
+          url: "#",
+          icon: Layers,
+          testId: "nav-graphs",
+          adminOnly: false,
+          permissionKey: null,
+          disabled: true,
+        },
+      ]
+    },
+    {
+      label: "Admin Panel",
+      items: [
+        {
+          title: "Management",
+          url: "/admin",
+          icon: Shield,
+          testId: "link-admin",
+          adminOnly: true,
+          permissionKey: null,
+        },
+      ]
+    },
+  ];
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
@@ -212,51 +283,61 @@ export function AppSidebar() {
     return url;
   };
   
-  const menuItems = allMenuItems.filter((item) => {
-    // Filter out admin-only items for non-admins
-    if (item.adminOnly && !isAdmin) {
-      return false;
-    }
-    
-    // Don't apply filters during auth loading to prevent flicker
-    if (isLoading) {
+  const filteredGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (item.adminOnly && !isAdmin) return false;
+      if (isLoading) return true;
+      if (item.permissionKey && !isAdmin) {
+        return !!(permissions as any)[item.permissionKey];
+      }
       return true;
-    }
-    
-    // Check granular permissions if defined
-    if (item.permissionKey && !isAdmin) {
-      return !!(permissions as any)[item.permissionKey];
-    }
-    
-    return true;
-  });
+    })
+  })).filter(group => group.items.length > 0);
 
   return (
     <Sidebar>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-base font-semibold px-4 py-4">
-            ONS Broadcast Portal
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={item.testId}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <div className="px-4 py-6">
+          <h2 className="text-xl font-bold tracking-tight text-primary">ONS Portal</h2>
+          <p className="text-xs text-muted-foreground mt-1">Broadcast Metadata Management</p>
+        </div>
+        
+        {filteredGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel className="text-xs uppercase tracking-widest font-semibold opacity-70 px-4 mb-2">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      data-testid={item.testId}
+                      disabled={(item as any).disabled}
+                      className={cn(
+                        "transition-all duration-200",
+                        (item as any).disabled && "opacity-50 cursor-not-allowed grayscale"
+                      )}
+                    >
+                      <Link href={item.url} onClick={(e) => (item as any).disabled && e.preventDefault()}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                        {(item as any).disabled && (
+                          <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                            Soon
+                          </span>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <div className="p-4 border-t space-y-3">

@@ -1,14 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Layers, Film, Plus, Tv, Calendar, Eye, Pencil } from "lucide-react";
+import { 
+  FileText, 
+  Layers, 
+  Film, 
+  Plus, 
+  Tv, 
+  Calendar, 
+  Eye, 
+  Pencil, 
+  CheckSquare, 
+  FileKey, 
+  Sparkles,
+  ArrowRight,
+  Clock,
+  LayoutDashboard
+} from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import type { MetadataFile } from "@shared/schema";
+import type { MetadataFile, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 interface Stats {
   totalFiles: number;
@@ -17,7 +33,7 @@ interface Stats {
 }
 
 export default function Dashboard() {
-  const { isAdmin, canWriteMetadata, canReadMetadata } = useAuth();
+  const { user, isAdmin, canWriteMetadata, canReadMetadata, canReadLicenses, canReadTasks } = useAuth();
 
   useEffect(() => {
     document.title = "Dashboard | ONS Broadcast Portal";
@@ -33,211 +49,301 @@ export default function Dashboard() {
     enabled: canReadMetadata || canWriteMetadata,
   });
 
+  const { data: licenses } = useQuery<License[]>({
+    queryKey: ["/api/licenses"],
+    enabled: !!canReadLicenses,
+  });
+
+  const { data: tasks } = useQuery<(Task & { metadataFile: MetadataFile })[]>({
+    queryKey: ["/api/tasks", { status: "pending" }],
+    enabled: !!canReadTasks,
+  });
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            Overview of your metadata files and recent activity
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Header & Greeting */}
+      <div className="relative overflow-hidden rounded-3xl bg-primary/5 border border-primary/10 p-8 md:p-12">
+        <div className="relative z-10">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+            {getGreeting()}, {user?.firstName || 'User'}!
+          </h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
+            Welcome back to the ONS Broadcast Portal. Here's a snapshot of what's happening across your metadata and licenses today.
           </p>
-        </div>
-        {canWriteMetadata && (
-          <Link href="/create">
-            <Button data-testid="button-create-file">
-              <Plus className="w-4 h-4 mr-2" />
-              Create File
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {statsLoading ? (
-          <>
-            <Card className="p-6">
-              <Skeleton className="h-4 w-24 mb-4" />
-              <Skeleton className="h-10 w-16" />
-            </Card>
-            <Card className="p-6">
-              <Skeleton className="h-4 w-24 mb-4" />
-              <Skeleton className="h-10 w-16" />
-            </Card>
-            <Card className="p-6">
-              <Skeleton className="h-4 w-24 mb-4" />
-              <Skeleton className="h-10 w-16" />
-            </Card>
-          </>
-        ) : (
-          <>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                    Total Files
-                  </p>
-                  <p className="text-3xl font-semibold text-foreground mt-2" data-testid="stat-total-files">
-                    {stats?.totalFiles || 0}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-primary" />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                    Recent (24h)
-                  </p>
-                  <p className="text-3xl font-semibold text-foreground mt-2" data-testid="stat-recent-files">
-                    {stats?.recentFiles || 0}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Layers className="w-6 h-6 text-primary" />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                    Total Series
-                  </p>
-                  <p className="text-3xl font-semibold text-foreground mt-2" data-testid="stat-total-series">
-                    {stats?.totalSeries || 0}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Film className="w-6 h-6 text-primary" />
-                </div>
-              </div>
-            </Card>
-          </>
-        )}
-      </div>
-
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        {filesLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-32" />
-                </div>
-                <Skeleton className="h-9 w-20" />
-              </div>
-            ))}
-          </div>
-        ) : recentFiles && recentFiles.length > 0 ? (
-          <div className="space-y-2">
-            {recentFiles.map((file) => (
-              <div
-                key={file.id}
-                className={`flex items-start justify-between p-4 border rounded-lg hover-elevate gap-4 ${(file.draft === 1 || file.draft === '1' || file.draft === true) ? '!bg-orange-100/80 !border-orange-400' : ''}`}
-                data-testid={`file-${file.id}`}
-              >
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="font-mono text-sm text-muted-foreground" data-testid={`file-id-${file.id}`}>
-                      {file.id}
-                    </span>
-                    {file.season && file.episode && (
-                      <Badge variant="outline" data-testid={`file-season-episode-${file.id}`}>
-                        S{file.season}E{file.episode}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="font-medium text-foreground" data-testid={`file-title-${file.id}`}>
-                      {file.title}
-                    </h3>
-                    {file.seriesTitle && (
-                      <p className="text-sm text-muted-foreground mt-1" data-testid={`file-series-title-${file.id}`}>
-                        {file.seriesTitle}
-                      </p>
-                    )}
-                    {file.episodeTitle && (
-                      <p className="text-sm text-muted-foreground mt-1" data-testid={`file-episode-title-${file.id}`}>
-                        Episode: {file.episodeTitle}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
-                      <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`file-draft-${file.id}`}>
-                        Draft
-                      </Badge>
-                    )}
-                    {file.channel && (
-                      <Badge variant="outline" className="gap-1" data-testid={`file-channel-${file.id}`}>
-                        <Tv className="w-3 h-3" />
-                        {file.channel}
-                      </Badge>
-                    )}
-                    {file.programRating && (
-                      <Badge variant="secondary" data-testid={`file-rating-${file.id}`}>
-                        {file.programRating}
-                      </Badge>
-                    )}
-                    {file.dateStart && file.dateEnd && (
-                      <Badge variant="outline" className="gap-1" data-testid={`file-availability-${file.id}`}>
-                        <Calendar className="w-3 h-3" />
-                        {format(new Date(file.dateStart), "MMM d")} - {format(new Date(file.dateEnd), "MMM d, yyyy")}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(file.createdAt!).toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {canReadMetadata && (
-                    <Link href={`/view/${file.id}`}>
-                      <Button size="sm" variant="outline" data-testid={`button-view-${file.id}`} title="View File">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  )}
-                  {canWriteMetadata && (
-                    <Link href={`/edit/${file.id}`}>
-                      <Button size="sm" variant="outline" data-testid={`button-edit-${file.id}`} title="Edit File">
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
-            <Link href="/all-files">
-              <Button variant="outline" className="w-full mt-4" data-testid="button-view-all">
-                View All Files
-              </Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No files created yet</p>
+          <div className="flex gap-3 mt-6">
             {canWriteMetadata && (
               <Link href="/create">
-                <Button className="mt-4" data-testid="button-create-first">
-                  Create Your First File
+                <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Metadata
                 </Button>
               </Link>
             )}
+            <Link href="/tasks">
+              <Button variant="outline" className="rounded-full px-6 bg-background">
+                View Tasks
+              </Button>
+            </Link>
           </div>
-        )}
-      </Card>
+        </div>
+        <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-48 h-48 bg-primary/5 rounded-full blur-2xl" />
+      </div>
+
+      {/* Main Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatsCard 
+          title="Total Metadata" 
+          value={stats?.totalFiles} 
+          loading={statsLoading} 
+          icon={FileText} 
+          description="Files in database"
+        />
+        <StatsCard 
+          title="Recent Activity" 
+          value={stats?.recentFiles} 
+          loading={statsLoading} 
+          icon={Clock} 
+          description="Added in last 24h"
+          highlight
+        />
+        <StatsCard 
+          title="Active Series" 
+          value={stats?.totalSeries} 
+          loading={statsLoading} 
+          icon={Film} 
+          description="Unique series titles"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Recent Metadata */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="shadow-sm border-muted">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <LayoutDashboard className="w-5 h-5 text-primary" />
+                  Recent Metadata
+                </CardTitle>
+                <CardDescription>The latest additions to the portal</CardDescription>
+              </div>
+              <Link href="/all-files">
+                <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/5">
+                  View All <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {filesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+                </div>
+              ) : recentFiles && recentFiles.length > 0 ? (
+                <div className="space-y-3">
+                  {recentFiles.slice(0, 5).map((file) => (
+                    <div
+                      key={file.id}
+                      className={cn(
+                        "group flex items-center justify-between p-4 border rounded-xl transition-all hover:border-primary/30 hover:shadow-md",
+                        (file.draft === 1 || file.draft === '1' || file.draft === true) && "bg-orange-50/50 border-orange-200"
+                      )}
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-tighter">
+                            {file.id}
+                          </span>
+                          {file.season && (
+                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-medium">
+                              S{file.season}E{file.episode}
+                            </Badge>
+                          )}
+                          {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
+                            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5">
+                              Draft
+                            </Badge>
+                          )}
+                        </div>
+                        <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          {file.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {file.seriesTitle || 'Stand-alone content'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Link href={`/view/${file.id}`}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/edit/${file.id}`}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 border-2 border-dashed rounded-xl">
+                  <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                  <p className="text-muted-foreground font-medium">No metadata files yet</p>
+                  <Link href="/create">
+                    <Button variant="link" className="text-primary">Create your first record</Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Tasks & Quick Actions */}
+        <div className="space-y-6">
+          {/* Tasks Overview */}
+          <Card className="shadow-sm border-muted h-fit">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <CheckSquare className="w-5 h-5 text-orange-500" />
+                Pending Tasks
+              </CardTitle>
+              <CardDescription>Action items requiring attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tasks && tasks.length > 0 ? (
+                <div className="space-y-4">
+                  {tasks.slice(0, 4).map((task) => (
+                    <div key={task.id} className="flex gap-3">
+                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground line-clamp-2">{task.description}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1 uppercase font-semibold">
+                          File: {task.metadataFile?.title}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <Link href="/tasks">
+                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
+                      View all {tasks.length} tasks
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="py-6 text-center">
+                  <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckSquare className="w-5 h-5 text-green-600" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">All caught up!</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Licenses Preview */}
+          <Card className="shadow-sm border-muted h-fit">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <FileKey className="w-5 h-5 text-blue-500" />
+                Latest Licenses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {licenses && licenses.length > 0 ? (
+                <div className="space-y-3">
+                  {licenses.slice(0, 3).map((license) => (
+                    <div key={license.id} className="p-3 bg-muted/30 rounded-lg border border-transparent hover:border-blue-200 transition-colors">
+                      <p className="text-sm font-semibold truncate">{license.name}</p>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                          {license.distributor}
+                        </span>
+                        {license.licenseEnd && (
+                          <span className="text-[10px] text-muted-foreground italic">
+                            Ends {format(new Date(license.licenseEnd), "MMM yyyy")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <Link href="/licenses">
+                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
+                      Open License Manager
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No licenses found.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* AI Helper Quick Link */}
+          <Card className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg shadow-indigo-200 border-none overflow-hidden relative">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-200" />
+                AI Assistant
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-indigo-100 mb-4 opacity-90 leading-relaxed">
+                Need to import data? Use the AI Uploader to parse contracts and metadata files instantly.
+              </p>
+              <Link href="/ai-upload">
+                <Button variant="secondary" size="sm" className="w-full bg-white text-indigo-700 hover:bg-indigo-50 border-none shadow-sm rounded-lg font-bold">
+                  Start Upload
+                </Button>
+              </Link>
+            </CardContent>
+            <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
+          </Card>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function StatsCard({ title, value, loading, icon: Icon, description, highlight }: any) {
+  return (
+    <Card className={cn(
+      "border-muted shadow-sm transition-all hover:shadow-md",
+      highlight && "border-primary/20 bg-primary/5 shadow-primary/5"
+    )}>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              {title}
+            </p>
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : (
+              <p className="text-3xl font-black tracking-tight text-foreground">
+                {value || 0}
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground font-medium">
+              {description}
+            </p>
+          </div>
+          <div className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
+            highlight ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+          )}>
+            <Icon className="w-6 h-6" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
