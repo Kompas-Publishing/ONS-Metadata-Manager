@@ -24,7 +24,7 @@ import {
 } from "../_shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
+import { UserPermissions, getFileVisibilityConditions } from "../_shared/types.js";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;

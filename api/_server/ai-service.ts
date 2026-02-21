@@ -6,7 +6,7 @@ import {
   type License,
   type MetadataFile 
 } from "../_shared/schema.js";
-import { type UserPermissions } from "./permissions.js";
+import { type UserPermissions } from "../_shared/types.js";
 import * as XLSX from "xlsx";
 
 export class AiService {

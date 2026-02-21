@@ -1,19 +1,5 @@
 import { storage } from "./storage.js";
-import type { User } from "../_shared/schema.js";
-
-export interface UserPermissions {
-  user: User;
-  isAdmin: boolean;
-  isActive: boolean;
-  permissions: {
-    metadata: { read: boolean; write: boolean };
-    licenses: { read: boolean; write: boolean };
-    tasks: { read: boolean; write: boolean };
-    ai: boolean;
-  };
-  fileVisibility: "own" | "all" | "group";
-  groupIds: string[];
-}
+import type { UserPermissions, PermissionFeature, PermissionAction } from "../_shared/types.js";
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);
@@ -49,9 +35,6 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
   };
 }
 
-export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai";
-export type PermissionAction = "read" | "write";
-
 export async function requirePermission(
   userId: string, 
   feature: PermissionFeature,
@@ -82,37 +65,5 @@ export async function requirePermission(
     allowed,
     permissions,
     reason: allowed ? undefined : `No ${action} permission for ${feature}`
-  };
-}
-
-export function getFileVisibilityConditions(permissions: UserPermissions) {
-  if (permissions.isAdmin) {
-    return {
-      type: "all" as const,
-      userId: permissions.user.id,
-      groupId: null,
-    };
-  }
-
-  if (permissions.fileVisibility === "all") {
-    return {
-      type: "all" as const,
-      userId: permissions.user.id,
-      groupId: null,
-    };
-  }
-
-  if (permissions.fileVisibility === "group") {
-    return {
-      type: "group" as const,
-      userId: permissions.user.id,
-      groupIds: permissions.groupIds,
-    };
-  }
-
-  return {
-    type: "own" as const,
-    userId: permissions.user.id,
-    groupId: null,
   };
 }
