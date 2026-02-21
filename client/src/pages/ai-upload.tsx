@@ -369,55 +369,57 @@ export default function AiUpload() {
                 ))}
 
                 {proposals.length > 0 && (
-                  <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-background border-t-4 border-t-primary shadow-lg overflow-hidden">
-                    <CardHeader className="pb-2 border-b border-primary/10 bg-primary/5">
-                      <div className="flex items-center gap-2">
-                        <div className="bg-primary/20 p-1.5 rounded-lg">
-                          <BrainCircuit className="w-5 h-5 text-primary" />
+                  <Card className="border border-border shadow-md overflow-hidden bg-background">
+                    <CardHeader className="pb-3 border-b bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-md bg-foreground/5 text-foreground/70">
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-sm font-semibold tracking-tight">AI Refinement</CardTitle>
+                            <CardDescription className="text-[11px] leading-none">
+                              Provide feedback to adjust the proposed changes
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-base font-semibold">AI Assistant</CardTitle>
-                          <CardDescription className="text-[11px]">
-                            Refine the extraction results with natural language feedback
-                          </CardDescription>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-[10px] font-medium text-primary">
+                          <Bot className="w-3 h-3" />
+                          <span>Gemini 1.5 Pro</span>
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <button 
-                            onClick={() => setUserFeedback("Group these by season")}
-                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
-                          >
-                            <Layers className="w-3 h-3" /> Group by season
-                          </button>
-                          <button 
-                            onClick={() => setUserFeedback("These are all movies, not series")}
-                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
-                          >
-                            <FileText className="w-3 h-3" /> Mark as movies
-                          </button>
-                          <button 
-                            onClick={() => setUserFeedback("The license start date should be 2025")}
-                            className="text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary flex items-center gap-1"
-                          >
-                            <CalendarIcon className="w-3 h-3" /> Fix dates
-                          </button>
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: "Group by season", icon: Layers, text: "Group these by season" },
+                            { label: "Mark as movies", icon: FileText, text: "These are all movies, not series" },
+                            { label: "Fix dates to 2025", icon: CalendarIcon, text: "The license start date should be 2025" }
+                          ].map((suggestion) => (
+                            <button
+                              key={suggestion.label}
+                              onClick={() => setUserFeedback(suggestion.text)}
+                              className="text-[11px] px-3 py-1.5 rounded-md border border-border bg-background hover:bg-muted hover:border-muted-foreground/30 transition-all text-muted-foreground flex items-center gap-1.5 font-medium"
+                            >
+                              <suggestion.icon className="w-3 h-3" />
+                              {suggestion.label}
+                            </button>
+                          ))}
                         </div>
                         
-                        <div className="relative">
+                        <div className="relative flex items-end gap-2 bg-muted/50 p-2 rounded-lg border border-border focus-within:border-primary/50 transition-colors">
                           <Textarea 
-                            placeholder="Tell Gemini what to fix or improve..."
+                            placeholder="Describe any corrections or refinements..."
                             value={userFeedback}
                             onChange={(e) => setUserFeedback(e.target.value)}
-                            className="bg-background min-h-[100px] pr-12 focus-visible:ring-primary/30 border-primary/20 resize-none shadow-inner"
+                            className="bg-transparent border-0 focus-visible:ring-0 min-h-[80px] p-2 resize-none text-sm shadow-none"
                           />
                           <Button 
-                            size="icon"
+                            size="sm"
                             className={cn(
-                              "absolute right-2 bottom-2 rounded-full w-8 h-8 transition-all",
-                              userFeedback.trim() ? "bg-primary opacity-100 scale-100" : "bg-muted opacity-50 scale-90"
+                              "h-9 px-4 transition-all shrink-0",
+                              !userFeedback.trim() && "opacity-50 cursor-not-allowed"
                             )}
                             disabled={!userFeedback.trim() || refineMutation.isPending}
                             onClick={() => refineMutation.mutate()}
@@ -425,16 +427,19 @@ export default function AiUpload() {
                             {refineMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Send className="h-4 w-4" />
+                              <>
+                                <Send className="h-3.5 w-3.5 mr-2" />
+                                <span>Refine</span>
+                              </>
                             )}
                           </Button>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 px-1">
-                        <Lightbulb className="w-3 h-3 text-yellow-500" />
-                        <span className="text-[10px] text-muted-foreground italic">
-                          Tip: You can ask the AI to recalculate durations, fix typos, or re-categorize items.
+                      <div className="flex items-center gap-2 px-1 text-muted-foreground/60">
+                        <Lightbulb className="w-3 h-3" />
+                        <span className="text-[10px] font-medium italic">
+                          Tip: Ask to recalculate fees, fix name casing, or merge duplicates.
                         </span>
                       </div>
                     </CardContent>
