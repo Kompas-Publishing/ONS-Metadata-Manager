@@ -6,7 +6,7 @@ import { requirePermission as checkPermission } from "../_server/permissions.js"
 
 export default async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   // Manual CORS handling
-  corsMiddleware(res);
+  corsMiddleware(req, res);
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }

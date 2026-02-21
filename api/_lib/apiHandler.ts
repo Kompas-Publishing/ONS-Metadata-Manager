@@ -13,9 +13,18 @@ export interface AuthenticatedRequest extends VercelRequest {
 
 export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void | VercelResponse> | void | VercelResponse;
 
-export function corsMiddleware(res: VercelResponse) {
+export function corsMiddleware(req: AuthenticatedRequest, res: VercelResponse) {
+  const origin = req.headers.origin;
+  const allowedOrigins = ['https://metadata.onstv.nl'];
+  
+  let currentOrigin = allowedOrigins[0];
+  // Allow primary domain and any Vercel preview URLs
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.startsWith('http://localhost'))) {
+    currentOrigin = origin;
+  }
+
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', currentOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -115,7 +124,7 @@ export function requireAdmin(handler: ApiHandler): ApiHandler {
 
 export function withCors(handler: ApiHandler): ApiHandler {
   return async (req: AuthenticatedRequest, res: VercelResponse) => {
-    corsMiddleware(res);
+    corsMiddleware(req, res);
 
     if (req.method === 'OPTIONS') {
       res.status(200).end();
