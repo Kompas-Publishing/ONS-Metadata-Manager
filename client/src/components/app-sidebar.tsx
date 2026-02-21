@@ -270,7 +270,7 @@ export function AppSidebar() {
             className="flex items-center gap-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors group"
           >
             <Avatar className="w-10 h-10 border border-border group-hover:border-primary/30 transition-colors">
-              <AvatarImage src={getProxiedUrl(user?.profileImageUrl)} />
+              <AvatarImage src={getProxiedUrl(user?.profileImageUrl)} className="aspect-square object-cover" />
               <AvatarFallback>{getUserInitials()}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -343,7 +343,7 @@ export function AppSidebar() {
                   </Label>
                   <div className="flex items-center gap-4">
                     <Avatar className="w-16 h-16 border-2 border-primary/20">
-                      <AvatarImage src={getProxiedUrl(profileImageUrl)} />
+                      <AvatarImage src={getProxiedUrl(profileImageUrl)} className="aspect-square object-cover" />
                       <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 space-y-2">
@@ -379,13 +379,6 @@ export function AppSidebar() {
                       </p>
                     </div>
                   </div>
-                  <Input 
-                    id="avatar-url" 
-                    value={profileImageUrl} 
-                    onChange={(e) => setProfileImageUrl(e.target.value)}
-                    placeholder="Or paste an image URL..."
-                    className="mt-2 h-8 text-xs font-mono"
-                  />
                 </div>
               </div>
 
