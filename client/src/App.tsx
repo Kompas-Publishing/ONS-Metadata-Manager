@@ -233,9 +233,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-4 border-b bg-background">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="text-sm font-semibold text-muted-foreground hidden md:block uppercase tracking-wider">
-              ONS Portal - Broadcast Management System
-            </div>
           </header>
           <main className="flex-1 overflow-auto p-6 lg:p-12">
             {children}

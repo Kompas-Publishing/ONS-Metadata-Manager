@@ -70,6 +70,7 @@ import {
   AlertTriangle,
   CheckSquare,
   Loader2,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
