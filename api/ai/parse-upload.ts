@@ -43,8 +43,10 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       const body = JSON.parse(Buffer.concat(chunks).toString());
       
       if (body.blobUrl) {
-        const blobRes = await fetch(body.blobUrl);
-        if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+        const blobRes = await fetch(body.blobUrl, {
+          headers: { 'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+        });
+        if (!blobRes.ok) throw new Error(`Failed to fetch blob from Vercel: ${blobRes.statusText}`);
         fileBuffer = Buffer.from(await blobRes.arrayBuffer());
         mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
         type = body.type || "license";

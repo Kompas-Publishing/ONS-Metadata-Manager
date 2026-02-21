@@ -50,6 +50,7 @@ export default function AiUpload() {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),
+          addRandomSuffix: true,
         });
         blobUrl = newBlob.url;
       }
@@ -96,6 +97,7 @@ export default function AiUpload() {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),
+          addRandomSuffix: true,
         });
         blobUrl = newBlob.url;
       }

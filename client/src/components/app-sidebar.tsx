@@ -152,6 +152,7 @@ export function AppSidebar() {
         access: 'private',
         handleUploadUrl: '/api/blob/upload',
         clientPayload: JSON.stringify({ type: 'avatar' }),
+        addRandomSuffix: true,
       });
 
       setProfileImageUrl(newBlob.url);
@@ -202,6 +203,14 @@ export function AppSidebar() {
       return user.email[0].toUpperCase();
     }
     return "U";
+  };
+
+  const getProxiedUrl = (url: string | null | undefined) => {
+    if (!url) return undefined;
+    if (url.includes('vercel-storage.com')) {
+      return `/api/blob/view?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   };
   
   const menuItems = allMenuItems.filter((item) => {
@@ -262,7 +271,7 @@ export function AppSidebar() {
             className="flex items-center gap-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors group"
           >
             <Avatar className="w-10 h-10 border border-border group-hover:border-primary/30 transition-colors">
-              <AvatarImage src={user?.profileImageUrl || undefined} />
+              <AvatarImage src={getProxiedUrl(user?.profileImageUrl)} />
               <AvatarFallback>{getUserInitials()}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -335,7 +344,7 @@ export function AppSidebar() {
                   </Label>
                   <div className="flex items-center gap-4">
                     <Avatar className="w-16 h-16 border-2 border-primary/20">
-                      <AvatarImage src={profileImageUrl || undefined} />
+                      <AvatarImage src={getProxiedUrl(profileImageUrl)} />
                       <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 space-y-2">
