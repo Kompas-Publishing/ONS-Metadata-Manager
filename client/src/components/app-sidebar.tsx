@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -42,7 +42,9 @@ import {
     Key,
     Save,
     Loader2,
+    Upload,
   } from "lucide-react";
+import { upload } from "@vercel/blob/client";
   
   const allMenuItems = [
     {
@@ -128,6 +130,8 @@ export function AppSidebar() {
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -136,6 +140,27 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const newBlob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob/upload',
+        clientPayload: JSON.stringify({ type: 'avatar' }),
+      });
+
+      setProfileImageUrl(newBlob.url);
+      toast({ title: "Success", description: "Avatar uploaded successfully" });
+    } catch (error: any) {
+      toast({ title: "Error", description: "Upload failed: " + error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -306,13 +331,52 @@ export function AppSidebar() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="avatar" className="flex items-center gap-2">
-                    <Camera className="w-4 h-4" /> Profile Image URL
+                    <Camera className="w-4 h-4" /> Profile Image
                   </Label>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-16 h-16 border-2 border-primary/20">
+                      <AvatarImage src={profileImageUrl || undefined} />
+                      <AvatarFallback className="text-xl">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        accept="image/*"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        className="w-full h-9"
+                        disabled={isUploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload New Image
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-[10px] text-muted-foreground">
+                        Supports JPG, PNG, GIF. Max 4.5MB for serverless.
+                      </p>
+                    </div>
+                  </div>
                   <Input 
-                    id="avatar" 
+                    id="avatar-url" 
                     value={profileImageUrl} 
                     onChange={(e) => setProfileImageUrl(e.target.value)}
-                    placeholder="https://example.com/image.jpg"
+                    placeholder="Or paste an image URL..."
+                    className="mt-2 h-8 text-xs font-mono"
                   />
                 </div>
               </div>

@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
+import { upload } from "@vercel/blob/client";
 
 type Proposal = {
   type: "license" | "metadata";
@@ -40,13 +41,30 @@ export default function AiUpload() {
     mutationFn: async () => {
       if (!file) throw new Error("Please select a file");
       
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", uploadType);
+      const MAX_BODY_SIZE = 4.5 * 1024 * 1024; // 4.5MB Vercel Limit
       
+      let blobUrl = "";
+      if (file.size > MAX_BODY_SIZE) {
+        // Upload to Vercel Blob first if it's too big for a standard POST body
+        const newBlob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/blob/upload',
+          clientPayload: JSON.stringify({ type: 'ai-upload' }),
+        });
+        blobUrl = newBlob.url;
+      }
+
       const res = await fetch("/api/ai/parse-upload", {
         method: "POST",
-        body: formData,
+        headers: blobUrl ? { 'Content-Type': 'application/json' } : undefined,
+        body: blobUrl 
+          ? JSON.stringify({ blobUrl, type: uploadType }) 
+          : (() => {
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("type", uploadType);
+              return formData;
+            })(),
       });
       
       if (!res.ok) {
@@ -69,15 +87,32 @@ export default function AiUpload() {
     mutationFn: async () => {
       if (!file || !userFeedback || !proposals) throw new Error("Missing data for refinement");
       
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", uploadType);
-      formData.append("feedback", userFeedback);
-      formData.append("previousProposals", JSON.stringify(proposals));
-      
+      const MAX_BODY_SIZE = 4.5 * 1024 * 1024;
+      let blobUrl = "";
+      if (file.size > MAX_BODY_SIZE) {
+        // Reuse upload if needed, though usually refine happens after parse
+        // For simplicity, we'll just upload again if needed or we could cache the blobUrl
+        const newBlob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/blob/upload',
+          clientPayload: JSON.stringify({ type: 'ai-upload' }),
+        });
+        blobUrl = newBlob.url;
+      }
+
       const res = await fetch("/api/ai/refine-upload", {
         method: "POST",
-        body: formData,
+        headers: blobUrl ? { 'Content-Type': 'application/json' } : undefined,
+        body: blobUrl
+          ? JSON.stringify({ blobUrl, type: uploadType, feedback: userFeedback, previousProposals: JSON.stringify(proposals) })
+          : (() => {
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("type", uploadType);
+              formData.append("feedback", userFeedback);
+              formData.append("previousProposals", JSON.stringify(proposals));
+              return formData;
+            })(),
       });
       
       if (!res.ok) {
@@ -124,12 +159,12 @@ export default function AiUpload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB for Vercel
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB new limit
       
       if (selectedFile.size > MAX_FILE_SIZE) {
         toast({
           title: "File too large",
-          description: "Vercel limits uploads to 4.5MB. Please upload a smaller file.",
+          description: "Max file size is 100MB.",
           variant: "destructive",
         });
         e.target.value = ""; // Clear the input

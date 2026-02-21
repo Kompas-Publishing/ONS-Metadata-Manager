@@ -1969,18 +1969,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: reason });
         }
 
-        if (!req.file) {
-          return res.status(400).json({ message: "No file uploaded" });
+        let fileBuffer: Buffer;
+        let mimeType: string;
+        let type = req.body.type || "license";
+
+        if (req.body.blobUrl) {
+          const blobRes = await fetch(req.body.blobUrl);
+          if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+          fileBuffer = Buffer.from(await blobRes.arrayBuffer());
+          mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
+        } else {
+          if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+          }
+          fileBuffer = req.file.buffer;
+          mimeType = req.file.mimetype;
         }
 
-        const type = req.body.type || "license";
         let proposals = [];
 
         if (type === "license") {
-          const result = await aiService.parseLicenseContract(req.file.buffer, req.file.mimetype);
+          const result = await aiService.parseLicenseContract(fileBuffer, mimeType);
           proposals = result.proposals || [];
         } else if (type === "metadata") {
-          const result = await aiService.parseMetadataDocument(req.file.buffer, req.file.mimetype, permissions);
+          const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, permissions);
           proposals = result.proposals;
         }
 
@@ -2004,21 +2016,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: reason });
         }
 
-        if (!req.file) {
-          return res.status(400).json({ message: "No file uploaded" });
-        }
+        let fileBuffer: Buffer;
+        let mimeType: string;
+        let type = req.body.type || "license";
+        let feedback = req.body.feedback;
+        let previousProposals = JSON.parse(req.body.previousProposals || "[]");
 
-        const type = req.body.type || "license";
-        const feedback = req.body.feedback;
-        const previousProposals = JSON.parse(req.body.previousProposals || "[]");
+        if (req.body.blobUrl) {
+          const blobRes = await fetch(req.body.blobUrl);
+          if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+          fileBuffer = Buffer.from(await blobRes.arrayBuffer());
+          mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
+        } else {
+          if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+          }
+          fileBuffer = req.file.buffer;
+          mimeType = req.file.mimetype;
+        }
 
         if (!feedback) {
           return res.status(400).json({ message: "Feedback is required for refinement" });
         }
 
         const result = await aiService.refineParsing(
-          req.file.buffer,
-          req.file.mimetype,
+          fileBuffer,
+          mimeType,
           type,
           previousProposals,
           feedback,
@@ -2386,6 +2409,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting task:", error);
       res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // Vercel Blob upload handshake
+  app.post("/api/blob/upload", isAuthenticated, async (req, res) => {
+    try {
+      const { handleUpload } = await import("@vercel/blob/client");
+      const jsonResponse = await handleUpload({
+        body: req.body,
+        request: req as any,
+        onBeforeGenerateToken: async (pathname, clientPayload) => {
+          const payload = clientPayload ? JSON.parse(clientPayload) : {};
+          const uploadType = payload.type || "unknown";
+
+          return {
+            allowedContentTypes: [
+              "image/jpeg", "image/png", "image/gif", "image/webp",
+              "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"
+            ],
+            tokenPayload: JSON.stringify({
+              userId: (req.user as any).id,
+              uploadType,
+            }),
+          };
+        },
+        onUploadCompleted: async ({ blob, tokenPayload }) => {
+          try {
+            const { userId, uploadType } = JSON.parse(tokenPayload!);
+            if (uploadType === "avatar") {
+              await storage.updateUserProfile(userId, { profileImageUrl: blob.url });
+            }
+          } catch (error) {
+            console.error("Could not update user profile during onUploadCompleted:", error);
+          }
+        },
+      });
+
+      return res.status(200).json(jsonResponse);
+    } catch (error) {
+      console.error("Vercel Blob upload handshake error:", error);
+      return res.status(400).json({ error: (error as Error).message });
     }
   });
 

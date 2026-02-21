@@ -27,22 +27,49 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   }
 
   try {
-    // Manually run multer
-    await runMiddleware(req, res, upload.single("file"));
+    let fileBuffer: Buffer;
+    let mimeType: string;
+    let type: string;
+
+    // Check content type to decide how to parse
+    const contentType = req.headers["content-type"] || "";
     
-    const file = (req as any).file;
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded" });
+    if (contentType.includes("application/json")) {
+      // Manually parse JSON body since bodyParser is false
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      
+      if (body.blobUrl) {
+        const blobRes = await fetch(body.blobUrl);
+        if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+        fileBuffer = Buffer.from(await blobRes.arrayBuffer());
+        mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
+        type = body.type || "license";
+      } else {
+        return res.status(400).json({ message: "Missing blobUrl in JSON request" });
+      }
+    } else {
+      // Use multer for multipart/form-data
+      await runMiddleware(req, res, upload.single("file"));
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      fileBuffer = file.buffer;
+      mimeType = file.mimetype;
+      type = req.body.type || "license";
     }
 
-    const type = req.body.type || "license";
     let proposals = [];
 
     if (type === "license") {
-      const result = await aiService.parseLicenseContract(file.buffer, file.mimetype);
+      const result = await aiService.parseLicenseContract(fileBuffer, mimeType);
       proposals = result.proposals || [];
     } else if (type === "metadata") {
-      const result = await aiService.parseMetadataDocument(file.buffer, file.mimetype, req.permissions!);
+      const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, req.permissions!);
       proposals = result.proposals;
     }
 

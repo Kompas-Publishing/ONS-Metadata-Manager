@@ -27,25 +27,55 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   }
 
   try {
-    // Manually run multer
-    await runMiddleware(req, res, upload.single("file"));
-    
-    const file = (req as any).file;
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    let fileBuffer: Buffer;
+    let mimeType: string;
+    let type: string;
+    let feedback: string;
+    let previousProposals: any[];
 
-    const type = req.body.type || "license";
-    const feedback = req.body.feedback;
-    const previousProposals = JSON.parse(req.body.previousProposals || "[]");
+    // Check content type
+    const contentType = req.headers["content-type"] || "";
+    
+    if (contentType.includes("application/json")) {
+      // Manually parse JSON body
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      
+      if (body.blobUrl) {
+        const blobRes = await fetch(body.blobUrl);
+        if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+        fileBuffer = Buffer.from(await blobRes.arrayBuffer());
+        mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
+        type = body.type || "license";
+        feedback = body.feedback;
+        previousProposals = JSON.parse(body.previousProposals || "[]");
+      } else {
+        return res.status(400).json({ message: "Missing blobUrl in JSON request" });
+      }
+    } else {
+      // Use multer for multipart/form-data
+      await runMiddleware(req, res, upload.single("file"));
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      fileBuffer = file.buffer;
+      mimeType = file.mimetype;
+      type = req.body.type || "license";
+      feedback = req.body.feedback;
+      previousProposals = JSON.parse(req.body.previousProposals || "[]");
+    }
 
     if (!feedback) {
       return res.status(400).json({ message: "Feedback is required for refinement" });
     }
 
     const result = await aiService.refineParsing(
-      file.buffer,
-      file.mimetype,
+      fileBuffer,
+      mimeType,
       type,
       previousProposals,
       feedback,
