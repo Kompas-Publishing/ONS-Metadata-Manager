@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/accordion";
 import { Layers } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useEffect } from "react";
 
 export default function ViewLicense() {
   const [, params] = useRoute("/licenses/:id");
