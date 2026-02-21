@@ -385,7 +385,7 @@ export default function AiUpload() {
                         </div>
                         <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-[10px] font-medium text-primary">
                           <Bot className="w-3 h-3" />
-                          <span>Gemini 1.5 Pro</span>
+                          <span>Gemini 3</span>
                         </div>
                       </div>
                     </CardHeader>
