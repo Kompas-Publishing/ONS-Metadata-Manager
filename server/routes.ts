@@ -2422,6 +2422,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onBeforeGenerateToken: async (pathname, clientPayload) => {
           const payload = clientPayload ? JSON.parse(clientPayload) : {};
           const uploadType = payload.type || "unknown";
+          const user = req.user as any;
+
+          if (!user) throw new Error("Unauthorized");
+
+          // For AI uploads, check if user has AI permission
+          if (uploadType === "ai-upload") {
+            const { allowed } = await requirePermission(user.id, "ai");
+            if (!allowed) throw new Error("Forbidden: AI permission required");
+          }
 
           return {
             allowedContentTypes: [
@@ -2429,7 +2438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"
             ],
             tokenPayload: JSON.stringify({
-              userId: (req.user as any).id,
+              userId: user.id,
               uploadType,
             }),
           };

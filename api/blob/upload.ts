@@ -1,8 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob";
 import { corsMiddleware, authenticate, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { storage } from "../_server/storage.js";
-import { requirePermission as checkPermission } from "../_server/permissions.js";
 
 export default async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   // Manual CORS handling
@@ -16,41 +14,51 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
   }
 
   try {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      throw new Error("BLOB_READ_WRITE_TOKEN is not configured on the server");
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return res.status(500).json({ error: "BLOB_READ_WRITE_TOKEN is missing from environment" });
     }
 
     const body = req.body as HandleUploadBody;
-    if (!body) {
-      return res.status(400).json({ error: "Missing request body" });
-    }
+
+    // Use standard imports at top level if possible, or dynamic if needed.
+    // Let's stick to dynamic for now to be safe against init errors.
+    const { storage } = await import("../_server/storage.js");
+    const { requirePermission: checkPermission } = await import("../_server/permissions.js");
 
     const jsonResponse = await handleUpload({
       body,
       request: req as any,
+      token: token,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        // Authenticate inside the callback
-        const user = await authenticate(req);
+        // Step 1: Authenticate the user
+        let user;
+        try {
+          user = await authenticate(req);
+        } catch (e) {
+          throw new Error("Authentication failed during handshake");
+        }
         
         if (!user) {
-          throw new Error("Unauthorized: Please log in to upload files.");
+          throw new Error("Unauthorized: You must be logged in to upload.");
         }
 
         if (user.status !== "active") {
-          throw new Error("Unauthorized: Your account is not active.");
+          throw new Error("Unauthorized: Your account is pending or archived.");
         }
 
         const payload = clientPayload ? JSON.parse(clientPayload) : {};
         const uploadType = payload.type || "unknown";
 
-        // If it's an AI upload, check if the user has AI permission
+        // Step 2: Check specific permissions
         if (uploadType === "ai-upload") {
           const { allowed } = await checkPermission(user.id, "ai");
           if (!allowed) {
-            throw new Error("Forbidden: You do not have permission to use the AI uploader.");
+            throw new Error("Forbidden: AI Upload permission required.");
           }
         }
 
+        // Step 3: Return the token instructions
         return {
           allowedContentTypes: [
             "image/jpeg", "image/png", "image/gif", "image/webp",
@@ -71,17 +79,18 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
             await storage.updateUserProfile(userId, { profileImageUrl: blob.url });
           }
         } catch (error) {
-          console.error("Error in onUploadCompleted callback:", error);
+          console.error("onUploadCompleted error:", error);
         }
       },
     });
 
     return res.status(200).json(jsonResponse);
   } catch (error: any) {
-    console.error("Vercel Blob handler error:", error);
-    return res.status(500).json({ 
-      message: "Vercel Blob error",
-      error: error.message || "Internal Server Error"
+    console.error("Blob Handler Exception:", error);
+    // Ensure we ALWAYS return a valid JSON response even on failure
+    return res.status(error.message?.includes("Unauthorized") ? 401 : 500).json({ 
+      message: "Handshake failed",
+      error: error.message || "Unknown error"
     });
   }
 }
