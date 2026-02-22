@@ -120,10 +120,18 @@ PERMISSION RULES:
 - License Read: ${permissions.permissions.licenses.read ? "ALLOWED" : "DENIED"}
 - License Write: ${permissions.permissions.licenses.write ? "ALLOWED" : "DENIED"}
 
-If a user asks for something they don't have permission for, politely explain that you cannot access that information.
-When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
-If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
-Changes are NOT applied automatically; they are shown to the user as proposals to accept or reject.
+LANGUAGE RULES:
+- IMPORTANT: All descriptions (description, episodeDescription) MUST be in Dutch (Nederlands).
+- Other fields like titles should remain in their original language (usually German or English) unless instructed otherwise.
+- Your conversation with the user should be in the same language as their prompt (default to English if unsure).
+
+GENERAL RULES:
+- If a user asks for something they don't have permission for, politely explain that you cannot access that information.
+- When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
+- If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
+- You can propose multiple changes at once if needed (e.g. for multiple episodes).
+- Changes are NOT applied automatically; they are shown to the user as proposals to accept or reject.
+- ALWAYS provide a text response explaining what you found or what you proposed. NEVER return an empty message.
 
 Always be professional and helpful.`;
 
@@ -134,27 +142,23 @@ Always be professional and helpful.`;
     .filter(m => m.role !== "system" && m.role !== "tool")
     .map(m => ({
       role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
+      parts: [{ text: m.content || " " }] // Ensure content is never empty
     }));
 
   const chat = model.startChat({
     history: chatHistory,
     generationConfig: {
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
     }
   });
 
-  // Since Gemini SDK handles the multi-turn conversation with tools a bit differently, 
-  // we'll use a loop to handle potential tool calls.
-  
   let currentPrompt = messages[messages.length - 1].content;
   if (messages[messages.length - 1].role !== "user") {
-    // This shouldn't happen with the current route logic, but for safety:
     return { message: "Last message was not from user." };
   }
 
   let response = await chat.sendMessage(currentPrompt);
-  let proposal: ChatProposal | null = null;
+  const proposals: ChatProposal[] = [];
   const debugLogs: any[] = [];
 
   // Handle function calls in a loop to allow multiple steps
@@ -191,14 +195,14 @@ Always be professional and helpful.`;
             if (!permissions.permissions.metadata.write) {
               result = { error: "Permission denied: Cannot write metadata." };
             } else {
-              proposal = {
+              proposals.push({
                 type: "metadata",
                 action: call.args.action as "create" | "update",
                 id: call.args.id as string,
                 data: call.args.data as Record<string, any>,
                 explanation: call.args.explanation as string
-              };
-              result = { status: "Proposal created. Awaiting user approval." };
+              });
+              result = { status: "Proposal recorded. Inform the user." };
             }
             break;
 
@@ -206,14 +210,14 @@ Always be professional and helpful.`;
             if (!permissions.permissions.licenses.write) {
               result = { error: "Permission denied: Cannot write licenses." };
             } else {
-              proposal = {
+              proposals.push({
                 type: "license",
                 action: call.args.action as "create" | "update",
                 id: call.args.id as string,
                 data: call.args.data as Record<string, any>,
                 explanation: call.args.explanation as string
-              };
-              result = { status: "Proposal created. Awaiting user approval." };
+              });
+              result = { status: "Proposal recorded. Inform the user." };
             }
             break;
             
@@ -242,11 +246,20 @@ Always be professional and helpful.`;
     functionCalls = response.response.functionCalls();
   }
 
-  const responseText = response.response.text();
+  let responseText = "";
+  try {
+    responseText = response.response.text();
+  } catch (e) {
+    if (proposals.length > 0) {
+      responseText = `I have generated ${proposals.length} proposals for you to review.`;
+    } else {
+      responseText = "I've processed your request. Is there anything else you need?";
+    }
+  }
 
   return {
     message: responseText,
-    proposal: proposal || undefined,
+    proposals: proposals.length > 0 ? proposals : undefined,
     debug: options?.debug ? debugLogs : undefined
   };
 }

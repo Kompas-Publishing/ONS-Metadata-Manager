@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 type Message = {
   role: "user" | "assistant";
   content: string;
-  proposal?: any;
+  proposals?: any[];
   debug?: any[];
 };
 
@@ -27,16 +27,32 @@ export default function AiChat() {
   const [isSending, setIsSending] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = "AI Chat | ONS Broadcast Portal";
   }, []);
 
+  // Use ResizeObserver to scroll when content height changes (like expanding debug logs)
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!scrollRef.current) return;
+    
+    const observer = new ResizeObserver(() => {
+      if (scrollRef.current) {
+        const scrollArea = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollArea) {
+          scrollArea.scrollTop = scrollArea.scrollHeight;
+        }
+      }
+    });
+
+    const scrollContent = scrollRef.current.querySelector('.space-y-6');
+    if (scrollContent) {
+      observer.observe(scrollContent);
     }
-  }, [messages]);
+
+    return () => observer.disconnect();
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isSending) return;
@@ -61,7 +77,7 @@ export default function AiChat() {
         { 
           role: "assistant", 
           content: data.message, 
-          proposal: data.proposal,
+          proposals: data.proposals,
           debug: data.debug
         },
       ]);
@@ -76,7 +92,7 @@ export default function AiChat() {
     }
   };
 
-  const handleExecuteProposal = async (proposal: any, messageIndex: number) => {
+  const handleExecuteProposal = async (proposal: any, messageIndex: number, proposalIndex: number) => {
     setIsExecuting(true);
     try {
       await apiRequest("POST", "/api/ai/chat/execute-proposal", proposal);
@@ -86,10 +102,15 @@ export default function AiChat() {
         description: "Change applied successfully.",
       });
 
-      // Update message to show it was applied
-      setMessages(prev => prev.map((msg, i) => 
-        i === messageIndex ? { ...msg, proposal: { ...msg.proposal, executed: true } } : msg
-      ));
+      // Update message to show specific proposal was applied
+      setMessages(prev => prev.map((msg, i) => {
+        if (i === messageIndex && msg.proposals) {
+          const newProposals = [...msg.proposals];
+          newProposals[proposalIndex] = { ...newProposals[proposalIndex], executed: true };
+          return { ...msg, proposals: newProposals };
+        }
+        return msg;
+      }));
 
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
@@ -190,58 +211,67 @@ export default function AiChat() {
                       </div>
                     )}
 
-                    {message.proposal && (
-                      <Card className="mt-4 w-full border-primary/20 bg-primary/5">
-                        <CardHeader className="py-3">
-                          <div className="flex items-center gap-2">
-                            <Info className="w-4 h-4 text-primary" />
-                            <CardTitle className="text-sm">Proposed {message.proposal.type} {message.proposal.action}</CardTitle>
-                          </div>
-                          {message.proposal.explanation && (
-                            <CardDescription className="text-xs">
-                              {message.proposal.explanation}
-                            </CardDescription>
-                          )}
-                        </CardHeader>
-                        <CardContent className="py-2">
-                          <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto">
-                            {JSON.stringify(message.proposal.data, null, 2)}
-                          </pre>
-                        </CardContent>
-                        <CardFooter className="py-3 flex justify-end gap-2">
-                          {message.proposal.executed ? (
-                            <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
-                              <Check className="w-4 h-4" /> Applied
-                            </div>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs"
-                                onClick={() => {
-                                  setMessages(prev => prev.filter((_, i) => i !== index));
-                                }}
-                              >
-                                <X className="w-3 h-3 mr-1" /> Dismiss
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 text-xs"
-                                disabled={isExecuting}
-                                onClick={() => handleExecuteProposal(message.proposal, index)}
-                              >
-                                {isExecuting ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <Check className="w-3 h-3 mr-1" />
-                                )}
-                                Accept Change
-                              </Button>
-                            </>
-                          )}
-                        </CardFooter>
-                      </Card>
+                    {message.proposals && message.proposals.length > 0 && (
+                      <div className="space-y-4 mt-4 w-full">
+                        {message.proposals.map((proposal, pIdx) => (
+                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5">
+                            <CardHeader className="py-3">
+                              <div className="flex items-center gap-2">
+                                <Info className="w-4 h-4 text-primary" />
+                                <CardTitle className="text-sm">Proposed {proposal.type} {proposal.action}</CardTitle>
+                              </div>
+                              {proposal.explanation && (
+                                <CardDescription className="text-xs">
+                                  {proposal.explanation}
+                                </CardDescription>
+                              )}
+                            </CardHeader>
+                            <CardContent className="py-2">
+                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto">
+                                {JSON.stringify(proposal.data, null, 2)}
+                              </pre>
+                            </CardContent>
+                            <CardFooter className="py-3 flex justify-end gap-2">
+                              {proposal.executed ? (
+                                <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
+                                  <Check className="w-4 h-4" /> Applied
+                                </div>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs"
+                                    onClick={() => {
+                                      setMessages(prev => prev.map((msg, mIdx) => {
+                                        if (mIdx === index && msg.proposals) {
+                                          return { ...msg, proposals: msg.proposals.filter((_, i) => i !== pIdx) };
+                                        }
+                                        return msg;
+                                      }));
+                                    }}
+                                  >
+                                    <X className="w-3 h-3 mr-1" /> Dismiss
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="h-8 text-xs"
+                                    disabled={isExecuting}
+                                    onClick={() => handleExecuteProposal(proposal, index, pIdx)}
+                                  >
+                                    {isExecuting ? (
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <Check className="w-3 h-3 mr-1" />
+                                    )}
+                                    Accept Change
+                                  </Button>
+                                </>
+                              )}
+                            </CardFooter>
+                          </Card>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
