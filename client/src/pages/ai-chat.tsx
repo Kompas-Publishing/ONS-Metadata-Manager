@@ -172,12 +172,12 @@ export default function AiChat() {
                 {messages.map((message, index) => (
                   <div
                     key={index}
-                    className={`flex flex-col ${
+                    className={`flex flex-col w-full ${
                       message.role === "user" ? "items-end" : "items-start"
                     }`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-lg p-3 ${
+                      className={`max-w-[90%] rounded-lg p-3 overflow-x-auto break-words ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
@@ -187,7 +187,7 @@ export default function AiChat() {
                     </div>
 
                     {message.debug && (
-                      <div className="mt-2 w-full max-w-[85%]">
+                      <div className="mt-2 w-full max-w-[90%]">
                         <details className="text-[10px] bg-slate-900 text-slate-300 rounded p-2 border border-slate-700">
                           <summary className="cursor-pointer font-mono hover:text-white flex items-center gap-1">
                             <Info className="w-3 h-3" /> Debug Tool Logs ({message.debug.length})
@@ -198,7 +198,7 @@ export default function AiChat() {
                                 <span className={log.type === "tool_call" ? "text-blue-400" : "text-green-400"}>
                                   [{log.type === "tool_call" ? "CALL" : "RESULT"}] {log.name}
                                 </span>
-                                <pre className="mt-1 whitespace-pre-wrap overflow-x-auto">
+                                <pre className="mt-1 whitespace-pre-wrap overflow-x-auto max-w-full">
                                   {JSON.stringify(log.args || log.result, null, 2)}
                                 </pre>
                               </div>
@@ -209,26 +209,26 @@ export default function AiChat() {
                     )}
 
                     {message.proposals && message.proposals.length > 0 && (
-                      <div className="space-y-4 mt-4 w-full">
+                      <div className="space-y-4 mt-4 w-full max-w-full">
                         {message.proposals.map((proposal, pIdx) => (
-                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5">
+                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5 overflow-hidden">
                             <CardHeader className="py-3">
                               <div className="flex items-center gap-2">
                                 <Info className="w-4 h-4 text-primary" />
                                 <CardTitle className="text-sm">Proposed {proposal.type} {proposal.action}</CardTitle>
                               </div>
                               {proposal.explanation && (
-                                <CardDescription className="text-xs">
+                                <CardDescription className="text-xs break-words">
                                   {proposal.explanation}
                                 </CardDescription>
                               )}
                             </CardHeader>
-                            <CardContent className="py-2">
-                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto">
+                            <CardContent className="py-2 overflow-hidden">
+                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto max-w-full">
                                 {JSON.stringify(proposal.data, null, 2)}
                               </pre>
                             </CardContent>
-                            <CardFooter className="py-3 flex justify-end gap-2">
+                            <CardFooter className="py-3 flex flex-wrap justify-end gap-2">
                               {proposal.executed ? (
                                 <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
                                   <Check className="w-4 h-4" /> Applied
@@ -238,7 +238,7 @@ export default function AiChat() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs shrink-0"
                                     onClick={() => {
                                       setMessages(prev => prev.map((msg, mIdx) => {
                                         if (mIdx === index && msg.proposals) {
@@ -252,7 +252,7 @@ export default function AiChat() {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs shrink-0"
                                     disabled={isExecuting}
                                     onClick={() => handleExecuteProposal(proposal, index, pIdx)}
                                   >
