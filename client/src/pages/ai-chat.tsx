@@ -172,33 +172,33 @@ export default function AiChat() {
                 {messages.map((message, index) => (
                   <div
                     key={index}
-                    className={`flex flex-col w-full ${
+                    className={`flex flex-col w-full min-w-0 ${
                       message.role === "user" ? "items-end" : "items-start"
                     }`}
                   >
                     <div
-                      className={`max-w-[90%] rounded-lg p-3 overflow-x-auto break-words ${
+                      className={`max-w-[95%] rounded-lg p-3 overflow-x-auto scrollbar-thin break-words ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
 
                     {message.debug && (
-                      <div className="mt-2 w-full max-w-[90%]">
-                        <details className="text-[10px] bg-slate-900 text-slate-300 rounded p-2 border border-slate-700">
+                      <div className="mt-2 w-full max-w-[95%] min-w-0">
+                        <details className="text-[10px] bg-slate-900 text-slate-300 rounded p-2 border border-slate-700 overflow-hidden">
                           <summary className="cursor-pointer font-mono hover:text-white flex items-center gap-1">
                             <Info className="w-3 h-3" /> Debug Tool Logs ({message.debug.length})
                           </summary>
-                          <div className="mt-2 space-y-2 font-mono max-h-40 overflow-y-auto">
+                          <div className="mt-2 space-y-2 font-mono max-h-40 overflow-y-auto overflow-x-hidden">
                             {message.debug.map((log, lIdx) => (
-                              <div key={lIdx} className="border-l-2 border-slate-700 pl-2">
+                              <div key={lIdx} className="border-l-2 border-slate-700 pl-2 min-w-0 overflow-hidden">
                                 <span className={log.type === "tool_call" ? "text-blue-400" : "text-green-400"}>
                                   [{log.type === "tool_call" ? "CALL" : "RESULT"}] {log.name}
                                 </span>
-                                <pre className="mt-1 whitespace-pre-wrap overflow-x-auto max-w-full">
+                                <pre className="mt-1 whitespace-pre-wrap overflow-x-auto max-w-full scrollbar-thin">
                                   {JSON.stringify(log.args || log.result, null, 2)}
                                 </pre>
                               </div>
@@ -209,10 +209,10 @@ export default function AiChat() {
                     )}
 
                     {message.proposals && message.proposals.length > 0 && (
-                      <div className="space-y-4 mt-4 w-full max-w-full">
+                      <div className="space-y-4 mt-4 w-full max-w-full min-w-0">
                         {message.proposals.map((proposal, pIdx) => (
-                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5 overflow-hidden">
-                            <CardHeader className="py-3">
+                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col">
+                            <CardHeader className="py-3 shrink-0">
                               <div className="flex items-center gap-2">
                                 <Info className="w-4 h-4 text-primary" />
                                 <CardTitle className="text-sm">Proposed {proposal.type} {proposal.action}</CardTitle>
@@ -223,12 +223,12 @@ export default function AiChat() {
                                 </CardDescription>
                               )}
                             </CardHeader>
-                            <CardContent className="py-2 overflow-hidden">
-                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto max-w-full">
+                            <CardContent className="py-2 overflow-hidden min-h-0">
+                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto max-w-full scrollbar-thin">
                                 {JSON.stringify(proposal.data, null, 2)}
                               </pre>
                             </CardContent>
-                            <CardFooter className="py-3 flex flex-wrap justify-end gap-2">
+                            <CardFooter className="py-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
                               {proposal.executed ? (
                                 <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
                                   <Check className="w-4 h-4" /> Applied
@@ -238,7 +238,7 @@ export default function AiChat() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 text-xs shrink-0"
+                                    className="h-8 text-xs px-2 sm:px-3"
                                     onClick={() => {
                                       setMessages(prev => prev.map((msg, mIdx) => {
                                         if (mIdx === index && msg.proposals) {
@@ -252,7 +252,7 @@ export default function AiChat() {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    className="h-8 text-xs shrink-0"
+                                    className="h-8 text-xs px-2 sm:px-3"
                                     disabled={isExecuting}
                                     onClick={() => handleExecuteProposal(proposal, index, pIdx)}
                                   >
