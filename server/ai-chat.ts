@@ -22,7 +22,7 @@ export type ChatProposal = {
   explanation?: string;
 };
 
-async function getModel() {
+async function getModel(systemPrompt: string) {
   const apiKey = (await storage.getSetting("ai_api_key"))?.value;
   const configuredModel = (await storage.getSetting("ai_model"))?.value;
 
@@ -36,6 +36,7 @@ async function getModel() {
   
   return genAI.getGenerativeModel({
     model: modelName,
+    systemInstruction: systemPrompt,
     tools: [
       {
         functionDeclarations: [
@@ -109,8 +110,6 @@ export async function runAiChat(
   permissions: UserPermissions,
   options?: { debug?: boolean }
 ) {
-  const model = await getModel();
-
   const systemPrompt = `You are the ONS Broadcast Portal Assistant. 
 You help users manage metadata, licenses, and tasks.
 You have access to tools to search the database and propose changes.
@@ -128,7 +127,9 @@ Changes are NOT applied automatically; they are shown to the user as proposals t
 
 Always be professional and helpful.`;
 
-  // Filter out any system messages from the history and add our fresh one
+  const model = await getModel(systemPrompt);
+
+  // Filter out any system messages from the history
   const chatHistory = messages
     .filter(m => m.role !== "system" && m.role !== "tool")
     .map(m => ({
