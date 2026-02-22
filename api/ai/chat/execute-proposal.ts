@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { executeChatProposal } from "../../../_server/ai-chat.js";
+import { executeChatProposal } from "../../_server/ai-chat.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
 
 export default apiHandler(

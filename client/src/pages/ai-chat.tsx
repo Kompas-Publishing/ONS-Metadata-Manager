@@ -3,8 +3,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Sparkles, Loader2, Check, X, Info, AlertCircle } from "lucide-react";
@@ -22,7 +20,6 @@ export default function AiChat() {
   const { canUseAIChat } = useAuth();
   const { toast } = useToast();
   const [input, setInput] = useState("");
-  const [debugEnabled, setDebugEnabled] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -68,7 +65,7 @@ export default function AiChat() {
           role: m.role,
           content: m.content,
         })),
-        debug: debugEnabled,
+        debug: true, // Keep debug: true on server for logging purposes if needed, or remove it
       });
 
       const data = await response.json();
@@ -189,7 +186,7 @@ export default function AiChat() {
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     </div>
 
-                    {message.debug && debugEnabled && (
+                    {message.debug && (
                       <div className="mt-2 w-full max-w-[85%]">
                         <details className="text-[10px] bg-slate-900 text-slate-300 rounded p-2 border border-slate-700">
                           <summary className="cursor-pointer font-mono hover:text-white flex items-center gap-1">
@@ -294,11 +291,6 @@ export default function AiChat() {
             <CardDescription>Use clear instructions. Include IDs when requesting updates.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground font-medium">Debug Mode</Label>
-              <Switch checked={debugEnabled} onCheckedChange={setDebugEnabled} />
-            </div>
-            
             <div className="p-3 rounded-lg border bg-yellow-50 border-yellow-100 flex gap-2">
               <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
               <p className="text-[11px] text-yellow-700 leading-relaxed">

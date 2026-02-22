@@ -184,7 +184,7 @@ Always be professional and helpful.`;
             break;
             
           case "searchLicenses":
-            if (!permissions.permissions.permissions.licenses.read) {
+            if (!permissions.permissions.licenses.read) {
               result = { error: "Permission denied: Cannot read licenses." };
             } else {
               result = await storage.searchLicenses(call.args.query as string);
@@ -250,10 +250,16 @@ Always be professional and helpful.`;
   try {
     responseText = response.response.text();
   } catch (e) {
+    // text() might throw if there are no text parts
+  }
+
+  if (!responseText || responseText.trim() === "") {
     if (proposals.length > 0) {
-      responseText = `I have generated ${proposals.length} proposals for you to review.`;
+      responseText = `I have generated ${proposals.length} proposal${proposals.length > 1 ? "s" : ""} for you to review based on the information I found.`;
+    } else if (debugLogs.length > 0) {
+      responseText = "I've searched the database and processed your request. Is there anything specific you'd like me to show you?";
     } else {
-      responseText = "I've processed your request. Is there anything else you need?";
+      responseText = "I've processed your request. How else can I help you today?";
     }
   }
 
