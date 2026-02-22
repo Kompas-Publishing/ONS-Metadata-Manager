@@ -154,19 +154,21 @@ Always be professional and helpful.`;
   }
 
   let response = await chat.sendMessage(currentPrompt);
-  let responseText = "";
   let proposal: ChatProposal | null = null;
+  const debugLogs: any[] = [];
 
-  // Handle function calls
-  const functionCalls = response.response.functionCalls();
-  if (functionCalls && functionCalls.length > 0) {
+  // Handle function calls in a loop to allow multiple steps
+  let functionCalls = response.response.functionCalls();
+  
+  while (functionCalls && functionCalls.length > 0) {
     const toolResults: any[] = [];
     
     for (const call of functionCalls) {
-      if (options?.debug) console.log(`[AI Chat] Tool Call: ${call.name}`, call.args);
+      if (options?.debug) {
+        debugLogs.push({ type: "tool_call", name: call.name, args: call.args });
+      }
       
       let result: any;
-      
       try {
         switch (call.name) {
           case "searchMetadata":
@@ -222,6 +224,10 @@ Always be professional and helpful.`;
         result = { error: err.message };
       }
 
+      if (options?.debug) {
+        debugLogs.push({ type: "tool_result", name: call.name, result });
+      }
+
       toolResults.push({
         functionResponse: {
           name: call.name,
@@ -230,16 +236,18 @@ Always be professional and helpful.`;
       });
     }
 
-    // Send tool results back to get final response
-    const finalResponse = await chat.sendMessage(toolResults);
-    responseText = finalResponse.response.text();
-  } else {
-    responseText = response.response.text();
+    // Send tool results back to the model
+    response = await chat.sendMessage(toolResults);
+    // Check if there are more function calls in the new response
+    functionCalls = response.response.functionCalls();
   }
+
+  const responseText = response.response.text();
 
   return {
     message: responseText,
-    proposal: proposal || undefined
+    proposal: proposal || undefined,
+    debug: options?.debug ? debugLogs : undefined
   };
 }
 
