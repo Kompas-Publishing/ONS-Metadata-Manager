@@ -13,7 +13,6 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   proposals?: any[];
-  debug?: any[];
 };
 
 export default function AiChat() {
@@ -30,7 +29,7 @@ export default function AiChat() {
     document.title = "AI Chat | ONS Broadcast Portal";
   }, []);
 
-  // Use ResizeObserver to scroll when content height changes (like expanding debug logs)
+  // Use ResizeObserver to scroll when content height changes (like expanding proposal cards)
   useEffect(() => {
     if (!scrollRef.current) return;
     
@@ -65,7 +64,6 @@ export default function AiChat() {
           role: m.role,
           content: m.content,
         })),
-        debug: true, // Keep debug: true on server for logging purposes if needed, or remove it
       });
 
       const data = await response.json();
@@ -74,8 +72,7 @@ export default function AiChat() {
         { 
           role: "assistant", 
           content: data.message, 
-          proposals: data.proposals,
-          debug: data.debug
+          proposals: data.proposals
         },
       ]);
     } catch (error: any) {
@@ -185,28 +182,6 @@ export default function AiChat() {
                     >
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
-
-                    {message.debug && (
-                      <div className="mt-2 w-full max-w-[95%] min-w-0">
-                        <details className="text-[10px] bg-slate-900 text-slate-300 rounded p-2 border border-slate-700 overflow-hidden">
-                          <summary className="cursor-pointer font-mono hover:text-white flex items-center gap-1">
-                            <Info className="w-3 h-3" /> Debug Tool Logs ({message.debug.length})
-                          </summary>
-                          <div className="mt-2 space-y-2 font-mono max-h-40 overflow-y-auto overflow-x-hidden">
-                            {message.debug.map((log, lIdx) => (
-                              <div key={lIdx} className="border-l-2 border-slate-700 pl-2 min-w-0 overflow-hidden">
-                                <span className={log.type === "tool_call" ? "text-blue-400" : "text-green-400"}>
-                                  [{log.type === "tool_call" ? "CALL" : "RESULT"}] {log.name}
-                                </span>
-                                <pre className="mt-1 whitespace-pre-wrap overflow-x-auto max-w-full scrollbar-thin">
-                                  {JSON.stringify(log.args || log.result, null, 2)}
-                                </pre>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      </div>
-                    )}
 
                     {message.proposals && message.proposals.length > 0 && (
                       <div className="space-y-4 mt-4 w-full max-w-full min-w-0">
