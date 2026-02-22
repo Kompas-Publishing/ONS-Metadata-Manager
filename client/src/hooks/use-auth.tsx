@@ -95,6 +95,7 @@ export function useAuth() {
   const canReadTasks = isAdmin || (isAuthenticated && user?.canReadTasks === 1);
   const canWriteTasks = isAdmin || (isAuthenticated && user?.canWriteTasks === 1);
   const canUseAI = isAdmin || (isAuthenticated && user?.canUseAI === 1);
+  const canUseAIChat = isAdmin || (isAuthenticated && user?.canUseAIChat === 1);
 
   return {
     user,
@@ -109,6 +110,7 @@ export function useAuth() {
     canReadTasks,
     canWriteTasks,
     canUseAI,
+    canUseAIChat,
     login,
     logout,
     register,

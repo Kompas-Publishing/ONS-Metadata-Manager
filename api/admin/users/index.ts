@@ -44,7 +44,8 @@ export default apiHandler(
             data.canWriteLicenses !== undefined || 
             data.canReadTasks !== undefined || 
             data.canWriteTasks !== undefined || 
-            data.canUseAI !== undefined
+            data.canUseAI !== undefined ||
+            data.canUseAIChat !== undefined
           ) {
             const permissions = {
               canReadMetadata: data.canReadMetadata !== undefined ? (data.canReadMetadata ? 1 : 0) : 0,
@@ -54,6 +55,7 @@ export default apiHandler(
               canReadTasks: data.canReadTasks !== undefined ? (data.canReadTasks ? 1 : 0) : 0,
               canWriteTasks: data.canWriteTasks !== undefined ? (data.canWriteTasks ? 1 : 0) : 0,
               canUseAI: data.canUseAI !== undefined ? (data.canUseAI ? 1 : 0) : 0,
+              canUseAIChat: data.canUseAIChat !== undefined ? (data.canUseAIChat ? 1 : 0) : 0,
             };
             await storage.updateUserPermissions(id, permissions);
           }

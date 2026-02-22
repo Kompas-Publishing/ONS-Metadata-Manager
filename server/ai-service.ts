@@ -321,6 +321,15 @@ Only return the JSON object. Do not include markdown formatting.`;
 
     return resultJson;
   }
+
+  async generateText(prompt: string): Promise<string> {
+    await this.initialize();
+    if (!this.genAI) throw new Error("AI not initialized");
+
+    const model = this.genAI.getGenerativeModel({ model: this.model });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  }
 }
 
 export const aiService = new AiService();

@@ -137,12 +137,11 @@ import { upload } from "@vercel/blob/client";
       items: [
         {
           title: "AI Chat",
-          url: "#",
+          url: "/ai-chat",
           icon: Sparkles,
           testId: "nav-ai-chat",
           adminOnly: false,
-          permissionKey: "canUseAI",
-          disabled: true,
+          permissionKey: "canUseAIChat",
         },
         {
           title: "AI Uploader",

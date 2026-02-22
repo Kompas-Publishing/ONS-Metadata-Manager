@@ -9,12 +9,13 @@ export interface UserPermissions {
     licenses: { read: boolean; write: boolean };
     tasks: { read: boolean; write: boolean };
     ai: boolean;
+    aiChat: boolean;
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
 }
 
-export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai";
+export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat";
 export type PermissionAction = "read" | "write";
 
 export function getFileVisibilityConditions(permissions: UserPermissions) {

@@ -49,6 +49,8 @@ export interface IStorage {
   getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]>;
   getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }>;
   searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]>;
+  searchLicenses(keyword: string): Promise<License[]>;
+  searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]>;
   
   getUserTags(userId: string, type: string): Promise<UserDefinedTag[]>;
   createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag>;
@@ -64,7 +66,8 @@ export interface IStorage {
     canWriteLicenses: number,
     canReadTasks: number,
     canWriteTasks: number,
-    canUseAI: number
+    canUseAI: number,
+    canUseAIChat: number
   }): Promise<User | undefined>;
   updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined>;
   updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined>;
@@ -842,6 +845,69 @@ export class DatabaseStorage implements IStorage {
     return files.map(normalizeMetadataFile);
   }
 
+  async searchLicenses(keyword: string): Promise<License[]> {
+    const trimmed = keyword.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    return await db
+      .select()
+      .from(licenses)
+      .where(
+        or(
+          sql`LOWER(${licenses.name}) LIKE LOWER(${'%' + trimmed + '%'})`,
+          sql`LOWER(${licenses.distributor}) LIKE LOWER(${'%' + trimmed + '%'})`,
+          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+        )
+      )
+      .orderBy(desc(licenses.createdAt))
+      .limit(50);
+  }
+
+  async searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]> {
+    const trimmed = keyword.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [
+      or(
+        sql`LOWER(${tasks.description}) LIKE LOWER(${'%' + trimmed + '%'})`,
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + trimmed + '%'})`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+      )
+    ];
+
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    const results = await db
+      .select({
+        task: tasks,
+        metadataFile: metadataFiles,
+      })
+      .from(tasks)
+      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(tasks.createdAt))
+      .limit(100);
+
+    return results.map(r => ({
+      ...r.task,
+      metadataFile: normalizeMetadataFile(r.metadataFile),
+    }));
+  }
+
   async listAllUsers(): Promise<User[]> {
     return await db
       .select()
@@ -880,7 +946,8 @@ export class DatabaseStorage implements IStorage {
     canWriteLicenses: number,
     canReadTasks: number,
     canWriteTasks: number,
-    canUseAI: number
+    canUseAI: number,
+    canUseAIChat: number
   }): Promise<User | undefined> {
     const [updated] = await db
       .update(users)

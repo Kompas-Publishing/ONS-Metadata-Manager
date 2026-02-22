@@ -252,6 +252,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
           canReadTasks: number;
           canWriteTasks: number;
           canUseAI: number;
+          canUseAIChat: number;
         } 
       }) => {
         const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, permissions);
@@ -615,6 +616,9 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                   {user.canUseAI === 1 && (
                                     <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
                                   )}
+                                  {user.canUseAIChat === 1 && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI Chat</Badge>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell data-testid={`text-visibility-${user.id}`}>
@@ -786,6 +790,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -805,6 +810,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -834,6 +840,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -853,6 +860,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -882,6 +890,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: checked ? 1 : 0,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -901,6 +910,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: checked ? 1 : 0,
                                                       canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
                                                     }
                                                   })}
                                                 />
@@ -916,7 +926,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                             </div>
                                             <div className="space-y-3">
                                               <div className="flex items-center justify-between">
-                                                <Label className="text-xs">Full Access</Label>
+                                                <Label className="text-xs">AI Uploader</Label>
                                                 <Switch
                                                   size="sm"
                                                   checked={user.canUseAI === 1}
@@ -930,12 +940,33 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canReadTasks: user.canReadTasks,
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: checked ? 1 : 0,
+                                                      canUseAIChat: user.canUseAIChat,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">AI Chat</Label>
+                                                <Switch
+                                                  size="sm"
+                                                  checked={user.canUseAIChat === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                      canUseAIChat: checked ? 1 : 0,
                                                     }
                                                   })}
                                                 />
                                               </div>
                                               <p className="text-[10px] text-muted-foreground leading-tight pt-1">
-                                                Allows document parsing and automated importing.
+                                                AI Chat is read/write scoped by the user's existing permissions.
                                               </p>
                                             </div>
                                           </Card>

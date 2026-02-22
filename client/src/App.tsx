@@ -26,6 +26,7 @@ import ViewLicense from "@/pages/view-license";
 import EditLicense from "@/pages/edit-license";
 import Tasks from "@/pages/tasks";
 import AiUpload from "@/pages/ai-upload";
+import AiChat from "@/pages/ai-chat";
 
 function Router() {
   const { 
@@ -36,6 +37,7 @@ function Router() {
     canReadTasks, 
     canWriteTasks, 
     canUseAI,
+    canUseAIChat,
     isAdmin
   } = useAuth();
 
@@ -180,6 +182,16 @@ function Router() {
           {canUseAI ? (
             <ProtectedLayout>
               <AiUpload />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/ai-chat">
+        <AuthenticatedRoute>
+          {canUseAIChat ? (
+            <ProtectedLayout>
+              <AiChat />
             </ProtectedLayout>
           ) : <Redirect to="/" />}
         </AuthenticatedRoute>

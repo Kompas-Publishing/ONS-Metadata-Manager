@@ -17,7 +17,8 @@ export default apiHandler(
         canWriteLicenses, 
         canReadTasks, 
         canWriteTasks, 
-        canUseAI 
+        canUseAI,
+        canUseAIChat
       } = req.body;
 
       if (!id || typeof id !== "string") {
@@ -32,6 +33,7 @@ export default apiHandler(
         canReadTasks: canReadTasks !== undefined ? (canReadTasks ? 1 : 0) : 0,
         canWriteTasks: canWriteTasks !== undefined ? (canWriteTasks ? 1 : 0) : 0,
         canUseAI: canUseAI !== undefined ? (canUseAI ? 1 : 0) : 0,
+        canUseAIChat: canUseAIChat !== undefined ? (canUseAIChat ? 1 : 0) : 0,
       };
 
       await storage.updateUserPermissions(id, updates);

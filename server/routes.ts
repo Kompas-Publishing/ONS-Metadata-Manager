@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 import { rateLimit } from "express-rate-limit";
 import multer from "multer";
 import { aiService } from "./ai-service";
+import { runAiChat, executeChatProposal } from "./ai-chat";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -1661,6 +1662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canReadTasks: z.number().int().min(0).max(1),
           canWriteTasks: z.number().int().min(0).max(1),
           canUseAI: z.number().int().min(0).max(1),
+          canUseAIChat: z.number().int().min(0).max(1),
         });
 
         const validation = updatePermissionsSchema.safeParse(req.body);
@@ -1952,6 +1954,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error updating AI settings:", error);
         res.status(500).json({ message: "Failed to update AI settings" });
+      }
+    },
+  );
+
+  // AI Chat Routes
+  app.post(
+    "/api/ai/chat",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        const { allowed, permissions, reason } = await requirePermission(userId, "aiChat");
+        if (!allowed) {
+          return res.status(403).json({ message: reason });
+        }
+
+        const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+        const debug = Boolean(req.body?.debug);
+        const result = await runAiChat(messages, permissions!, { debug });
+        return res.json(result);
+      } catch (error: any) {
+        console.error("Error in AI chat:", error);
+        return res.status(500).json({ message: error.message || "AI chat failed" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/ai/chat/execute-proposal",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        const { allowed, permissions, reason } = await requirePermission(userId, "aiChat");
+        if (!allowed) {
+          return res.status(403).json({ message: reason });
+        }
+
+        const proposal = req.body;
+        const result = await executeChatProposal(proposal, permissions!, userId);
+        return res.json(result);
+      } catch (error: any) {
+        console.error("Error executing AI chat proposal:", error);
+        return res.status(500).json({ message: error.message || "Failed to execute proposal" });
       }
     },
   );
