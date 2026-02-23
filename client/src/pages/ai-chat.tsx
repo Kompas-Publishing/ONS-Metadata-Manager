@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,7 +39,6 @@ export default function AiChat() {
   const [isSending, setIsSending] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -300,6 +300,24 @@ export default function AiChat() {
     }
   };
 
+  const proposalGroups = useMemo(
+    () =>
+      messages
+        .map((message, messageIndex) => ({
+          messageIndex,
+          proposals: message.proposals || [],
+        }))
+        .filter((group) => group.proposals.length > 0),
+    [messages]
+  );
+
+  const proposalCount = useMemo(
+    () => proposalGroups.reduce((sum, group) => sum + group.proposals.length, 0),
+    [proposalGroups]
+  );
+
+  const hasProposals = proposalCount > 0;
+
   if (!canUseAIChat) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -324,13 +342,21 @@ export default function AiChat() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 flex flex-col h-[650px]">
-          <CardHeader>
+      <div
+        className={`grid gap-6 ${
+          hasProposals ? "grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : "grid-cols-1"
+        }`}
+      >
+        <Card
+          className={`flex flex-col min-h-[560px] ${
+            hasProposals ? "xl:h-[calc(100vh-240px)]" : "xl:h-[calc(100vh-220px)]"
+          }`}
+        >
+          <CardHeader className="pb-3">
             <CardTitle>Conversation</CardTitle>
             <CardDescription>AI suggestions require confirmation before any changes are applied.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-grow overflow-hidden relative">
+          <CardContent className="flex-1 overflow-hidden relative">
             <ScrollArea className="h-full pr-4" ref={scrollRef}>
               <div className="space-y-6">
                 {messages.length === 0 && (
@@ -354,7 +380,7 @@ export default function AiChat() {
                     }`}
                   >
                     <div
-                      className={`max-w-[95%] rounded-lg p-3 overflow-x-auto scrollbar-thin break-words ${
+                      className={`max-w-[95%] rounded-lg p-3 break-words ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
@@ -375,97 +401,6 @@ export default function AiChat() {
                         </div>
                       )}
                     </div>
-
-                    {message.proposals && message.proposals.length > 0 && (
-                      <div className="space-y-4 mt-4 w-full max-w-full min-w-0">
-                        {message.proposals.length > 1 && (
-                          <div className="flex justify-end px-1">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary" 
-                                  className="h-8 font-semibold shadow-sm border border-primary/20"
-                                  disabled={isExecuting}
-                                >
-                                  <Check className="w-3.5 h-3.5 mr-1.5" />
-                                  Accept All ({message.proposals.length})
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will apply all {message.proposals.length} proposed changes at once. 
-                                    Please ensure you have properly read and verified all data before proceeding.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Review Again</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => handleExecuteAllProposals(index)}
-                                    className="bg-primary text-primary-foreground"
-                                  >
-                                    Yes, I'm sure
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        )}
-
-                        {message.proposals.map((proposal, pIdx) => (
-                          <Card key={pIdx} className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col">
-                            <CardHeader className="py-3 shrink-0">
-                              <div className="flex items-center gap-2">
-                                <Info className="w-4 h-4 text-primary" />
-                                <CardTitle className="text-sm">Proposed {proposal.type} {proposal.action}</CardTitle>
-                              </div>
-                              {proposal.explanation && (
-                                <CardDescription className="text-xs break-words">
-                                  {proposal.explanation}
-                                </CardDescription>
-                              )}
-                            </CardHeader>
-                            <CardContent className="py-2 overflow-hidden min-h-0">
-                              <pre className="text-[10px] bg-background p-2 rounded border overflow-x-auto max-w-full scrollbar-thin">
-                                {JSON.stringify(proposal.data, null, 2)}
-                              </pre>
-                            </CardContent>
-                            <CardFooter className="py-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs px-2 sm:px-3"
-                                onClick={() => {
-                                  setMessages(prev => prev.map((msg, mIdx) => {
-                                    if (mIdx === index && msg.proposals) {
-                                      return { ...msg, proposals: msg.proposals.filter((_, i) => i !== pIdx) };
-                                    }
-                                    return msg;
-                                  }));
-                                }}
-                              >
-                                <X className="w-3 h-3 mr-1" /> Dismiss
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 text-xs px-2 sm:px-3"
-                                disabled={isExecuting}
-                                onClick={() => handleExecuteProposal(proposal, index, pIdx)}
-                              >
-                                {isExecuting ? (
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <Check className="w-3 h-3 mr-1" />
-                                )}
-                                Accept Change
-                              </Button>
-                            </CardFooter>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
                 {isSending && (
@@ -479,82 +414,198 @@ export default function AiChat() {
               </div>
             </ScrollArea>
           </CardContent>
-        </Card>
+          <CardFooter className="border-t bg-background">
+            <div className="w-full space-y-3">
+              <div className="p-3 rounded-lg border bg-yellow-50 border-yellow-100 flex gap-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-yellow-700 leading-relaxed">
+                  The AI can search the database and suggest changes. 
+                  Always verify data before accepting a proposal.
+                </p>
+              </div>
 
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Prompt</CardTitle>
-            <CardDescription>Use clear instructions. Include IDs when requesting updates.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-3 rounded-lg border bg-yellow-50 border-yellow-100 flex gap-2">
-              <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-yellow-700 leading-relaxed">
-                The AI can search the database and suggest changes. 
-                Always verify data before accepting a proposal.
-              </p>
-            </div>
-
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask the AI to search metadata, licenses, or tasks..."
-              rows={8}
-              className="resize-none"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-            />
-            <div className="space-y-2">
-              <Label htmlFor="ai-chat-attachment">Attachment (PDF, DOCX, XLSX, JSON, YAML, images, etc.)</Label>
-              <Input
-                id="ai-chat-attachment"
-                type="file"
-                accept={ACCEPTED_FILE_TYPES}
-                onChange={handleFileChange}
-                ref={fileInputRef}
-                className="cursor-pointer"
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask the AI to search metadata, licenses, or tasks..."
+                rows={4}
+                className="resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
               />
-              {attachment && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{attachment.name}</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2"
-                    onClick={() => {
-                      setAttachment(null);
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
-                      }
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              )}
-              <p className="text-[11px] text-muted-foreground">
-                Attachments are routed through private Vercel Blob storage (required over 4.5MB).
-              </p>
+              <div className="space-y-2">
+                <Label htmlFor="ai-chat-attachment">Attachment (PDF, DOCX, XLSX, JSON, YAML, images, etc.)</Label>
+                <Input
+                  id="ai-chat-attachment"
+                  type="file"
+                  accept={ACCEPTED_FILE_TYPES}
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                  className="cursor-pointer"
+                />
+                {attachment && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{attachment.name}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2"
+                      onClick={() => {
+                        setAttachment(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[11px] text-muted-foreground">
+                  Attachments are routed through private Vercel Blob storage (required over 4.5MB).
+                </p>
+                <Button
+                  className="w-full sm:w-auto"
+                  onClick={handleSend}
+                  disabled={isSending || (!input.trim() && !attachment)}
+                >
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Send Message
+                </Button>
+              </div>
             </div>
-            <Button 
-              className="w-full" 
-              onClick={handleSend}
-              disabled={isSending || (!input.trim() && !attachment)}
-            >
-              {isSending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4 mr-2" />
-              )}
-              Send Message
-            </Button>
-          </CardContent>
+          </CardFooter>
         </Card>
+
+        {hasProposals && (
+          <Card className="flex flex-col min-h-[560px] xl:h-[calc(100vh-240px)]">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Proposed Changes</CardTitle>
+                  <CardDescription>Review and apply AI suggestions.</CardDescription>
+                </div>
+                <Badge variant="secondary">{proposalCount}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-hidden">
+              <ScrollArea className="h-full pr-2">
+                <div className="space-y-6">
+                  {proposalGroups.map((group) => (
+                    <div key={group.messageIndex} className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-muted-foreground">
+                          From message {group.messageIndex + 1}
+                        </p>
+                        {group.proposals.length > 1 && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-8 font-semibold shadow-sm border border-primary/20"
+                                disabled={isExecuting}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1.5" />
+                                Accept All ({group.proposals.length})
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will apply all {group.proposals.length} proposed changes at once. 
+                                  Please ensure you have properly read and verified all data before proceeding.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Review Again</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleExecuteAllProposals(group.messageIndex)}
+                                  className="bg-primary text-primary-foreground"
+                                >
+                                  Yes, I'm sure
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                      {group.proposals.map((proposal, pIdx) => (
+                        <Card
+                          key={`${group.messageIndex}-${pIdx}`}
+                          className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col"
+                        >
+                          <CardHeader className="py-3 shrink-0">
+                            <div className="flex items-center gap-2">
+                              <Info className="w-4 h-4 text-primary" />
+                              <CardTitle className="text-sm">
+                                Proposed {proposal.type} {proposal.action}
+                              </CardTitle>
+                            </div>
+                            {proposal.explanation && (
+                              <CardDescription className="text-xs break-words">
+                                {proposal.explanation}
+                              </CardDescription>
+                            )}
+                          </CardHeader>
+                          <CardContent className="py-3">
+                            <div className="text-[11px] bg-background p-2 rounded border max-h-48 overflow-auto">
+                              <pre className="whitespace-pre-wrap break-words">
+                                {JSON.stringify(proposal.data, null, 2)}
+                              </pre>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="py-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs px-2 sm:px-3"
+                              onClick={() => {
+                                setMessages(prev => prev.map((msg, mIdx) => {
+                                  if (mIdx === group.messageIndex && msg.proposals) {
+                                    return { ...msg, proposals: msg.proposals.filter((_, i) => i !== pIdx) };
+                                  }
+                                  return msg;
+                                }));
+                              }}
+                            >
+                              <X className="w-3 h-3 mr-1" /> Dismiss
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs px-2 sm:px-3"
+                              disabled={isExecuting}
+                              onClick={() => handleExecuteProposal(proposal, group.messageIndex, pIdx)}
+                            >
+                              {isExecuting ? (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <Check className="w-3 h-3 mr-1" />
+                              )}
+                              Accept Change
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
