@@ -31,6 +31,12 @@ export type ChatProposal = {
   explanation?: string;
 };
 
+export type ChatSource = {
+  title?: string;
+  url?: string;
+  query?: string;
+};
+
 const MAX_CHAT_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_ATTACHMENT_TEXT_CHARS = 200_000;
 
@@ -479,6 +485,7 @@ Always be professional and helpful.`;
   }
   const proposals: ChatProposal[] = [];
   const debugLogs: any[] = [];
+  const searchSources: ChatSource[] = [];
 
   // Handle function calls in a loop to allow multiple steps
   let functionCalls = response.response.functionCalls();
@@ -499,6 +506,15 @@ Always be professional and helpful.`;
               result = { error: "Missing query." };
             } else {
               result = await runWebSearch(call.args.query as string);
+              if (Array.isArray(result?.sources)) {
+                for (const source of result.sources) {
+                  searchSources.push({
+                    title: source.title,
+                    url: source.url,
+                    query: result.query,
+                  });
+                }
+              }
             }
             break;
           case "searchMetadata":
@@ -594,6 +610,9 @@ Always be professional and helpful.`;
   return {
     message: responseText,
     proposals: proposals.length > 0 ? proposals : undefined,
+    sources: searchSources.length > 0
+      ? Array.from(new Map(searchSources.filter(s => s.url).map(s => [s.url!, s])).values())
+      : undefined,
     debug: options?.debug ? debugLogs : undefined
   };
 }

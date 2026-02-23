@@ -4,10 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Loader2, Check, X, Info, AlertCircle, Paperclip } from "lucide-react";
+import { Send, Sparkles, Loader2, Check, X, Info, Paperclip } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { upload } from "@vercel/blob/client";
@@ -28,6 +27,7 @@ type Message = {
   content: string;
   proposals?: any[];
   attachments?: { name: string; size: number; mimeType?: string }[];
+  sources?: { title?: string; url?: string; query?: string }[];
 };
 
 export default function AiChat() {
@@ -203,7 +203,8 @@ export default function AiChat() {
         { 
           role: "assistant", 
           content: data.message, 
-          proposals: data.proposals
+          proposals: data.proposals,
+          sources: data.sources,
         },
       ]);
     } catch (error: any) {
@@ -329,7 +330,7 @@ export default function AiChat() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -343,20 +344,20 @@ export default function AiChat() {
       </div>
 
       <div
-        className={`grid gap-6 ${
+        className={`grid gap-6 min-h-0 ${
           hasProposals ? "grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : "grid-cols-1"
         }`}
       >
         <Card
-          className={`flex flex-col min-h-[560px] ${
-            hasProposals ? "xl:h-[calc(100vh-240px)]" : "xl:h-[calc(100vh-220px)]"
+          className={`flex flex-col min-h-[520px] ${
+            hasProposals ? "xl:h-[calc(100vh-280px)]" : "xl:h-[calc(100vh-250px)]"
           }`}
         >
           <CardHeader className="pb-3">
             <CardTitle>Conversation</CardTitle>
             <CardDescription>AI suggestions require confirmation before any changes are applied.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-hidden relative">
+          <CardContent className="flex-1 overflow-hidden relative min-h-0">
             <ScrollArea className="h-full pr-4" ref={scrollRef}>
               <div className="space-y-6">
                 {messages.length === 0 && (
@@ -380,7 +381,7 @@ export default function AiChat() {
                     }`}
                   >
                     <div
-                      className={`max-w-[95%] rounded-lg p-3 break-words ${
+                      className={`max-w-[95%] rounded-2xl px-4 py-3 break-words shadow-sm ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
@@ -401,6 +402,35 @@ export default function AiChat() {
                         </div>
                       )}
                     </div>
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="mt-3 w-full max-w-[95%] rounded-2xl border bg-background px-4 py-3 text-xs shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Sources
+                          </span>
+                          <Badge variant="secondary">{message.sources.length}</Badge>
+                        </div>
+                        <div className="mt-2 space-y-2">
+                          {message.sources.map((source) => (
+                            <div key={source.url} className="flex flex-col gap-1">
+                              <a
+                                href={source.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline-offset-4 hover:underline break-words"
+                              >
+                                {source.title || source.url}
+                              </a>
+                              {source.query && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  Query: {source.query}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {isSending && (
@@ -416,40 +446,43 @@ export default function AiChat() {
           </CardContent>
           <CardFooter className="border-t bg-background">
             <div className="w-full space-y-3">
-              <div className="p-3 rounded-lg border bg-yellow-50 border-yellow-100 flex gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-yellow-700 leading-relaxed">
-                  The AI can search the database and suggest changes. 
-                  Always verify data before accepting a proposal.
-                </p>
-              </div>
-
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask the AI to search metadata, licenses, or tasks..."
-                rows={4}
-                className="resize-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
-              <div className="space-y-2">
-                <Label htmlFor="ai-chat-attachment">Attachment (PDF, DOCX, XLSX, JSON, YAML, images, etc.)</Label>
-                <Input
-                  id="ai-chat-attachment"
-                  type="file"
-                  accept={ACCEPTED_FILE_TYPES}
-                  onChange={handleFileChange}
-                  ref={fileInputRef}
-                  className="cursor-pointer"
-                />
+              <div className="space-y-3">
+                <div className="relative">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask the AI to search metadata, licenses, or tasks..."
+                    rows={3}
+                    className="resize-none pr-12"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-2 top-2 h-8 w-8"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label="Attach file"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    id="ai-chat-attachment"
+                    type="file"
+                    accept={ACCEPTED_FILE_TYPES}
+                    onChange={handleFileChange}
+                    ref={fileInputRef}
+                    className="hidden"
+                  />
+                </div>
                 {attachment && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{attachment.name}</span>
+                    <span className="truncate">{attachment.name}</span>
                     <Button
                       type="button"
                       size="sm"
@@ -466,13 +499,8 @@ export default function AiChat() {
                     </Button>
                   </div>
                 )}
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] text-muted-foreground">
-                  Attachments are routed through private Vercel Blob storage (required over 4.5MB).
-                </p>
                 <Button
-                  className="w-full sm:w-auto"
+                  className="w-full"
                   onClick={handleSend}
                   disabled={isSending || (!input.trim() && !attachment)}
                 >
@@ -489,7 +517,7 @@ export default function AiChat() {
         </Card>
 
         {hasProposals && (
-          <Card className="flex flex-col min-h-[560px] xl:h-[calc(100vh-240px)]">
+          <Card className="flex flex-col min-h-[520px] xl:h-[calc(100vh-280px)]">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -499,7 +527,7 @@ export default function AiChat() {
                 <Badge variant="secondary">{proposalCount}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden">
+            <CardContent className="flex-1 overflow-hidden min-h-0">
               <ScrollArea className="h-full pr-2">
                 <div className="space-y-6">
                   {proposalGroups.map((group) => (
