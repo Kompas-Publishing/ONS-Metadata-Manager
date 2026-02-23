@@ -37,6 +37,9 @@ export class AiService {
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
       return XLSX.utils.sheet_to_csv(worksheet);
+    } else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      return result.value;
     }
     // Fallback for other potential text formats
     return fileBuffer.toString("utf-8");

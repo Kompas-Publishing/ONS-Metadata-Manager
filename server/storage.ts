@@ -5,6 +5,7 @@ import {
   userDefinedTags,
   groups,
   licenses,
+  metadataToLicenses,
   tasks,
   type User,
   type UpsertUser,
@@ -26,6 +27,9 @@ import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
 import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
+// Extend MetadataFile type to include licenseIds array
+export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
@@ -35,22 +39,22 @@ export interface IStorage {
   
   peekNextId(): Promise<string>;
   consumeNextId(): Promise<string>;
-  getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined>;
-  getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
-  getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]>;
-  getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
-  createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
-  updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
-  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number>;
+  getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
+  getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFileWithLicenses[]>;
+  getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses>;
+  updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
+  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
-  createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createBatchMetadataFiles(batch: BatchCreate & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }>;
-  getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]>;
-  getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]>;
-  getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }>;
-  searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]>;
+  getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFileWithLicenses | null; next: MetadataFileWithLicenses | null }>;
+  searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   searchLicenses(keyword: string): Promise<License[]>;
-  searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
   
   getUserTags(userId: string, type: string): Promise<UserDefinedTag[]>;
   createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag>;
@@ -81,7 +85,7 @@ export interface IStorage {
   deleteGroup(groupId: string): Promise<boolean>;
 
   // Multi-batch creation
-  createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
 
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
@@ -89,12 +93,12 @@ export interface IStorage {
   listLicenses(): Promise<License[]>;
   updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
   deleteLicense(id: string): Promise<boolean>;
-  generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]>;
+  generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFileWithLicenses[]>;
 
   // Task Management
   createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
   bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]>;
-  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
@@ -122,15 +126,22 @@ function parseMetadataId(id: string): number {
   return segment1 + segment2 + segment3;
 }
 
-function normalizeMetadataFile(file: MetadataFile): MetadataFile {
+function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = []): MetadataFileWithLicenses {
   // Normalize breakTimes and ensure breakTime is synced
   const breakTimes = file.breakTimes || (file.breakTime ? [file.breakTime] : []);
   const breakTime = breakTimes.length > 0 ? breakTimes[0] : file.breakTime;
   
+  // Combine legacy licenseId with many-to-many licenseIds
+  const licenseIds = [...linkedLicenseIds];
+  if (file.licenseId && !licenseIds.includes(file.licenseId)) {
+    licenseIds.push(file.licenseId);
+  }
+
   return {
     ...file,
     breakTime,
     breakTimes,
+    licenseIds,
   };
 }
 
@@ -227,7 +238,7 @@ export class DatabaseStorage implements IStorage {
     return formatMetadataId(nextId);
   }
 
-  async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined> {
+  async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
     
@@ -242,14 +253,26 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const [file] = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(and(...whereConditions));
-    return file ? normalizeMetadataFile(file) : undefined;
+
+    if (results.length === 0) return undefined;
+
+    const file = results[0].file;
+    const linkedLicenseIds = results
+      .map(r => r.licenseLink)
+      .filter((id): id is string => id !== null);
+
+    return normalizeMetadataFile(file, linkedLicenseIds);
   }
 
-  async getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]> {
+  async getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
     if (ids.length === 0) {
       return [];
     }
@@ -268,14 +291,30 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(and(...whereConditions));
-    return files.map(normalizeMetadataFile);
+
+    // Group by file ID to handle multiple licenses per file
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]> {
+  async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
@@ -291,18 +330,37 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (licenseId) {
-      whereConditions.push(eq(metadataFiles.licenseId, licenseId));
+      // Find files linked to this license either via legacy or join table
+      whereConditions.push(or(
+        eq(metadataFiles.licenseId, licenseId),
+        sql`${metadataFiles.id} IN (SELECT metadata_file_id FROM metadata_to_licenses WHERE license_id = ${licenseId})`
+      ));
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(metadataFiles.createdAt));
-    return files.map(normalizeMetadataFile);
+
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]> {
+  async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
@@ -317,25 +375,42 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(metadataFiles.createdAt))
       .limit(limit);
-    return files.map(normalizeMetadataFile);
+
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile> {
+  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, ...data } = file;
+    
     // Normalize breakTimes array - filter empty strings and trim
-    const normalizedBreakTimes = (file.breakTimes || [])
+    const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
     
     // Compute breakTime from normalized breakTimes, or use provided breakTime
     const normalizedBreakTime = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes[0] 
-      : (file.breakTime && file.breakTime.trim() ? file.breakTime.trim() : null);
+      : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
     
     // Ensure breakTimes is populated from breakTime if empty
     const finalBreakTimes = normalizedBreakTimes.length > 0 
@@ -343,11 +418,11 @@ export class DatabaseStorage implements IStorage {
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
     
     const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
-      ...file,
+      ...data,
       breakTime: normalizedBreakTime,
       breakTimes: finalBreakTimes,
       id,
-      createdBy: permissions.user.id,
+      createdBy: permissions.userId,
     };
     
     if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
@@ -358,10 +433,19 @@ export class DatabaseStorage implements IStorage {
       .insert(metadataFiles)
       .values(fileData)
       .returning();
-    return created;
+
+    if (licenseIds && licenseIds.length > 0) {
+      const links = licenseIds.map(lId => ({
+        metadataFileId: id,
+        licenseId: lId
+      }));
+      await db.insert(metadataToLicenses).values(links);
+    }
+
+    return normalizeMetadataFile(created, licenseIds || []);
   }
 
-  async updateMetadataFile(id: string, file: Partial<InsertMetadataFile>, permissions: UserPermissions): Promise<MetadataFile | undefined> {
+  async updateMetadataFile(id: string, file: Partial<InsertMetadataFile> & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
     
@@ -375,16 +459,18 @@ export class DatabaseStorage implements IStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
+
+    const { licenseIds, ...data } = file;
     
     // Normalize breakTimes array - filter empty strings and trim
-    const normalizedBreakTimes = (file.breakTimes || [])
+    const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
     
     // Compute breakTime from normalized breakTimes, or use provided breakTime
     const normalizedBreakTime = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes[0] 
-      : (file.breakTime && file.breakTime.trim() ? file.breakTime.trim() : null);
+      : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
     
     // Ensure breakTimes is populated from breakTime if empty
     const finalBreakTimes = normalizedBreakTimes.length > 0 
@@ -394,14 +480,40 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(metadataFiles)
       .set({
-        ...file,
+        ...data,
         breakTime: normalizedBreakTime,
         breakTimes: finalBreakTimes,
         updatedAt: new Date(),
       })
       .where(and(...whereConditions))
       .returning();
-    return updated;
+
+    if (!updated) return undefined;
+
+    // Update join table if licenseIds provided
+    if (licenseIds !== undefined) {
+      // Clear existing
+      await db.delete(metadataToLicenses).where(eq(metadataToLicenses.metadataFileId, id));
+      
+      // Add new
+      if (licenseIds.length > 0) {
+        const links = licenseIds.map(lId => ({
+          metadataFileId: id,
+          licenseId: lId
+        }));
+        await db.insert(metadataToLicenses).values(links);
+      }
+    }
+
+    // Fetch final license set
+    const finalLinks = await db
+      .select()
+      .from(metadataToLicenses)
+      .where(eq(metadataToLicenses.metadataFileId, id));
+    
+    const finalLicenseIds = finalLinks.map(l => l.licenseId);
+
+    return normalizeMetadataFile(updated, finalLicenseIds);
   }
 
   async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {

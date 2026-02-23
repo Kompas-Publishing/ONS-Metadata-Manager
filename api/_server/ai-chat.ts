@@ -168,17 +168,22 @@ PERMISSION RULES:
 LANGUAGE RULES:
 - IMPORTANT: All descriptions (description, episodeDescription) MUST be in Dutch (Nederlands).
 - Other fields like titles should remain in their original language (usually German or English) unless instructed otherwise.
-- Your conversation with the user should be in the same language as their prompt (default to English if unsure).
+- CONVERSATION: Speak to the user in the SAME LANGUAGE they use to address you. If they speak English, you reply in English. If they speak Dutch, you reply in Dutch.
 
 DATA TYPE RULES:
 - IMPORTANT: The following fields MUST be arrays of strings: 'genre', 'actors', 'tags', 'breakTimes'.
 - Use EXACT database field names: 'seriesTitle', 'productionCountry', 'yearOfProduction', 'episodeTitle', 'episodeDescription'.
 
+TOOL USAGE RULES:
+- If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS. 
+- DO NOT just say "I have updated it" or "I will do it". You MUST call the 'proposeMetadataChange' or 'proposeLicenseChange' tool for EACH item you intend to change.
+- If updating multiple episodes, call the tool multiple times (once for each episode).
+- After calling a tool, inform the user that you have created a proposal for them to review and accept.
+
 GENERAL RULES:
 - If a user asks for something they don't have permission for, politely explain that you cannot access that information.
 - When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
 - If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
-- You can propose multiple changes at once if needed (e.g. for multiple episodes).
 - Changes are NOT applied automatically; they are shown to the user as proposals to accept or reject.
 - ALWAYS provide a text response explaining what you found or what you proposed. NEVER return an empty message.
 
@@ -331,16 +336,23 @@ export async function executeChatProposal(
     if (!permissions.permissions.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
     
     const normalizedData = normalizeMetadataData(proposal.data);
+    const { licenseIds, ...dataWithoutLicenses } = normalizedData as any;
 
     if (proposal.action === "create") {
       const validation = insertMetadataFileSchema.safeParse(normalizedData);
       if (!validation.success) throw new Error("Validation failed: " + JSON.stringify(validation.error.errors));
       
       const nextId = await storage.consumeNextId();
-      return await storage.createMetadataFile(validation.data, nextId, permissions);
+      return await storage.createMetadataFile({
+        ...validation.data,
+        licenseIds: licenseIds || []
+      }, nextId, permissions);
     } else {
       if (!proposal.id) throw new Error("ID required for update action.");
-      return await storage.updateMetadataFile(proposal.id, normalizedData, permissions);
+      return await storage.updateMetadataFile(proposal.id, {
+        ...normalizedData,
+        licenseIds: licenseIds
+      }, permissions);
     }
   } else if (proposal.type === "license") {
     if (!permissions.permissions.licenses.write) throw new Error("Permission denied: Cannot write licenses.");
