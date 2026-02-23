@@ -225,7 +225,9 @@ function normalizeMetadataData(data: Record<string, any>): Record<string, any> {
   return normalized;
 }
 
-async function getModel(systemPrompt: string) {
+const DEFAULT_CHAT_MODEL = "gemini-3-pro-preview";
+
+async function getModel(systemPrompt: string, modelOverride?: string) {
   const apiKey = (await storage.getSetting("ai_api_key"))?.value;
   const configuredModel = (await storage.getSetting("ai_model"))?.value;
 
@@ -235,78 +237,149 @@ async function getModel(systemPrompt: string) {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   // Use the configured model or fallback
-  const modelName = configuredModel || "gemini-3-pro-preview";
+  const modelName = modelOverride || configuredModel || DEFAULT_CHAT_MODEL;
   
-  const tools: any[] = [];
-  if (modelName.startsWith("gemini-3")) {
-    tools.push({ google_search: {} } as any);
-  }
-  tools.push({
-    functionDeclarations: [
-      {
-        name: "searchMetadata",
-        description: "Search the metadata database for files by keyword. Only returns data if user has read permissions.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            query: { type: "STRING", description: "The keyword to search for (e.g. series title, episode title)" }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "searchLicenses",
-        description: "Search the license database for contracts by keyword. Only returns data if user has read permissions.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            query: { type: "STRING", description: "The keyword to search for (e.g. distributor name, contract title)" }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "proposeMetadataChange",
-        description: "Propose a creation or update to a metadata file. The user must approve this change. Only works if user has write permissions.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            action: { type: "STRING", enum: ["create", "update"] },
-            id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
-            data: { 
-              type: "OBJECT", 
-              description: "The metadata fields to set. Use database field names like 'title', 'season', 'episode', 'duration', 'description', 'genre', 'actors', 'yearOfProduction', etc."
+  const tools: any[] = [
+    {
+      functionDeclarations: [
+        {
+          name: "searchWeb",
+          description: "Search the public web for up-to-date information and return sources.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "Search query." }
             },
-            explanation: { type: "STRING", description: "Explain why you are proposing this change (e.g. 'Found missing duration on IMDb')" }
-          },
-          required: ["action", "data", "explanation"]
-        }
-      },
-      {
-        name: "proposeLicenseChange",
-        description: "Propose a creation or update to a license. The user must approve this change. Only works if user has write permissions.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            action: { type: "STRING", enum: ["create", "update"] },
-            id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
-            data: { 
-              type: "OBJECT", 
-              description: "The license fields to set. Use database field names like 'name', 'distributor', 'licenseStart', 'licenseEnd', 'allowedRuns', etc."
+            required: ["query"]
+          }
+        },
+        {
+          name: "searchMetadata",
+          description: "Search the metadata database for files by keyword. Only returns data if user has read permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "The keyword to search for (e.g. series title, episode title)" }
             },
-            explanation: { type: "STRING", description: "Explain why you are proposing this change." }
-          },
-          required: ["action", "data", "explanation"]
+            required: ["query"]
+          }
+        },
+        {
+          name: "searchLicenses",
+          description: "Search the license database for contracts by keyword. Only returns data if user has read permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "The keyword to search for (e.g. distributor name, contract title)" }
+            },
+            required: ["query"]
+          }
+        },
+        {
+          name: "proposeMetadataChange",
+          description: "Propose a creation or update to a metadata file. The user must approve this change. Only works if user has write permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              action: { type: "STRING", enum: ["create", "update"] },
+              id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
+              data: { 
+                type: "OBJECT", 
+                description: "The metadata fields to set. Use database field names like 'title', 'season', 'episode', 'duration', 'description', 'genre', 'actors', 'yearOfProduction', etc."
+              },
+              explanation: { type: "STRING", description: "Explain why you are proposing this change (e.g. 'Found missing duration on IMDb')" }
+            },
+            required: ["action", "data", "explanation"]
+          }
+        },
+        {
+          name: "proposeLicenseChange",
+          description: "Propose a creation or update to a license. The user must approve this change. Only works if user has write permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              action: { type: "STRING", enum: ["create", "update"] },
+              id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
+              data: { 
+                type: "OBJECT", 
+                description: "The license fields to set. Use database field names like 'name', 'distributor', 'licenseStart', 'licenseEnd', 'allowedRuns', etc."
+              },
+              explanation: { type: "STRING", description: "Explain why you are proposing this change." }
+            },
+            required: ["action", "data", "explanation"]
+          }
         }
-      }
-    ]
-  });
+      ]
+    }
+  ];
 
   return genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: systemPrompt,
     tools,
   });
+}
+
+function extractSearchSources(response: any) {
+  const sources: { title?: string; url?: string }[] = [];
+  const grounding = response?.candidates?.[0]?.groundingMetadata;
+  const chunks = grounding?.groundingChunks || [];
+  for (const chunk of chunks) {
+    const web = chunk?.web || chunk?.document || {};
+    const url = web?.uri || web?.url || chunk?.uri || chunk?.url;
+    const title = web?.title || chunk?.title;
+    if (url) {
+      sources.push({ title, url });
+    }
+  }
+  const deduped = new Map<string, { title?: string; url?: string }>();
+  for (const source of sources) {
+    if (source.url && !deduped.has(source.url)) {
+      deduped.set(source.url, source);
+    }
+  }
+  return Array.from(deduped.values()).slice(0, 8);
+}
+
+async function runWebSearch(query: string) {
+  const apiKey = (await storage.getSetting("ai_api_key"))?.value;
+  const configuredModel = (await storage.getSetting("ai_model"))?.value;
+  if (!apiKey) {
+    throw new Error("AI not configured. Please set the Gemini API key in the Admin panel.");
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const searchModelName =
+    configuredModel && configuredModel.startsWith("gemini-3")
+      ? configuredModel
+      : DEFAULT_CHAT_MODEL;
+
+  const searchModel = genAI.getGenerativeModel({
+    model: searchModelName,
+    tools: [{ google_search: {} } as any],
+  });
+
+  const prompt = `Search the web for: ${query}\nReturn a concise factual summary with sources.`;
+  const result = await searchModel.generateContent(prompt);
+  const response = result.response;
+  let summary = "";
+  try {
+    summary = response.text();
+  } catch (error) {
+    summary = "";
+  }
+
+  return {
+    query,
+    summary: summary || "No summary returned.",
+    sources: extractSearchSources(response),
+    model: searchModelName,
+  };
+}
+
+function isToolUnsupportedError(error: any) {
+  const message = typeof error?.message === "string" ? error.message : "";
+  return message.includes("Tool use with function calling is unsupported by the model");
 }
 
 /**
@@ -342,6 +415,7 @@ TOOL USAGE RULES:
 - If updating multiple episodes, call the tool multiple times (once for each episode).
 - After calling a tool, summarize what you've done and inform the user you have created a proposal for them to review.
 - If you cannot find information on IMDb or elsewhere, tell the user exactly what you searched for.
+- If the user asks for up-to-date information or anything outside the database, use the 'searchWeb' tool and reference its sources.
 
 GENERAL RULES:
 - IMPORTANT: You MUST generate a text response AFTER calling tools. Never leave the final response blank.
@@ -353,7 +427,7 @@ GENERAL RULES:
 
 Always be professional and helpful.`;
 
-  const model = await getModel(systemPrompt);
+  let model = await getModel(systemPrompt);
 
   // Filter out any system messages from the history
   const chatHistory = messages
@@ -363,12 +437,15 @@ Always be professional and helpful.`;
       parts: [{ text: m.content || " " }] // Ensure content is never empty
     }));
 
-  const chat = model.startChat({
-    history: chatHistory,
-    generationConfig: {
-      maxOutputTokens: 4096,
-    }
-  });
+  const buildChat = (chatModel: any) =>
+    chatModel.startChat({
+      history: chatHistory,
+      generationConfig: {
+        maxOutputTokens: 4096,
+      }
+    });
+
+  let chat = buildChat(model);
 
   let currentPrompt = messages[messages.length - 1].content;
   if (messages[messages.length - 1].role !== "user") {
@@ -387,7 +464,19 @@ Always be professional and helpful.`;
     promptParts.push(...attachmentParts);
   }
 
-  let response = await chat.sendMessage(promptParts);
+  let response;
+  try {
+    response = await chat.sendMessage(promptParts);
+  } catch (error: any) {
+    if (isToolUnsupportedError(error)) {
+      console.warn("Configured model does not support tool use. Falling back to Gemini 3 Pro preview.");
+      model = await getModel(systemPrompt, DEFAULT_CHAT_MODEL);
+      chat = buildChat(model);
+      response = await chat.sendMessage(promptParts);
+    } else {
+      throw error;
+    }
+  }
   const proposals: ChatProposal[] = [];
   const debugLogs: any[] = [];
 
@@ -405,6 +494,13 @@ Always be professional and helpful.`;
       let result: any;
       try {
         switch (call.name) {
+          case "searchWeb":
+            if (!call.args?.query) {
+              result = { error: "Missing query." };
+            } else {
+              result = await runWebSearch(call.args.query as string);
+            }
+            break;
           case "searchMetadata":
             if (!permissions.permissions.metadata.read) {
               result = { error: "Permission denied: Cannot read metadata." };
