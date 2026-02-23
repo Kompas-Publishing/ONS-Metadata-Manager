@@ -8,6 +8,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Sparkles, Loader2, Check, X, Info, AlertCircle } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Message = {
   role: "user" | "assistant";
@@ -96,11 +107,10 @@ export default function AiChat() {
         description: "Change applied successfully.",
       });
 
-      // Update message to show specific proposal was applied
+      // Update message to remove the specific proposal that was applied
       setMessages(prev => prev.map((msg, i) => {
         if (i === messageIndex && msg.proposals) {
-          const newProposals = [...msg.proposals];
-          newProposals[proposalIndex] = { ...newProposals[proposalIndex], executed: true };
+          const newProposals = msg.proposals.filter((_, pIdx) => pIdx !== proposalIndex);
           return { ...msg, proposals: newProposals };
         }
         return msg;
@@ -115,6 +125,56 @@ export default function AiChat() {
         description: error.message || "Failed to execute proposal.",
         variant: "destructive",
       });
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleExecuteAllProposals = async (messageIndex: number) => {
+    const message = messages[messageIndex];
+    if (!message || !message.proposals || message.proposals.length === 0) return;
+
+    setIsExecuting(true);
+    const proposalsToExecute = [...message.proposals];
+    const successfulIndices: number[] = [];
+    let errors: string[] = [];
+
+    try {
+      // Execute all proposals in this message
+      for (let pIdx = 0; pIdx < proposalsToExecute.length; pIdx++) {
+        try {
+          await apiRequest("POST", "/api/ai/chat/execute-proposal", proposalsToExecute[pIdx]);
+          successfulIndices.push(pIdx);
+        } catch (err: any) {
+          errors.push(err.message || "Unknown error");
+        }
+      }
+
+      if (successfulIndices.length > 0) {
+        toast({
+          title: "Batch Success",
+          description: `Successfully applied ${successfulIndices.length} change(s).`,
+        });
+
+        // Remove only the successfully executed proposals
+        setMessages(prev => prev.map((msg, i) => {
+          if (i === messageIndex && msg.proposals) {
+            const newProposals = msg.proposals.filter((_, pIdx) => !successfulIndices.includes(pIdx));
+            return { ...msg, proposals: newProposals };
+          }
+          return msg;
+        }));
+
+        queryClient.invalidateQueries();
+      }
+
+      if (errors.length > 0) {
+        toast({
+          title: "Partial Failure",
+          description: `${errors.length} proposal(s) failed to apply.`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsExecuting(false);
     }
@@ -185,6 +245,42 @@ export default function AiChat() {
 
                     {message.proposals && message.proposals.length > 0 && (
                       <div className="space-y-4 mt-4 w-full max-w-full min-w-0">
+                        {message.proposals.length > 1 && (
+                          <div className="flex justify-end px-1">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary" 
+                                  className="h-8 font-semibold shadow-sm border border-primary/20"
+                                  disabled={isExecuting}
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                                  Accept All ({message.proposals.length})
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will apply all {message.proposals.length} proposed changes at once. 
+                                    Please ensure you have properly read and verified all data before proceeding.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Review Again</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleExecuteAllProposals(index)}
+                                    className="bg-primary text-primary-foreground"
+                                  >
+                                    Yes, I'm sure
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
+
                         {message.proposals.map((proposal, pIdx) => (
                           <Card key={pIdx} className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col">
                             <CardHeader className="py-3 shrink-0">
@@ -204,42 +300,34 @@ export default function AiChat() {
                               </pre>
                             </CardContent>
                             <CardFooter className="py-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
-                              {proposal.executed ? (
-                                <div className="flex items-center gap-1 text-green-600 text-xs font-medium">
-                                  <Check className="w-4 h-4" /> Applied
-                                </div>
-                              ) : (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 text-xs px-2 sm:px-3"
-                                    onClick={() => {
-                                      setMessages(prev => prev.map((msg, mIdx) => {
-                                        if (mIdx === index && msg.proposals) {
-                                          return { ...msg, proposals: msg.proposals.filter((_, i) => i !== pIdx) };
-                                        }
-                                        return msg;
-                                      }));
-                                    }}
-                                  >
-                                    <X className="w-3 h-3 mr-1" /> Dismiss
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="h-8 text-xs px-2 sm:px-3"
-                                    disabled={isExecuting}
-                                    onClick={() => handleExecuteProposal(proposal, index, pIdx)}
-                                  >
-                                    {isExecuting ? (
-                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    ) : (
-                                      <Check className="w-3 h-3 mr-1" />
-                                    )}
-                                    Accept Change
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs px-2 sm:px-3"
+                                onClick={() => {
+                                  setMessages(prev => prev.map((msg, mIdx) => {
+                                    if (mIdx === index && msg.proposals) {
+                                      return { ...msg, proposals: msg.proposals.filter((_, i) => i !== pIdx) };
+                                    }
+                                    return msg;
+                                  }));
+                                }}
+                              >
+                                <X className="w-3 h-3 mr-1" /> Dismiss
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs px-2 sm:px-3"
+                                disabled={isExecuting}
+                                onClick={() => handleExecuteProposal(proposal, index, pIdx)}
+                              >
+                                {isExecuting ? (
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                ) : (
+                                  <Check className="w-3 h-3 mr-1" />
+                                )}
+                                Accept Change
+                              </Button>
                             </CardFooter>
                           </Card>
                         ))}
