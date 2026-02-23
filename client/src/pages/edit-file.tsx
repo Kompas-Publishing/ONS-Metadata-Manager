@@ -12,6 +12,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { InsertMetadataFile, MetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
+type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
+
 export default function EditFile() {
   const [, params] = useRoute("/edit/:id");
   const [, setLocation] = useLocation();
@@ -47,7 +49,7 @@ export default function EditFile() {
     }
   }, [authLoading, canWriteMetadata, params?.id, toast, setLocation]);
 
-  const { data: file, isLoading } = useQuery<MetadataFile>({
+  const { data: file, isLoading } = useQuery<MetadataFileWithLicenses>({
     queryKey: ["/api/metadata", params?.id],
     enabled: !!params?.id && canWriteMetadata,
   });
@@ -58,7 +60,7 @@ export default function EditFile() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: InsertMetadataFile) => {
+    mutationFn: async (data: InsertMetadataFile & { licenseIds?: string[] }) => {
       return await apiRequest("PATCH", `/api/metadata/${params?.id}`, data);
     },
     onSuccess: () => {
@@ -88,11 +90,11 @@ export default function EditFile() {
     },
   });
 
-  const handleSubmit = (data: InsertMetadataFile) => {
+  const handleSubmit = (data: InsertMetadataFile & { licenseIds?: string[] }) => {
     updateMutation.mutate({ ...data, draft: 0 });
   };
 
-  const handleSaveDraft = (data: InsertMetadataFile) => {
+  const handleSaveDraft = (data: InsertMetadataFile & { licenseIds?: string[] }) => {
     updateMutation.mutate({ ...data, draft: 1 });
   };
 
@@ -181,7 +183,7 @@ export default function EditFile() {
             originalFilename: file.originalFilename ?? "",
             googleDriveLink: file.googleDriveLink ?? "",
             draft: file.draft ?? 0,
-            licenseId: file.licenseId || undefined,
+            licenseIds: file.licenseIds || (file.licenseId ? [file.licenseId] : []),
           }}
           onSubmit={handleSubmit}
           onSaveDraft={handleSaveDraft}
@@ -234,4 +236,13 @@ export default function EditFile() {
       )}
     </div>
   );
+}
+
+// Helper to determine the correct data type for the mutation
+function prepareMutationData(data: InsertMetadataFile & { licenseIds?: string[] }): InsertMetadataFile & { licenseIds?: string[] } {
+  const { licenseId, licenseIds, ...rest } = data;
+  return {
+    ...rest,
+    licenseIds: licenseIds || (licenseId ? [licenseId] : []),
+  };
 }

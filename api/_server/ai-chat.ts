@@ -178,9 +178,11 @@ TOOL USAGE RULES:
 - If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS. 
 - DO NOT just say "I have updated it" or "I will do it". You MUST call the 'proposeMetadataChange' or 'proposeLicenseChange' tool for EACH item you intend to change.
 - If updating multiple episodes, call the tool multiple times (once for each episode).
-- After calling a tool, inform the user that you have created a proposal for them to review and accept.
+- After calling a tool, summarize what you've done and inform the user you have created a proposal for them to review.
+- If you cannot find information on IMDb or elsewhere, tell the user exactly what you searched for.
 
 GENERAL RULES:
+- IMPORTANT: You MUST generate a text response AFTER calling tools. Never leave the final response blank.
 - If a user asks for something they don't have permission for, politely explain that you cannot access that information.
 - When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
 - If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
@@ -309,11 +311,12 @@ Always be professional and helpful.`;
 
   if (!responseText || responseText.trim() === "") {
     if (proposals.length > 0) {
-      responseText = `I have generated ${proposals.length} proposal${proposals.length > 1 ? "s" : ""} for you to review based on the information I found.`;
-    } else if (debugLogs.length > 0) {
-      responseText = "I've searched the database and processed your request. Is there anything specific you'd like me to show you?";
+      responseText = `I have generated ${proposals.length} proposal${proposals.length > 1 ? "s" : ""} for you to review and accept. These include updates for: ${proposals.map(p => p.data.title || p.data.seriesTitle || p.type).join(", ")}.`;
+    } else if (debugLogs.some(log => log.type === 'tool_call')) {
+      const toolNames = Array.from(new Set(debugLogs.filter(d => d.type === "tool_call").map(d => d.name)));
+      responseText = `I've performed a search via the ${toolNames.join(", ")} tool(s) but didn't find specific changes to propose. You can view the search results to see what I found.`;
     } else {
-      responseText = "I've processed your request. How else can I help you today?";
+      responseText = "I've analyzed your request. Please clarify what information you'd like me to find or change, and I will do my best to assist.";
     }
   }
 

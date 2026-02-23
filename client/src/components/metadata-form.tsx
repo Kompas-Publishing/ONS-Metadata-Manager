@@ -49,6 +49,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { MultiSelect, Option } from "./ui/multi-select";
 
 // Predefined seasonal/event tags
 const PREDEFINED_TAGS = [
@@ -62,9 +63,9 @@ const PREDEFINED_TAGS = [
 ] as const;
 
 interface MetadataFormProps {
-  defaultValues?: Partial<InsertMetadataFile>;
-  onSubmit: (data: InsertMetadataFile) => void;
-  onSaveDraft?: (data: InsertMetadataFile) => void;
+  defaultValues?: Partial<InsertMetadataFile & { licenseIds?: string[] }>;
+  onSubmit: (data: InsertMetadataFile & { licenseIds?: string[] }) => void;
+  onSaveDraft?: (data: InsertMetadataFile & { licenseIds?: string[] }) => void;
   isPending: boolean;
   submitLabel: string;
   generatedId?: string;
@@ -88,13 +89,18 @@ export function MetadataForm({
     queryKey: ["/api/licenses"],
   });
 
+  const licenseOptions: Option[] = licenses?.map(l => ({ value: l.id, label: l.name })) || [];
+
   // Compute breakTimes initialization properly
   const initialBreakTimes =
     defaultValues?.breakTimes ||
     (defaultValues?.breakTime ? [defaultValues.breakTime] : []);
 
-  const form = useForm<InsertMetadataFile>({
-    resolver: zodResolver(insertMetadataFileSchema),
+  // Compute licenseIds initialization
+  const initialLicenseIds = defaultValues?.licenseIds || (defaultValues?.licenseId ? [defaultValues.licenseId] : []);
+
+  const form = useForm<InsertMetadataFile & { licenseIds?: string[] }>({
+    resolver: zodResolver(insertMetadataFileSchema.extend({ licenseIds: z.array(z.string()).optional() })),
     defaultValues: {
       title: "",
       season: undefined,
@@ -127,7 +133,8 @@ export function MetadataForm({
       segmented: undefined,
       subtitles: undefined,
       draft: 0,
-      licenseId: undefined,
+      licenseId: undefined, // Keep for legacy
+      licenseIds: initialLicenseIds,
       ...defaultValues,
     },
   });
@@ -166,10 +173,10 @@ export function MetadataForm({
     );
   };
 
-  const handleSubmit = (data: InsertMetadataFile) => {
+  const handleSubmit = (data: InsertMetadataFile & { licenseIds?: string[] }) => {
     const convertedData = {
       ...data,
-      licenseId: data.licenseId === "none" ? null : data.licenseId,
+      licenseId: data.licenseIds && data.licenseIds.length > 0 ? data.licenseIds[0] : null, // Set primary legacy ID
       breakTime:
         data.breakTimes && data.breakTimes.length > 0 ? data.breakTimes[0] : "",
       breakTimes: data.breakTimes || [],
@@ -207,35 +214,19 @@ export function MetadataForm({
               <div className="grid grid-cols-1 gap-6 max-w-md">
                 <FormField
                   control={form.control}
-                  name="licenseId"
+                  name="licenseIds"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>License Association</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || undefined}
+                      <MultiSelect
+                        options={licenseOptions}
+                        value={licenseOptions.filter(opt => field.value?.includes(opt.value))}
+                        onChange={(selectedOptions) => field.onChange(selectedOptions.map(opt => opt.value))}
+                        placeholder="Select licenses..."
                         disabled={readOnly}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            {readOnly && field.value ? (
-                              <span>{licenses?.find(l => l.id === field.value)?.name || "Linked License"}</span>
-                            ) : (
-                              <SelectValue placeholder="Select a license (optional)" />
-                            )}
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none" onClick={() => field.onChange(null)}>None</SelectItem>
-                          {licenses?.map((license) => (
-                            <SelectItem key={license.id} value={license.id}>
-                              {license.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <FormDescription>
-                        Link this file to a content license/contract
+                        Link this file to one or more content licenses/contracts.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -249,24 +240,6 @@ export function MetadataForm({
             <h3 className="text-xl font-semibold mb-6">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <fieldset disabled={readOnly} className="contents">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title *</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter title"
-                          {...field}
-                          data-testid="input-title"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="category"

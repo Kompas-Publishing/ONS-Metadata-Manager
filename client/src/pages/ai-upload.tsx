@@ -159,7 +159,7 @@ export default function AiUpload() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB new limit
+      const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB new limit with vercel blob
       
       if (selectedFile.size > MAX_FILE_SIZE) {
         toast({
@@ -430,7 +430,7 @@ export default function AiUpload() {
                           {[
                             { label: "Group by season", icon: Layers, text: "Group these by season" },
                             { label: "Mark as movies", icon: FileText, text: "These are all movies, not series" },
-                            { label: "Fix dates to 2025", icon: CalendarIcon, text: "The license start date should be 2025" }
+                            { label: "Seperate licenses", icon: CalendarIcon, text: "Seperate into individual licenses based on the content, seasons, end dates, prices, allowed reruns, etc." }
                           ].map((suggestion) => (
                             <button
                               key={suggestion.label}
