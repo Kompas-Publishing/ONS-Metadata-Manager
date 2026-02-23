@@ -3,11 +3,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Loader2, Check, X, Info, AlertCircle } from "lucide-react";
+import { Send, Sparkles, Loader2, Check, X, Info, AlertCircle, Paperclip } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { upload } from "@vercel/blob/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   proposals?: any[];
+  attachments?: { name: string; size: number; mimeType?: string }[];
 };
 
 export default function AiChat() {
@@ -31,14 +34,73 @@ export default function AiChat() {
   const { toast } = useToast();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.title = "AI Chat | ONS Broadcast Portal";
   }, []);
+
+  const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
+  const ALLOWED_EXTENSIONS = [
+    ".pdf",
+    ".docx",
+    ".rtf",
+    ".txt",
+    ".csv",
+    ".tsv",
+    ".xlsx",
+    ".xls",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+  ];
+
+  const ALLOWED_MIME_TYPES = new Set([
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/rtf",
+    "text/plain",
+    "text/csv",
+    "text/tab-separated-values",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "application/json",
+    "text/json",
+    "application/x-yaml",
+    "text/yaml",
+    "text/x-yaml",
+    "application/yaml",
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/bmp",
+    "image/tiff",
+  ]);
+
+  const ACCEPTED_FILE_TYPES = ALLOWED_EXTENSIONS.join(",");
+
+  const isAllowedFile = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    const ext = lowerName.includes(".") ? lowerName.slice(lowerName.lastIndexOf(".")) : "";
+    if (ALLOWED_EXTENSIONS.includes(ext)) return true;
+    if (file.type && ALLOWED_MIME_TYPES.has(file.type)) return true;
+    return false;
+  };
 
   // Use ResizeObserver to scroll when content height changes (like expanding proposal cards)
   useEffect(() => {
@@ -61,20 +123,78 @@ export default function AiChat() {
     return () => observer.disconnect();
   }, []);
 
-  const handleSend = async () => {
-    if (!input.trim() || isSending) return;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
 
-    const userMessage: Message = { role: "user", content: input };
+    if (!isAllowedFile(selected)) {
+      toast({
+        title: "Unsupported file type",
+        description: "Please upload documents, spreadsheets, PDFs, images, JSON, or YAML files.",
+        variant: "destructive",
+      });
+      e.target.value = "";
+      setAttachment(null);
+      return;
+    }
+
+    if (selected.size > MAX_FILE_SIZE) {
+      toast({
+        title: "File too large",
+        description: "Max file size is 100MB.",
+        variant: "destructive",
+      });
+      e.target.value = "";
+      setAttachment(null);
+      return;
+    }
+
+    setAttachment(selected);
+  };
+
+  const handleSend = async () => {
+    if (isSending) return;
+    const trimmedInput = input.trim();
+    if (!trimmedInput && !attachment) return;
+
+    const displayContent = trimmedInput || (attachment ? `Attached file: ${attachment.name}` : "");
+
+    const userMessage: Message = {
+      role: "user",
+      content: displayContent,
+      attachments: attachment
+        ? [{ name: attachment.name, size: attachment.size, mimeType: attachment.type }]
+        : undefined,
+    };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsSending(true);
+    const currentAttachment = attachment;
+    setAttachment(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
 
     try {
+      let blobUrl = "";
+      if (currentAttachment) {
+        const newBlob = await upload(currentAttachment.name, currentAttachment, {
+          access: "private",
+          handleUploadUrl: "/api/blob/upload",
+          clientPayload: JSON.stringify({ type: "ai-chat" }),
+        });
+        blobUrl = newBlob.url;
+      }
+
       const response = await apiRequest("POST", "/api/ai/chat", {
         messages: [...messages, userMessage].map((m) => ({
           role: m.role,
           content: m.content,
         })),
+        blobUrl: blobUrl || undefined,
+        fileName: currentAttachment?.name,
+        mimeType: currentAttachment?.type,
+        fileSize: currentAttachment?.size,
       });
 
       const data = await response.json();
@@ -241,6 +361,19 @@ export default function AiChat() {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-primary-foreground/90">
+                          {message.attachments.map((file) => (
+                            <span
+                              key={file.name}
+                              className="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1"
+                            >
+                              <Paperclip className="w-3 h-3" />
+                              {file.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {message.proposals && message.proposals.length > 0 && (
@@ -375,10 +508,43 @@ export default function AiChat() {
                 }
               }}
             />
+            <div className="space-y-2">
+              <Label htmlFor="ai-chat-attachment">Attachment (PDF, DOCX, XLSX, JSON, YAML, images, etc.)</Label>
+              <Input
+                id="ai-chat-attachment"
+                type="file"
+                accept={ACCEPTED_FILE_TYPES}
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                className="cursor-pointer"
+              />
+              {attachment && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{attachment.name}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2"
+                    onClick={() => {
+                      setAttachment(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Attachments are routed through private Vercel Blob storage (required over 4.5MB).
+              </p>
+            </div>
             <Button 
               className="w-full" 
               onClick={handleSend}
-              disabled={isSending || !input.trim()}
+              disabled={isSending || (!input.trim() && !attachment)}
             >
               {isSending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

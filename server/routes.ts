@@ -1972,7 +1972,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
         const debug = Boolean(req.body?.debug);
-        const result = await runAiChat(messages, permissions!, { debug });
+
+        const blobUrl = typeof req.body?.blobUrl === "string" ? req.body.blobUrl : "";
+        const fileName =
+          typeof req.body?.fileName === "string" && req.body.fileName.trim()
+            ? req.body.fileName
+            : "attachment";
+        const mimeTypeOverride = typeof req.body?.mimeType === "string" ? req.body.mimeType : undefined;
+        const MAX_CHAT_FILE_SIZE = 100 * 1024 * 1024;
+
+        let attachment;
+        if (blobUrl) {
+          let isBlobUrl = false;
+          try {
+            const parsed = new URL(blobUrl);
+            isBlobUrl = parsed.hostname.endsWith(".blob.vercel-storage.com");
+          } catch {
+            isBlobUrl = false;
+          }
+
+          if (!isBlobUrl) {
+            return res.status(400).json({ message: "Invalid blob URL." });
+          }
+
+          const blobRes = await fetch(blobUrl);
+          if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+
+          const contentLength = blobRes.headers.get("content-length");
+          if (contentLength && Number(contentLength) > MAX_CHAT_FILE_SIZE) {
+            return res.status(400).json({ message: "File too large. Max file size is 100MB." });
+          }
+
+          const fileBuffer = Buffer.from(await blobRes.arrayBuffer());
+          const mimeType = blobRes.headers.get("content-type") || mimeTypeOverride || "application/octet-stream";
+
+          attachment = {
+            fileName,
+            mimeType,
+            buffer: fileBuffer,
+          };
+        }
+
+        const result = await runAiChat(messages, permissions!, { debug, attachment });
         return res.json(result);
       } catch (error: any) {
         console.error("Error in AI chat:", error);
@@ -2478,11 +2519,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!allowed) throw new Error("Forbidden: AI permission required");
           }
 
+          if (uploadType === "ai-chat") {
+            const { allowed } = await requirePermission(user.id, "aiChat");
+            if (!allowed) throw new Error("Forbidden: AI Chat permission required");
+          }
+
+          const imageTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/bmp",
+            "image/tiff",
+          ];
+
+          const aiUploadTypes = [
+            ...imageTypes,
+            "application/pdf",
+            "text/csv",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/plain",
+          ];
+
+          const aiChatTypes = [
+            ...imageTypes,
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/rtf",
+            "text/plain",
+            "text/csv",
+            "text/tab-separated-values",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "application/json",
+            "text/json",
+            "application/x-yaml",
+            "text/yaml",
+            "text/x-yaml",
+            "application/yaml",
+          ];
+
           return {
-            allowedContentTypes: [
-              "image/jpeg", "image/png", "image/gif", "image/webp",
-              "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"
-            ],
+            allowedContentTypes:
+              uploadType === "avatar"
+                ? imageTypes
+                : uploadType === "ai-chat"
+                  ? aiChatTypes
+                  : uploadType === "ai-upload"
+                    ? aiUploadTypes
+                    : imageTypes,
             addRandomSuffix: true,
             tokenPayload: JSON.stringify({
               userId: user.id,

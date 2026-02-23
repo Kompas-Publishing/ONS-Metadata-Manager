@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { extname } from "path";
+import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 import { storage } from "./storage.js";
 import type { UserPermissions } from "../_shared/types.js";
 import { 
@@ -14,6 +17,12 @@ export type ChatMessage = {
   name?: string;
 };
 
+export type ChatAttachment = {
+  fileName: string;
+  mimeType?: string;
+  buffer: Buffer;
+};
+
 export type ChatProposal = {
   type: "metadata" | "license" | "task";
   action: "create" | "update";
@@ -21,6 +30,155 @@ export type ChatProposal = {
   id?: string;
   explanation?: string;
 };
+
+const MAX_CHAT_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_ATTACHMENT_TEXT_CHARS = 200_000;
+
+const CHAT_ALLOWED_EXTENSIONS = new Set([
+  ".pdf",
+  ".docx",
+  ".rtf",
+  ".txt",
+  ".csv",
+  ".tsv",
+  ".xlsx",
+  ".xls",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tif",
+  ".tiff",
+]);
+
+const CHAT_ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/rtf",
+  "text/plain",
+  "text/csv",
+  "text/tab-separated-values",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/json",
+  "text/json",
+  "application/x-yaml",
+  "text/yaml",
+  "text/x-yaml",
+  "application/yaml",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/tiff",
+]);
+
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".rtf": "application/rtf",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
+  ".tsv": "text/tab-separated-values",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".xls": "application/vnd.ms-excel",
+  ".json": "application/json",
+  ".yaml": "application/x-yaml",
+  ".yml": "application/x-yaml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+};
+
+function resolveMimeType(fileName: string, mimeType?: string) {
+  const ext = extname(fileName).toLowerCase();
+  if (mimeType && mimeType !== "application/octet-stream") {
+    return mimeType;
+  }
+  return EXTENSION_MIME_MAP[ext] || mimeType || "application/octet-stream";
+}
+
+function assertAllowedChatAttachment(fileName: string, mimeType?: string) {
+  const ext = extname(fileName).toLowerCase();
+  const resolvedMime = resolveMimeType(fileName, mimeType);
+  const allowed = CHAT_ALLOWED_EXTENSIONS.has(ext) || CHAT_ALLOWED_MIME_TYPES.has(resolvedMime);
+  if (!allowed) {
+    throw new Error("Unsupported file type. Please upload documents, spreadsheets, PDFs, images, JSON, or YAML files.");
+  }
+  return resolvedMime;
+}
+
+async function extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {
+  if (
+    mimeType.startsWith("text/") ||
+    mimeType === "application/json" ||
+    mimeType === "text/json" ||
+    mimeType === "application/x-yaml" ||
+    mimeType === "text/yaml" ||
+    mimeType === "text/x-yaml" ||
+    mimeType === "application/yaml"
+  ) {
+    return fileBuffer.toString("utf-8");
+  }
+
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mimeType === "application/vnd.ms-excel"
+  ) {
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    return XLSX.utils.sheet_to_csv(worksheet);
+  }
+
+  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    const result = await mammoth.extractRawText({ buffer: fileBuffer });
+    return result.value;
+  }
+
+  if (mimeType === "application/rtf") {
+    return fileBuffer.toString("utf-8");
+  }
+
+  return fileBuffer.toString("utf-8");
+}
+
+async function buildAttachmentParts(attachment: ChatAttachment) {
+  if (attachment.buffer.length > MAX_CHAT_FILE_SIZE) {
+    throw new Error("File too large. Max file size is 100MB.");
+  }
+
+  const resolvedMime = assertAllowedChatAttachment(attachment.fileName, attachment.mimeType);
+  const ext = extname(attachment.fileName).toLowerCase();
+  const isPdf = resolvedMime === "application/pdf" || ext === ".pdf";
+  const isImage = resolvedMime.startsWith("image/");
+
+  if (isPdf || isImage) {
+    return [
+      { text: `Attachment: ${attachment.fileName}` },
+      { inlineData: { data: attachment.buffer.toString("base64"), mimeType: resolvedMime } },
+    ];
+  }
+
+  const extractedText = await extractTextFromBuffer(attachment.buffer, resolvedMime);
+  const trimmedText =
+    extractedText.length > MAX_ATTACHMENT_TEXT_CHARS
+      ? `${extractedText.slice(0, MAX_ATTACHMENT_TEXT_CHARS)}\n\n[Truncated]`
+      : extractedText;
+
+  return [{ text: `Attachment: ${attachment.fileName}\n\n${trimmedText}` }];
+}
 
 /**
  * Helper to normalize metadata fields before database operations.
@@ -77,73 +235,77 @@ async function getModel(systemPrompt: string) {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   // Use the configured model or fallback
-  const modelName = configuredModel || "gemini-1.5-pro";
+  const modelName = configuredModel || "gemini-3-pro-preview";
   
+  const tools: any[] = [];
+  if (modelName.startsWith("gemini-3")) {
+    tools.push({ google_search: {} } as any);
+  }
+  tools.push({
+    functionDeclarations: [
+      {
+        name: "searchMetadata",
+        description: "Search the metadata database for files by keyword. Only returns data if user has read permissions.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            query: { type: "STRING", description: "The keyword to search for (e.g. series title, episode title)" }
+          },
+          required: ["query"]
+        }
+      },
+      {
+        name: "searchLicenses",
+        description: "Search the license database for contracts by keyword. Only returns data if user has read permissions.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            query: { type: "STRING", description: "The keyword to search for (e.g. distributor name, contract title)" }
+          },
+          required: ["query"]
+        }
+      },
+      {
+        name: "proposeMetadataChange",
+        description: "Propose a creation or update to a metadata file. The user must approve this change. Only works if user has write permissions.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "update"] },
+            id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
+            data: { 
+              type: "OBJECT", 
+              description: "The metadata fields to set. Use database field names like 'title', 'season', 'episode', 'duration', 'description', 'genre', 'actors', 'yearOfProduction', etc."
+            },
+            explanation: { type: "STRING", description: "Explain why you are proposing this change (e.g. 'Found missing duration on IMDb')" }
+          },
+          required: ["action", "data", "explanation"]
+        }
+      },
+      {
+        name: "proposeLicenseChange",
+        description: "Propose a creation or update to a license. The user must approve this change. Only works if user has write permissions.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            action: { type: "STRING", enum: ["create", "update"] },
+            id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
+            data: { 
+              type: "OBJECT", 
+              description: "The license fields to set. Use database field names like 'name', 'distributor', 'licenseStart', 'licenseEnd', 'allowedRuns', etc."
+            },
+            explanation: { type: "STRING", description: "Explain why you are proposing this change." }
+          },
+          required: ["action", "data", "explanation"]
+        }
+      }
+    ]
+  });
+
   return genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: systemPrompt,
-    tools: [
-      {
-        functionDeclarations: [
-          {
-            name: "searchMetadata",
-            description: "Search the metadata database for files by keyword. Only returns data if user has read permissions.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                query: { type: "STRING", description: "The keyword to search for (e.g. series title, episode title)" }
-              },
-              required: ["query"]
-            }
-          },
-          {
-            name: "searchLicenses",
-            description: "Search the license database for contracts by keyword. Only returns data if user has read permissions.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                query: { type: "STRING", description: "The keyword to search for (e.g. distributor name, contract title)" }
-              },
-              required: ["query"]
-            }
-          },
-          {
-            name: "proposeMetadataChange",
-            description: "Propose a creation or update to a metadata file. The user must approve this change. Only works if user has write permissions.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                action: { type: "STRING", enum: ["create", "update"] },
-                id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
-                data: { 
-                  type: "OBJECT", 
-                  description: "The metadata fields to set. Use database field names like 'title', 'season', 'episode', 'duration', 'description', 'genre', 'actors', 'yearOfProduction', etc."
-                },
-                explanation: { type: "STRING", description: "Explain why you are proposing this change (e.g. 'Found missing duration on IMDb')" }
-              },
-              required: ["action", "data", "explanation"]
-            }
-          },
-          {
-            name: "proposeLicenseChange",
-            description: "Propose a creation or update to a license. The user must approve this change. Only works if user has write permissions.",
-            parameters: {
-              type: "OBJECT",
-              properties: {
-                action: { type: "STRING", enum: ["create", "update"] },
-                id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
-                data: { 
-                  type: "OBJECT", 
-                  description: "The license fields to set. Use database field names like 'name', 'distributor', 'licenseStart', 'licenseEnd', 'allowedRuns', etc."
-                },
-                explanation: { type: "STRING", description: "Explain why you are proposing this change." }
-              },
-              required: ["action", "data", "explanation"]
-            }
-          }
-        ]
-      }
-    ]
+    tools,
   });
 }
 
@@ -153,7 +315,7 @@ async function getModel(systemPrompt: string) {
 export async function runAiChat(
   messages: ChatMessage[],
   permissions: UserPermissions,
-  options?: { debug?: boolean }
+  options?: { debug?: boolean; attachment?: ChatAttachment }
 ) {
   const systemPrompt = `You are the ONS Broadcast Portal Assistant. 
 You help users manage metadata, licenses, and tasks.
@@ -213,7 +375,19 @@ Always be professional and helpful.`;
     return { message: "Last message was not from user." };
   }
 
-  let response = await chat.sendMessage(currentPrompt);
+  const promptText = currentPrompt?.trim()
+    ? currentPrompt
+    : options?.attachment
+      ? "Please analyze the attached file."
+      : " ";
+
+  const promptParts: any[] = [{ text: promptText }];
+  if (options?.attachment) {
+    const attachmentParts = await buildAttachmentParts(options.attachment);
+    promptParts.push(...attachmentParts);
+  }
+
+  let response = await chat.sendMessage(promptParts);
   const proposals: ChatProposal[] = [];
   const debugLogs: any[] = [];
 

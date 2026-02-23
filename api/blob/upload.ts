@@ -53,11 +53,57 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
           }
         }
 
+        if (uploadType === "ai-chat") {
+          const { allowed } = await checkPermission(user.id, "aiChat");
+          if (!allowed) {
+            throw new Error("You do not have permission to use AI Chat.");
+          }
+        }
+
+        const imageTypes = [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "image/bmp",
+          "image/tiff",
+        ];
+
+        const aiUploadTypes = [
+          ...imageTypes,
+          "application/pdf",
+          "text/csv",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "text/plain",
+        ];
+
+        const aiChatTypes = [
+          ...imageTypes,
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/rtf",
+          "text/plain",
+          "text/csv",
+          "text/tab-separated-values",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+          "application/json",
+          "text/json",
+          "application/x-yaml",
+          "text/yaml",
+          "text/x-yaml",
+          "application/yaml",
+        ];
+
         return {
-          allowedContentTypes: [
-            "image/jpeg", "image/png", "image/gif", "image/webp",
-            "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/plain"
-          ],
+          allowedContentTypes:
+            uploadType === "avatar"
+              ? imageTypes
+              : uploadType === "ai-chat"
+                ? aiChatTypes
+                : uploadType === "ai-upload"
+                  ? aiUploadTypes
+                  : imageTypes,
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             userId: user.id,
