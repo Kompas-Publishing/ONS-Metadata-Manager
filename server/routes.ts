@@ -15,7 +15,7 @@ import {
 } from "@shared/schema";
 import { create } from "xmlbuilder2";
 import { z } from "zod";
-import { getUserPermissions, requirePermission } from "./permissions";
+import { getUserPermissions, requirePermission, isValidBlobUrl } from "./permissions";
 import * as XLSX from "xlsx";
 import { rateLimit } from "express-rate-limit";
 import multer from "multer";
@@ -1983,15 +1983,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let attachment;
         if (blobUrl) {
-          let isBlobUrl = false;
-          try {
-            const parsed = new URL(blobUrl);
-            isBlobUrl = parsed.hostname.endsWith(".blob.vercel-storage.com");
-          } catch {
-            isBlobUrl = false;
-          }
-
-          if (!isBlobUrl) {
+          // Pentest Fix: Use centralized validation helper
+          if (!isValidBlobUrl(blobUrl)) {
             return res.status(400).json({ message: "Invalid blob URL." });
           }
 
@@ -2065,6 +2058,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let type = req.body.type || "license";
 
         if (req.body.blobUrl) {
+          // Pentest Fix: Validate blob URL before fetching
+          if (!isValidBlobUrl(req.body.blobUrl)) {
+            return res.status(400).json({ message: "Invalid blob URL origin" });
+          }
+
           const blobRes = await fetch(req.body.blobUrl, {
             headers: {
               'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
@@ -2118,6 +2116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let previousProposals = JSON.parse(req.body.previousProposals || "[]");
 
         if (req.body.blobUrl) {
+          // Pentest Fix: Validate blob URL before fetching
+          if (!isValidBlobUrl(req.body.blobUrl)) {
+            return res.status(400).json({ message: "Invalid blob URL origin" });
+          }
+
           const blobRes = await fetch(req.body.blobUrl, {
             headers: {
               'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
@@ -2603,6 +2606,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Vercel Blob upload handshake error:", error);
       return res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  /**
+   * Proxy endpoint to view private blobs.
+   * Requires authentication and strict URL validation to prevent SSRF and token leakage.
+   * Synced with Vercel serverless version.
+   */
+  app.get("/api/blob/view", isAuthenticated, async (req, res) => {
+    const { url } = req.query;
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ message: "Missing blob URL" });
+    }
+
+    // Pentest Fix: Use strict hostname validation instead of .includes()
+    if (!isValidBlobUrl(url)) {
+      console.warn(`Blocked potentially malicious blob proxy request to: ${url}`);
+      return res.status(403).json({ message: "Invalid blob URL origin" });
+    }
+
+    try {
+      const blobRes = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+        }
+      });
+
+      if (!blobRes.ok) {
+        return res.status(blobRes.status).json({ message: "Failed to retrieve blob" });
+      }
+
+      const contentType = blobRes.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+
+      const arrayBuffer = await blobRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return res.send(buffer);
+    } catch (error) {
+      console.error("Error proxying blob:", error);
+      return res.status(500).json({ message: "Error retrieving blob" });
     }
   });
 

@@ -1,6 +1,10 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { withCors, authenticate, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import type { VercelResponse } from "@vercel/node";
+import { apiHandler, requireAuth, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
+/**
+ * Proxy endpoint to view private blobs.
+ * Requires authentication and strict URL validation to prevent SSRF and token leakage.
+ */
 async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
@@ -12,8 +16,9 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
     return res.status(400).json({ message: "Missing blob URL" });
   }
 
-  // Ensure the URL belongs to our Vercel Storage
-  if (!url.includes('vercel-storage.com')) {
+  // Pentest Fix: Use strict hostname validation instead of .includes()
+  if (!isValidBlobUrl(url)) {
+    console.warn(`Blocked potentially malicious blob proxy request to: ${url}`);
     return res.status(403).json({ message: "Invalid blob URL origin" });
   }
 
@@ -45,4 +50,5 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   }
 }
 
-export default withCors(handler);
+// Pentest Fix: Wrap with requireAuth to ensure only authenticated users can use the proxy
+export default apiHandler(requireAuth(handler));

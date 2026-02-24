@@ -135,6 +135,25 @@ export function withCors(handler: ApiHandler): ApiHandler {
   };
 }
 
+/**
+ * Validates that a URL belongs to Vercel Blob storage.
+ * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
+ */
+export function isValidBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    
+    // Vercel Blob storage hostnames
+    return (
+      parsed.hostname === "blob.vercel-storage.com" ||
+      parsed.hostname.endsWith(".public.blob.vercel-storage.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function apiHandler(handler: ApiHandler): ApiHandler {
   return withCors(handler);
 }

@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
 import { runAiChat } from "../../_server/ai-chat.js";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
+import { apiHandler, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 export default apiHandler(
   requirePermission("aiChat")(async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -22,15 +22,8 @@ export default apiHandler(
 
       let attachment;
       if (blobUrl) {
-        let isBlobUrl = false;
-        try {
-          const parsed = new URL(blobUrl);
-          isBlobUrl = parsed.hostname.endsWith(".blob.vercel-storage.com");
-        } catch {
-          isBlobUrl = false;
-        }
-
-        if (!isBlobUrl) {
+        // Pentest Fix: Use centralized validation helper
+        if (!isValidBlobUrl(blobUrl)) {
           return res.status(400).json({ message: "Invalid blob URL." });
         }
 

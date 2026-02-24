@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { aiService } from "../_server/ai-service.js";
-import { withCors, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import { withCors, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import multer from "multer";
 
 // Multer configuration
@@ -45,6 +45,11 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       const body = JSON.parse(Buffer.concat(chunks).toString());
       
       if (body.blobUrl) {
+        // Pentest Fix: Validate blob URL before fetching
+        if (!isValidBlobUrl(body.blobUrl)) {
+          return res.status(400).json({ message: "Invalid blob URL origin" });
+        }
+
         const blobRes = await fetch(body.blobUrl, {
           headers: { 'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
         });
