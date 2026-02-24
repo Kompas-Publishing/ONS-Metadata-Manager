@@ -98,10 +98,12 @@ export function isValidBlobUrl(url: string): boolean {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') return false;
     
-    // Vercel Blob storage hostnames
+    const hostname = parsed.hostname;
+    // Pentest Fix (Refined): Allow any legitimate Vercel Blob storage subdomain.
+    // This includes both .public.blob.vercel-storage.com and .blob.vercel-storage.com (for private blobs).
     return (
-      parsed.hostname === "blob.vercel-storage.com" ||
-      parsed.hostname.endsWith(".public.blob.vercel-storage.com")
+      hostname === "blob.vercel-storage.com" ||
+      hostname.endsWith(".blob.vercel-storage.com")
     );
   } catch {
     return false;
