@@ -144,12 +144,12 @@ export function isValidBlobUrl(url: string): boolean {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') return false;
     
-    const hostname = parsed.hostname;
-    // Pentest Fix (Refined): Allow any legitimate Vercel Blob storage subdomain.
-    // This includes both .public.blob.vercel-storage.com and .blob.vercel-storage.com (for private blobs).
+    const hostname = parsed.hostname.toLowerCase();
+    // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
+    // This is the most robust way to prevent SSRF and token leakage.
     return (
-      hostname === "blob.vercel-storage.com" ||
-      hostname.endsWith(".blob.vercel-storage.com")
+      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
+      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
     );
   } catch {
     return false;
