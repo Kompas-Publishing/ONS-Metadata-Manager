@@ -332,44 +332,43 @@ export default function AiChat() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-6 h-6 text-primary" />
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="shrink-0">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="text-3xl font-semibold text-foreground">AI Chat</h1>
+          <h1 className="text-2xl font-semibold text-foreground">AI Chat</h1>
         </div>
-        <p className="text-muted-foreground">
-          Ask questions about metadata, licenses, and tasks. Conversations are not stored.
+        <p className="text-sm text-muted-foreground">
+          Ask questions about metadata, licenses, and tasks.
         </p>
       </div>
 
       <div
-        className={`grid gap-6 min-h-0 ${
+        className={`grid gap-4 flex-1 min-h-0 ${
           hasProposals ? "grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : "grid-cols-1"
         }`}
       >
         <Card
-          className={`flex flex-col min-h-[520px] ${
-            hasProposals ? "xl:h-[calc(100vh-280px)]" : "xl:h-[calc(100vh-250px)]"
+          className={`flex flex-col min-h-[500px] ${
+            hasProposals ? "xl:h-[calc(100vh-180px)]" : "xl:h-[calc(100vh-180px)]"
           }`}
         >
-          <CardHeader className="pb-3">
-            <CardTitle>Conversation</CardTitle>
-            <CardDescription>AI suggestions require confirmation before any changes are applied.</CardDescription>
+          <CardHeader className="pb-2 pt-4 px-4 shrink-0">
+            <CardTitle className="text-lg">Conversation</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 overflow-hidden relative min-h-0">
+          <CardContent className="flex-1 overflow-hidden relative min-h-0 px-4">
             <ScrollArea className="h-full pr-4" ref={scrollRef}>
-              <div className="space-y-6">
+              <div className="space-y-4 pb-4">
                 {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-[400px] text-center space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                      <Sparkles className="w-8 h-8 text-muted-foreground" />
+                  <div className="flex flex-col items-center justify-center h-[350px] text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                      <Sparkles className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <div className="max-w-sm">
+                    <div className="max-w-xs">
                       <p className="text-sm font-medium">No conversation started</p>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Try asking for metadata or suggesting a correction for a specific file.
                       </p>
                     </div>
@@ -383,7 +382,7 @@ export default function AiChat() {
                     }`}
                   >
                     <div
-                      className={`max-w-[95%] rounded-2xl px-4 py-3 break-words shadow-sm ${
+                      className={`max-w-[90%] rounded-2xl px-4 py-2.5 break-words shadow-sm ${
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
@@ -391,11 +390,11 @@ export default function AiChat() {
                     >
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                       {message.attachments && message.attachments.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-primary-foreground/90">
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-primary-foreground/90">
                           {message.attachments.map((file) => (
                             <span
                               key={file.name}
-                              className="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-1"
+                              className="inline-flex items-center gap-1 rounded-md bg-primary/20 px-2 py-0.5"
                             >
                               <Paperclip className="w-3 h-3" />
                               {file.name}
@@ -405,29 +404,24 @@ export default function AiChat() {
                       )}
                     </div>
                     {message.sources && message.sources.length > 0 && (
-                      <div className="mt-3 w-full max-w-[95%] rounded-2xl border bg-background px-4 py-3 text-xs shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="mt-2 w-full max-w-[90%] rounded-xl border bg-background px-3 py-2 text-xs shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                             Sources
                           </span>
-                          <Badge variant="secondary">{message.sources.length}</Badge>
+                          <Badge variant="secondary" className="h-4 text-[10px] px-1">{message.sources.length}</Badge>
                         </div>
-                        <div className="mt-2 space-y-2">
+                        <div className="space-y-1">
                           {message.sources.map((source) => (
-                            <div key={source.url} className="flex flex-col gap-1">
+                            <div key={source.url} className="flex flex-col">
                               <a
                                 href={source.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-primary underline-offset-4 hover:underline break-words"
+                                className="text-primary text-[11px] underline-offset-4 hover:underline truncate"
                               >
                                 {source.title || source.url}
                               </a>
-                              {source.query && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  Query: {source.query}
-                                </span>
-                              )}
                             </div>
                           ))}
                         </div>
@@ -437,105 +431,103 @@ export default function AiChat() {
                 ))}
                 {isSending && (
                   <div className="flex items-start">
-                    <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Thinking...</span>
+                    <div className="bg-muted rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Thinking...</span>
                     </div>
                   </div>
                 )}
               </div>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="border-t bg-background">
-            <div className="w-full space-y-3">
-              <div className="space-y-3">
-                <div className="relative">
-                  <Textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask the AI to search metadata, licenses, or tasks..."
-                    rows={3}
-                    className="resize-none pr-12"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-2 top-2 h-8 w-8"
-                    onClick={() => fileInputRef.current?.click()}
-                    aria-label="Attach file"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="ai-chat-attachment"
-                    type="file"
-                    accept={ACCEPTED_FILE_TYPES}
-                    onChange={handleFileChange}
-                    ref={fileInputRef}
-                    className="hidden"
-                  />
-                </div>
-                {attachment && (
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="truncate">{attachment.name}</span>
+          <CardFooter className="p-4 border-t bg-muted/20 shrink-0">
+            <div className="w-full flex flex-col gap-2">
+               {attachment && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-background border rounded-lg text-xs animate-in fade-in slide-in-from-bottom-1">
+                    <Paperclip className="h-3 w-3 text-muted-foreground" />
+                    <span className="truncate flex-1 font-medium">{attachment.name}</span>
                     <Button
                       type="button"
-                      size="sm"
+                      size="icon"
                       variant="ghost"
-                      className="h-6 px-2"
+                      className="h-5 w-5 hover:text-destructive"
                       onClick={() => {
                         setAttachment(null);
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = "";
-                        }
+                        if (fileInputRef.current) fileInputRef.current.value = "";
                       }}
                     >
-                      Remove
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
                 )}
+              <div className="relative flex items-center gap-2 bg-background p-1.5 border rounded-xl shadow-sm focus-within:ring-1 focus-within:ring-primary/30 transition-shadow">
                 <Button
-                  className="w-full"
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask something..."
+                  rows={1}
+                  className="min-h-[40px] flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none py-2.5 px-0 shadow-none text-sm bg-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                />
+                <Button
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-lg"
                   onClick={handleSend}
                   disabled={isSending || (!input.trim() && !attachment)}
                 >
                   {isSending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="w-4 h-4 mr-2" />
+                    <Send className="h-4 w-4" />
                   )}
-                  Send Message
                 </Button>
+                <Input
+                  id="ai-chat-attachment"
+                  type="file"
+                  accept={ACCEPTED_FILE_TYPES}
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                  className="hidden"
+                />
               </div>
+              <p className="text-[10px] text-center text-muted-foreground px-2">
+                AI may generate inaccurate information. Verify important details.
+              </p>
             </div>
           </CardFooter>
         </Card>
 
         {hasProposals && (
-          <Card className="flex flex-col min-h-[520px] xl:h-[calc(100vh-280px)]">
-            <CardHeader className="pb-3">
+          <Card className="flex flex-col min-h-[500px] xl:h-[calc(100vh-180px)]">
+            <CardHeader className="pb-2 pt-4 px-4 shrink-0">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle>Proposed Changes</CardTitle>
-                  <CardDescription>Review and apply AI suggestions.</CardDescription>
+                  <CardTitle className="text-lg">Proposed Changes</CardTitle>
                 </div>
-                <Badge variant="secondary">{proposalCount}</Badge>
+                <Badge variant="secondary" className="h-5">{proposalCount}</Badge>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden min-h-0">
+            <CardContent className="flex-1 overflow-hidden min-h-0 px-4">
               <ScrollArea className="h-full pr-2">
-                <div className="space-y-6">
+                <div className="space-y-4 pb-4">
                   {proposalGroups.map((group) => (
-                    <div key={group.messageIndex} className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-muted-foreground">
+                    <div key={group.messageIndex} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                           From message {group.messageIndex + 1}
                         </p>
                         {group.proposals.length > 1 && (
@@ -543,12 +535,12 @@ export default function AiChat() {
                             <AlertDialogTrigger asChild>
                               <Button
                                 size="sm"
-                                variant="secondary"
-                                className="h-8 font-semibold shadow-sm border border-primary/20"
+                                variant="outline"
+                                className="h-7 text-[10px] font-semibold shadow-sm border-primary/20 hover:bg-primary/5 px-2"
                                 disabled={isExecuting}
                               >
-                                <Check className="w-3.5 h-3.5 mr-1.5" />
-                                Accept All ({group.proposals.length})
+                                <Check className="w-3 h-3 mr-1" />
+                                Accept All
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -556,7 +548,6 @@ export default function AiChat() {
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   This will apply all {group.proposals.length} proposed changes at once. 
-                                  Please ensure you have properly read and verified all data before proceeding.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -575,33 +566,33 @@ export default function AiChat() {
                       {group.proposals.map((proposal, pIdx) => (
                         <Card
                           key={`${group.messageIndex}-${pIdx}`}
-                          className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col"
+                          className="w-full border-primary/20 bg-primary/5 overflow-hidden flex flex-col shadow-none"
                         >
-                          <CardHeader className="py-3 shrink-0">
+                          <CardHeader className="p-3 shrink-0">
                             <div className="flex items-center gap-2">
-                              <Info className="w-4 h-4 text-primary" />
-                              <CardTitle className="text-sm">
-                                Proposed {proposal.type} {proposal.action}
+                              <Info className="w-3.5 h-3.5 text-primary" />
+                              <CardTitle className="text-xs">
+                                {proposal.type} {proposal.action}
                               </CardTitle>
                             </div>
                             {proposal.explanation && (
-                              <CardDescription className="text-xs break-words">
+                              <CardDescription className="text-[10px] leading-tight">
                                 {proposal.explanation}
                               </CardDescription>
                             )}
                           </CardHeader>
-                          <CardContent className="py-3">
-                            <div className="text-[11px] bg-background p-2 rounded border max-h-48 overflow-auto">
+                          <CardContent className="px-3 py-0">
+                            <div className="text-[10px] bg-background/50 p-2 rounded border border-primary/10 max-h-32 overflow-auto font-mono">
                               <pre className="whitespace-pre-wrap break-words">
                                 {JSON.stringify(proposal.data, null, 2)}
                               </pre>
                             </div>
                           </CardContent>
-                          <CardFooter className="py-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
+                          <CardFooter className="p-3 flex flex-wrap items-center justify-end gap-2 shrink-0">
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="h-8 text-xs px-2 sm:px-3"
+                              variant="ghost"
+                              className="h-7 text-[10px] px-2"
                               onClick={() => {
                                 setMessages(prev => prev.map((msg, mIdx) => {
                                   if (mIdx === group.messageIndex && msg.proposals) {
@@ -611,11 +602,11 @@ export default function AiChat() {
                                 }));
                               }}
                             >
-                              <X className="w-3 h-3 mr-1" /> Dismiss
+                              Dismiss
                             </Button>
                             <Button
                               size="sm"
-                              className="h-8 text-xs px-2 sm:px-3"
+                              className="h-7 text-[10px] px-2"
                               disabled={isExecuting}
                               onClick={() => handleExecuteProposal(proposal, group.messageIndex, pIdx)}
                             >
@@ -624,7 +615,7 @@ export default function AiChat() {
                               ) : (
                                 <Check className="w-3 h-3 mr-1" />
                               )}
-                              Accept Change
+                              Accept
                             </Button>
                           </CardFooter>
                         </Card>
