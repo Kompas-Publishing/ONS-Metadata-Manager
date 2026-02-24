@@ -67,6 +67,7 @@ export default function AiChat() {
     ".bmp",
     ".tif",
     ".tiff",
+    ".md",  
   ];
 
   const ALLOWED_MIME_TYPES = new Set([
@@ -90,6 +91,7 @@ export default function AiChat() {
     "image/webp",
     "image/bmp",
     "image/tiff",
+    "text/markdown",
   ]);
 
   const ACCEPTED_FILE_TYPES = ALLOWED_EXTENSIONS.join(",");
@@ -130,7 +132,7 @@ export default function AiChat() {
     if (!isAllowedFile(selected)) {
       toast({
         title: "Unsupported file type",
-        description: "Please upload documents, spreadsheets, PDFs, images, JSON, or YAML files.",
+        description: "Please upload documents, spreadsheets, or images.",
         variant: "destructive",
       });
       e.target.value = "";

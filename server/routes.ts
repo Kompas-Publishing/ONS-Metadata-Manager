@@ -1995,8 +1995,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(400).json({ message: "Invalid blob URL." });
           }
 
-          const blobRes = await fetch(blobUrl);
-          if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+          const blobRes = await fetch(blobUrl, {
+            headers: {
+              'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+            }
+          });
+          if (!blobRes.ok) throw new Error(`Failed to fetch blob from Vercel: ${blobRes.statusText}`);
 
           const contentLength = blobRes.headers.get("content-length");
           if (contentLength && Number(contentLength) > MAX_CHAT_FILE_SIZE) {
@@ -2061,7 +2065,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let type = req.body.type || "license";
 
         if (req.body.blobUrl) {
-          const blobRes = await fetch(req.body.blobUrl);
+          const blobRes = await fetch(req.body.blobUrl, {
+            headers: {
+              'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+            }
+          });
           if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
           fileBuffer = Buffer.from(await blobRes.arrayBuffer());
           mimeType = blobRes.headers.get("content-type") || "application/octet-stream";
@@ -2110,7 +2118,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let previousProposals = JSON.parse(req.body.previousProposals || "[]");
 
         if (req.body.blobUrl) {
-          const blobRes = await fetch(req.body.blobUrl);
+          const blobRes = await fetch(req.body.blobUrl, {
+            headers: {
+              'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+            }
+          });
           if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
           fileBuffer = Buffer.from(await blobRes.arrayBuffer());
           mimeType = blobRes.headers.get("content-type") || "application/octet-stream";

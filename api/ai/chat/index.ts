@@ -34,8 +34,12 @@ export default apiHandler(
           return res.status(400).json({ message: "Invalid blob URL." });
         }
 
-        const blobRes = await fetch(blobUrl);
-        if (!blobRes.ok) throw new Error("Failed to fetch blob from Vercel");
+        const blobRes = await fetch(blobUrl, {
+          headers: {
+            'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+          }
+        });
+        if (!blobRes.ok) throw new Error(`Failed to fetch blob from Vercel: ${blobRes.statusText}`);
 
         const contentLength = blobRes.headers.get("content-length");
         if (contentLength && Number(contentLength) > MAX_CHAT_FILE_SIZE) {
