@@ -352,7 +352,7 @@ export default function AiChat() {
       >
         <Card
           className={`flex flex-col min-h-[500px] ${
-            hasProposals ? "xl:h-[calc(100vh-180px)]" : "xl:h-[calc(100vh-180px)]"
+            hasProposals ? "xl:h-[calc(100vh-220px)]" : "xl:h-[calc(100vh-220px)]"
           }`}
         >
           <CardHeader className="pb-2 pt-4 px-4 shrink-0">
@@ -512,7 +512,7 @@ export default function AiChat() {
         </Card>
 
         {hasProposals && (
-          <Card className="flex flex-col min-h-[500px] xl:h-[calc(100vh-180px)]">
+          <Card className="flex flex-col min-h-[500px] xl:h-[calc(100vh-220px)]">
             <CardHeader className="pb-2 pt-4 px-4 shrink-0">
               <div className="flex items-start justify-between gap-3">
                 <div>
