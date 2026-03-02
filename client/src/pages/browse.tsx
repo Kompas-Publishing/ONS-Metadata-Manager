@@ -245,40 +245,6 @@ export default function Browse() {
                     onClick={() => setSelectedSeries(series.title)}
                     data-testid={`series-card-${series.title}`}
                   >
-                    {canWriteMetadata && (
-                      <div className="absolute top-4 right-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete all {series.episodeCount} episodes across {series.seasonCount} seasons for <strong>{series.title}</strong>. 
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteSeriesMutation.mutate(series.title)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete Series
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    )}
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Film className="w-6 h-6 text-primary" />
@@ -336,37 +302,6 @@ export default function Browse() {
                             <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedSeries(series.title); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
-                            {canWriteMetadata && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Series?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Delete all files for <strong>{series.title}</strong>?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteSeriesMutation.mutate(series.title)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -420,6 +355,38 @@ export default function Browse() {
                   <Download className="w-4 h-4" />
                   Download Series (XLSX)
                 </Button>
+                {canWriteMetadata && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete Series
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete all {selectedSeriesData?.episodeCount} episodes across {selectedSeriesData?.seasonCount} seasons for <strong>{selectedSeriesData?.title}</strong>. 
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => selectedSeriesData && deleteSeriesMutation.mutate(selectedSeriesData.title)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete Series
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             </div>
           </div>
