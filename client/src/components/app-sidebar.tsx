@@ -136,7 +136,7 @@ import { upload } from "@vercel/blob/client";
       label: "AI",
       items: [
         {
-          title: "AI Chat",
+          title: "AI Chat (BETA)",
           url: "/ai-chat",
           icon: Sparkles,
           testId: "nav-ai-chat",
