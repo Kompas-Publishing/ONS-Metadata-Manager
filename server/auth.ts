@@ -47,7 +47,7 @@ export function setupPassport(storage: IStorage) {
             return done(null, false, { message: "Invalid email or password" });
           }
 
-          if (user.status !== "active") {
+          if (user.status !== "active" && user.status !== "pending") {
             return done(null, false, { message: "Account is not active. Please contact an administrator." });
           }
 

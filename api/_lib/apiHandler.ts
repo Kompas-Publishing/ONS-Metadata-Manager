@@ -73,7 +73,7 @@ export function requireAuth(handler: ApiHandler): ApiHandler {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    if (user.status !== "active") {
+    if (user.status !== "active" && user.status !== "pending") {
       return res.status(423).json({ message: "Account is not active. Please contact an administrator." });
     }
 

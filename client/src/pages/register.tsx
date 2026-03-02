@@ -61,11 +61,11 @@ export default function Register() {
       
       toast({
         title: "Registration successful!",
-        description: "Your account has been created. Please wait for admin approval before you can sign in.",
+        description: "Your account has been created and you are now signed in. Please wait for admin approval.",
       });
       
       setTimeout(() => {
-        setLocation("/login");
+        setLocation("/");
       }, 2000);
     } catch (error: any) {
       toast({

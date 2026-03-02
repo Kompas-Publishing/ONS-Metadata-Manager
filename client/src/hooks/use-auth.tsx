@@ -44,6 +44,12 @@ export function useAuth() {
       const response = await apiRequest("POST", "/api/auth/register", data);
       return response.json();
     },
+    onSuccess: (data) => {
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
   });
 
   const updateProfileMutation = useMutation({

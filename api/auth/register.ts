@@ -40,9 +40,26 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
       isAdmin: 0,
     });
 
+    // Generate JWT token for auto-login
+    const { signToken } = await import("../_server/jwt.js");
+    const { serialize } = await import("cookie");
+    const token = signToken(user);
+
+    // Set HTTP-only cookie
+    const cookie = serialize('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    });
+
+    res.setHeader('Set-Cookie', cookie);
+
     res.json({
       message: "Registration successful. Please wait for admin approval.",
       user: { id: user.id, email: user.email, status: user.status },
+      token, // Also send in response
     });
   } catch (error: any) {
     console.error("Registration error:", error);

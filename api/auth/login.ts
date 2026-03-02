@@ -37,7 +37,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
       return res.status(401).json({ message: "Authentication failed" });
     }
 
-    if (user.status !== "active") {
+    if (user.status !== "active" && user.status !== "pending") {
       return res.status(423).json({
         message: "Account is not active. Please contact an administrator.",
         status: user.status

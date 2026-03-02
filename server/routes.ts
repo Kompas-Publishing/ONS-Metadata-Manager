@@ -428,9 +428,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isAdmin: 0,
       });
 
-      res.json({ 
-        message: "Registration successful. Please wait for admin approval.",
-        user: { id: user.id, email: user.email, status: user.status }
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Auto-login failed after registration" });
+        }
+        res.json({ 
+          message: "Registration successful. Please wait for admin approval.",
+          user: { id: user.id, email: user.email, status: user.status }
+        });
       });
     } catch (error: any) {
       console.error("Registration error:", error);
