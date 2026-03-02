@@ -1,16 +1,47 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye } from "lucide-react";
+import { 
+  Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
+  LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle
+} from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const handleDownload = (url: string) => {
   const link = document.createElement('a');
@@ -24,14 +55,19 @@ interface SeriesGroup {
   seasonCount: number;
   episodeCount: number;
   seriesTitle?: string;
+  lastAddedAt: Date;
   seasons: { [key: number]: MetadataFile[] };
 }
 
 export default function Browse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState<"newest" | "name">("newest");
   const [, setLocation] = useLocation();
   const { canWriteMetadata, canReadMetadata } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     document.title = "Browse Series | ONS Broadcast Portal";
@@ -40,6 +76,49 @@ export default function Browse() {
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
     enabled: canReadMetadata || canWriteMetadata,
+  });
+
+  const deleteSeriesMutation = useMutation({
+    mutationFn: async (title: string) => {
+      await apiRequest("DELETE", `/api/metadata/series/${encodeURIComponent(title)}`);
+    },
+    onSuccess: (_, title) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      toast({
+        title: "Series deleted",
+        description: `Successfully deleted all files for ${title}`,
+      });
+      if (selectedSeries === title) {
+        setSelectedSeries(null);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteSeasonMutation = useMutation({
+    mutationFn: async ({ title, season }: { title: string; season: number }) => {
+      await apiRequest("DELETE", `/api/metadata/season/${encodeURIComponent(title)}/${season}`);
+    },
+    onSuccess: (_, { title, season }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      toast({
+        title: "Season deleted",
+        description: `Successfully deleted all files for ${title} Season ${season}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const seriesGroups: { [key: string]: SeriesGroup } = {};
@@ -55,8 +134,14 @@ export default function Browse() {
           seasonCount: 0,
           episodeCount: 0,
           seriesTitle: file.seriesTitle ?? undefined,
+          lastAddedAt: file.createdAt ? new Date(file.createdAt) : new Date(0),
           seasons: {},
         };
+      }
+      
+      const fileDate = file.createdAt ? new Date(file.createdAt) : new Date(0);
+      if (fileDate > seriesGroups[file.title].lastAddedAt) {
+        seriesGroups[file.title].lastAddedAt = fileDate;
       }
       
       const seasonNum = file.season || 0;
@@ -70,9 +155,18 @@ export default function Browse() {
     });
   }
 
-  const filteredSeries = Object.values(seriesGroups).filter((series) =>
-    series.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSeries = useMemo(() => {
+    return Object.values(seriesGroups)
+      .filter((series) =>
+        series.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => {
+        if (sortBy === "newest") {
+          return b.lastAddedAt.getTime() - a.lastAddedAt.getTime();
+        }
+        return a.title.localeCompare(b.title);
+      });
+  }, [seriesGroups, searchQuery, sortBy]);
 
   const selectedSeriesData = selectedSeries ? seriesGroups[selectedSeries] : null;
 
@@ -85,15 +179,48 @@ export default function Browse() {
         </p>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search series..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          data-testid="input-search-series"
-        />
+      <div className="flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search series..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-series"
+          />
+        </div>
+        {!selectedSeries && (
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <SelectTrigger className="w-full md:w-[160px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Latest Added</SelectItem>
+                <SelectItem value="name">Name (A-Z)</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex border rounded-md overflow-hidden flex-shrink-0">
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setViewMode("grid")}
+                className="rounded-none h-10 w-10"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setViewMode("list")}
+                className="rounded-none h-10 w-10"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {!selectedSeries ? (
@@ -109,36 +236,145 @@ export default function Browse() {
               ))}
             </div>
           ) : filteredSeries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSeries.map((series) => (
-                <Card
-                  key={series.title}
-                  className="p-6 hover-elevate cursor-pointer"
-                  onClick={() => setSelectedSeries(series.title)}
-                  data-testid={`series-card-${series.title}`}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Film className="w-6 h-6 text-primary" />
+            viewMode === "grid" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSeries.map((series) => (
+                  <Card
+                    key={series.title}
+                    className="p-6 hover-elevate cursor-pointer group relative"
+                    onClick={() => setSelectedSeries(series.title)}
+                    data-testid={`series-card-${series.title}`}
+                  >
+                    {canWriteMetadata && (
+                      <div className="absolute top-4 right-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete all {series.episodeCount} episodes across {series.seasonCount} seasons for <strong>{series.title}</strong>. 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteSeriesMutation.mutate(series.title)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete Series
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Film className="w-6 h-6 text-primary" />
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2 text-foreground">{series.title}</h3>
-                  {series.seriesTitle && (
-                    <p className="text-sm text-muted-foreground mb-2">{series.seriesTitle}</p>
-                  )}
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      {series.seasonCount} {series.seasonCount === 1 ? "Season" : "Seasons"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {series.episodeCount} {series.episodeCount === 1 ? "Episode" : "Episodes"}
-                    </p>
-                    <Badge variant="secondary" className="mt-2">{series.category}</Badge>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                    <h3 className="text-lg font-semibold mb-2 text-foreground">{series.title}</h3>
+                    {series.seriesTitle && (
+                      <p className="text-sm text-muted-foreground mb-2">{series.seriesTitle}</p>
+                    )}
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {series.seasonCount} {series.seasonCount === 1 ? "Season" : "Seasons"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {series.episodeCount} {series.episodeCount === 1 ? "Episode" : "Episodes"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary">{series.category}</Badge>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Added {format(series.lastAddedAt, "dd MMM yyyy")}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Series Title</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Seasons</TableHead>
+                      <TableHead>Episodes</TableHead>
+                      <TableHead>Last Added</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSeries.map((series) => (
+                      <TableRow 
+                        key={series.title} 
+                        className="cursor-pointer"
+                        onClick={() => setSelectedSeries(series.title)}
+                      >
+                        <TableCell className="font-medium">{series.title}</TableCell>
+                        <TableCell><Badge variant="outline">{series.category}</Badge></TableCell>
+                        <TableCell>{series.seasonCount}</TableCell>
+                        <TableCell>{series.episodeCount}</TableCell>
+                        <TableCell className="text-muted-foreground">{format(series.lastAddedAt, "dd-MM-yyyy")}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedSeries(series.title); }}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {canWriteMetadata && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Series?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Delete all files for <strong>{series.title}</strong>?
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteSeriesMutation.mutate(series.title)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )
           ) : (
             <Card className="p-12 text-center">
               <Film className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -232,6 +468,54 @@ export default function Browse() {
                       <Download className="w-4 h-4" />
                       Download (XLSX)
                     </Button>
+                    {canWriteMetadata && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="gap-2"
+                        >
+                          <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`}>
+                            <Edit className="w-4 h-4" />
+                            Batch Editor
+                          </Link>
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete Season
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Entire Season?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete all episodes in <strong>{selectedSeriesData?.title} Season {seasonNum}</strong>. 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteSeasonMutation.mutate({ 
+                                  title: selectedSeriesData?.title || '', 
+                                  season: parseInt(seasonNum) 
+                                })}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete Season
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">

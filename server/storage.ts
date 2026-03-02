@@ -47,6 +47,8 @@ export interface IStorage {
   updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
   bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
+  deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
+  deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number>;
   createBatchMetadataFiles(batch: BatchCreate & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }>;
   getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
@@ -574,6 +576,61 @@ export class DatabaseStorage implements IStorage {
       .where(and(...whereConditions))
       .returning();
     return result.length > 0;
+  }
+
+  async deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [
+      or(
+        eq(metadataFiles.seriesTitle, seriesTitle),
+        eq(metadataFiles.title, seriesTitle)
+      )
+    ];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+    
+    const result = await db
+      .delete(metadataFiles)
+      .where(and(...whereConditions))
+      .returning();
+    return result.length;
+  }
+
+  async deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [
+      or(
+        eq(metadataFiles.seriesTitle, seriesTitle),
+        eq(metadataFiles.title, seriesTitle)
+      ),
+      eq(metadataFiles.season, season)
+    ];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+    
+    const result = await db
+      .delete(metadataFiles)
+      .where(and(...whereConditions))
+      .returning();
+    return result.length;
   }
 
   async createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]> {

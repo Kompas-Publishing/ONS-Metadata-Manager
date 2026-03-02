@@ -225,6 +225,15 @@ export default function Licenses() {
                 </TableHead>
                 <TableHead 
                   className="cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => handleSort("licenseStart")}
+                >
+                  <div className="flex items-center">
+                    Start Date
+                    <SortIcon column="licenseStart" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:text-primary transition-colors"
                   onClick={() => handleSort("licenseEnd")}
                 >
                   <div className="flex items-center">
@@ -247,7 +256,7 @@ export default function Licenses() {
             <TableBody>
               {filteredAndSortedLicenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No matching licenses found.
                   </TableCell>
                 </TableRow>
@@ -282,6 +291,16 @@ export default function Licenses() {
                             <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {license.licenseStart ? (
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                            {format(new Date(license.licenseStart), "dd-MM-yyyy")}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                       <TableCell>
                         {license.licenseEnd ? (

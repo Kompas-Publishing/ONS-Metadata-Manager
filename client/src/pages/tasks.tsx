@@ -51,6 +51,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 
+const PREDEFINED_DESCRIPTIONS = [
+  "heeft meta nodig",
+  "heeft subs nodig",
+  "heeft QC nodig",
+  "is klaar voor export",
+] as const;
+
 type TaskWithFile = Task & { metadataFile: MetadataFile };
 
 export default function Tasks() {
@@ -255,21 +262,18 @@ export default function Tasks() {
                 <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
                   <div className="space-y-2">
                     <Label>Task Description</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="e.g., heeft meta nodig" 
-                        value={taskDescription}
-                        onChange={(e) => setTaskDescription(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft meta nodig")}>
-                        heeft meta nodig
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setTaskDescription("heeft subs nodig")}>
-                        heeft subs nodig
-                      </Button>
-                    </div>
+                    <Select value={taskDescription} onValueChange={setTaskDescription}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a task description" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PREDEFINED_DESCRIPTIONS.map((desc) => (
+                          <SelectItem key={desc} value={desc}>
+                            {desc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <Label className="mb-2 block">Select Files</Label>
@@ -289,17 +293,20 @@ export default function Tasks() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Task for these assets</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., heeft meta nodig" {...field} />
-                            </FormControl>
-                            <div className="flex gap-2 mt-2">
-                              <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft meta nodig")}>
-                                heeft meta nodig
-                              </Button>
-                              <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => batchForm.setValue("taskDescription", "heeft subs nodig")}>
-                                heeft subs nodig
-                              </Button>
-                            </div>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a task description" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {PREDEFINED_DESCRIPTIONS.map((desc) => (
+                                  <SelectItem key={desc} value={desc}>
+                                    {desc}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </FormItem>
                         )}
                       />

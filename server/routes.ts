@@ -629,6 +629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -750,7 +751,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
-          "edit",
+          "metadata",
+          "write",
         );
 
         if (!allowed) {
@@ -937,6 +939,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete(
+    "/api/metadata/series/:title",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        if (!userId) {
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { allowed, permissions, reason } = await requirePermission(
+          userId,
+          "metadata",
+          "write",
+        );
+
+        if (!allowed) {
+          const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+          return res.status(statusCode).json({ message: reason });
+        }
+
+        const decodedTitle = decodeURIComponent(req.params.title);
+        const count = await storage.deleteMetadataBySeries(
+          decodedTitle,
+          permissions!,
+        );
+        res.json({ message: `Deleted ${count} files for series: ${decodedTitle}`, count });
+      } catch (error) {
+        console.error("Error deleting series metadata:", error);
+        res.status(500).json({ message: "Failed to delete series metadata" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/metadata/season/:title/:season",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = (req.user as any)?.id;
+        if (!userId) {
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const { allowed, permissions, reason } = await requirePermission(
+          userId,
+          "metadata",
+          "write",
+        );
+
+        if (!allowed) {
+          const statusCode = permissions?.user.status === "pending" ? 423 : 403;
+          return res.status(statusCode).json({ message: reason });
+        }
+
+        const decodedTitle = decodeURIComponent(req.params.title);
+        const seasonNum = parseInt(req.params.season);
+
+        if (isNaN(seasonNum)) {
+          return res.status(400).json({ message: "Invalid season number" });
+        }
+
+        const count = await storage.deleteMetadataBySeason(
+          decodedTitle,
+          seasonNum,
+          permissions!,
+        );
+        res.json({ message: `Deleted ${count} files for series: ${decodedTitle} season ${seasonNum}`, count });
+      } catch (error) {
+        console.error("Error deleting season metadata:", error);
+        res.status(500).json({ message: "Failed to delete season metadata" });
+      }
+    },
+  );
+
   app.post("/api/metadata/batch", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
@@ -1085,6 +1162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -1164,6 +1242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -1211,6 +1290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -1297,6 +1377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -1351,6 +1432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
@@ -1414,6 +1496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const { allowed, permissions, reason } = await requirePermission(
           userId,
+          "metadata",
           "read",
         );
 
