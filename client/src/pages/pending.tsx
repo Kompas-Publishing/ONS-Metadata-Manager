@@ -29,8 +29,8 @@ export default function Pending() {
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            An administrator will review your account request and grant the appropriate
-            permissions. This process typically takes 1-2 business days.
+            Please contact an administrator via Slack to activate your account. 
+            They will get back to you as soon as possible.
           </p>
 
           <Button

@@ -63,7 +63,7 @@ export default function Browse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState<"newest" | "name">("newest");
+  const [sortBy, setSortBy] = useState<"newest" | "name" | "category" | "seasons" | "episodes">("newest");
   const [, setLocation] = useLocation();
   const { canWriteMetadata, canReadMetadata } = useAuth();
   const { toast } = useToast();
@@ -164,11 +164,28 @@ export default function Browse() {
         if (sortBy === "newest") {
           return b.lastAddedAt.getTime() - a.lastAddedAt.getTime();
         }
-        return a.title.localeCompare(b.title);
+        if (sortBy === "name") {
+          return a.title.localeCompare(b.title);
+        }
+        if (sortBy === "category") {
+          return a.category.localeCompare(b.category);
+        }
+        if (sortBy === "seasons") {
+          return b.seasonCount - a.seasonCount;
+        }
+        if (sortBy === "episodes") {
+          return b.episodeCount - a.episodeCount;
+        }
+        return 0;
       });
   }, [seriesGroups, searchQuery, sortBy]);
 
   const selectedSeriesData = selectedSeries ? seriesGroups[selectedSeries] : null;
+
+  const SortIcon = ({ column }: { column: typeof sortBy }) => {
+    if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    return <ArrowUpDown className="ml-2 h-4 w-4 text-primary" />;
+  };
 
   return (
     <div className="space-y-8">
@@ -193,12 +210,15 @@ export default function Browse() {
         {!selectedSeries && (
           <div className="flex items-center gap-2 w-full md:w-auto">
             <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-              <SelectTrigger className="w-full md:w-[160px]">
+              <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="newest">Latest Added</SelectItem>
                 <SelectItem value="name">Name (A-Z)</SelectItem>
+                <SelectItem value="category">Category (A-Z)</SelectItem>
+                <SelectItem value="seasons">Seasons (Most)</SelectItem>
+                <SelectItem value="episodes">Episodes (Most)</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex border rounded-md overflow-hidden flex-shrink-0">
@@ -277,11 +297,51 @@ export default function Browse() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Series Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Seasons</TableHead>
-                      <TableHead>Episodes</TableHead>
-                      <TableHead>Last Added</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setSortBy("name")}
+                      >
+                        <div className="flex items-center">
+                          Series Title
+                          <SortIcon column="name" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setSortBy("category")}
+                      >
+                        <div className="flex items-center">
+                          Category
+                          <SortIcon column="category" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setSortBy("seasons")}
+                      >
+                        <div className="flex items-center">
+                          Seasons
+                          <SortIcon column="seasons" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setSortBy("episodes")}
+                      >
+                        <div className="flex items-center">
+                          Episodes
+                          <SortIcon column="episodes" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => setSortBy("newest")}
+                      >
+                        <div className="flex items-center">
+                          Last Added
+                          <SortIcon column="newest" />
+                        </div>
+                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
