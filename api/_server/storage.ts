@@ -5,6 +5,7 @@ import {
   userDefinedTags,
   groups,
   licenses,
+  metadataToLicenses,
   tasks,
   type User,
   type UpsertUser,
@@ -21,10 +22,13 @@ import {
   type LicenseBatchGenerate,
   type Task,
   type InsertTask,
-} from "../_shared/schema.js";
-import { db } from "./db.js";
+} from "@shared/schema";
+import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "../_shared/types.js";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions";
+
+// Extend MetadataFile type to include licenseIds array
+export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -35,24 +39,25 @@ export interface IStorage {
   
   peekNextId(): Promise<string>;
   consumeNextId(): Promise<string>;
-  getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined>;
-  getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]>;
-  getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]>;
-  getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]>;
-  createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile>;
-  updateMetadataFile(id: string, file: InsertMetadataFile, permissions: UserPermissions): Promise<MetadataFile | undefined>;
-  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number>;
+  getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
+  getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFileWithLicenses[]>;
+  getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses>;
+  updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
+  upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses>;
+  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
   deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
   deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number>;
-  createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createBatchMetadataFiles(batch: BatchCreate & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }>;
-  getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]>;
-  getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]>;
-  getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }>;
-  searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]>;
+  getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFileWithLicenses | null; next: MetadataFileWithLicenses | null }>;
+  searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   searchLicenses(keyword: string): Promise<License[]>;
-  searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
   
   getUserTags(userId: string, type: string): Promise<UserDefinedTag[]>;
   createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag>;
@@ -83,7 +88,7 @@ export interface IStorage {
   deleteGroup(groupId: string): Promise<boolean>;
 
   // Multi-batch creation
-  createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]>;
+  createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
 
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
@@ -91,12 +96,12 @@ export interface IStorage {
   listLicenses(): Promise<License[]>;
   updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
   deleteLicense(id: string): Promise<boolean>;
-  generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]>;
+  generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFileWithLicenses[]>;
 
   // Task Management
   createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
   bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]>;
-  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]>;
+  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
@@ -115,7 +120,6 @@ function formatMetadataId(num: number): string {
 }
 
 function parseMetadataId(id: string): number {
-  // Parse format: xxx-xxx-xxx back to number
   const parts = id.split('-');
   if (parts.length !== 3) return 0;
   const segment1 = parseInt(parts[0]) * 1000000;
@@ -124,15 +128,20 @@ function parseMetadataId(id: string): number {
   return segment1 + segment2 + segment3;
 }
 
-function normalizeMetadataFile(file: MetadataFile): MetadataFile {
-  // Normalize breakTimes and ensure breakTime is synced
+function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = []): MetadataFileWithLicenses {
   const breakTimes = file.breakTimes || (file.breakTime ? [file.breakTime] : []);
   const breakTime = breakTimes.length > 0 ? breakTimes[0] : file.breakTime;
   
+  const licenseIds = [...linkedLicenseIds];
+  if (file.licenseId && !licenseIds.includes(file.licenseId)) {
+    licenseIds.push(file.licenseId);
+  }
+
   return {
     ...file,
     breakTime,
     breakTimes,
+    licenseIds,
   };
 }
 
@@ -200,7 +209,6 @@ export class DatabaseStorage implements IStorage {
     if (setting) {
       nextId = parseInt(setting.value);
     } else {
-      // Initialize from highest existing ID in database
       const existingFiles = await db
         .select({ id: metadataFiles.id })
         .from(metadataFiles);
@@ -229,12 +237,12 @@ export class DatabaseStorage implements IStorage {
     return formatMetadataId(nextId);
   }
 
-  async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFile | undefined> {
+  async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -244,23 +252,33 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const [file] = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(and(...whereConditions));
-    return file ? normalizeMetadataFile(file) : undefined;
+
+    if (results.length === 0) return undefined;
+
+    const file = results[0].file;
+    const linkedLicenseIds = results
+      .map(r => r.licenseLink)
+      .filter((id): id is string => id !== null);
+
+    return normalizeMetadataFile(file, linkedLicenseIds);
   }
 
-  async getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFile[]> {
-    if (ids.length === 0) {
-      return [];
-    }
+  async getMetadataByIds(ids: string[], permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+    if (ids.length === 0) return [];
     
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [inArray(metadataFiles.id, ids)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -270,19 +288,34 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(and(...whereConditions));
-    return files.map(normalizeMetadataFile);
+
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFile[]> {
+  async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -293,23 +326,41 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (licenseId) {
-      whereConditions.push(eq(metadataFiles.licenseId, licenseId));
+      whereConditions.push(or(
+        eq(metadataFiles.licenseId, licenseId),
+        sql`${metadataFiles.id} IN (SELECT metadata_file_id FROM metadata_to_licenses WHERE license_id = ${licenseId})`
+      ));
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(metadataFiles.createdAt));
-    return files.map(normalizeMetadataFile);
+
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFile[]> {
+  async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -319,33 +370,47 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const files = await db
-      .select()
+    const results = await db
+      .select({
+        file: metadataFiles,
+        licenseLink: metadataToLicenses.licenseId
+      })
       .from(metadataFiles)
+      .leftJoin(metadataToLicenses, eq(metadataFiles.id, metadataToLicenses.metadataFileId))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(metadataFiles.createdAt))
       .limit(limit);
-    return files.map(normalizeMetadataFile);
+
+    const fileMap = new Map<string, { file: MetadataFile, licenseIds: string[] }>();
+    for (const r of results) {
+      if (!fileMap.has(r.file.id)) {
+        fileMap.set(r.file.id, { file: r.file, licenseIds: [] });
+      }
+      if (r.licenseLink) {
+        fileMap.get(r.file.id)!.licenseIds.push(r.licenseLink);
+      }
+    }
+
+    return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async createMetadataFile(file: InsertMetadataFile, id: string, permissions: UserPermissions): Promise<MetadataFile> {
-    // Normalize breakTimes array - filter empty strings and trim
-    const normalizedBreakTimes = (file.breakTimes || [])
+  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, ...data } = file;
+    
+    const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
     
-    // Compute breakTime from normalized breakTimes, or use provided breakTime
     const normalizedBreakTime = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes[0] 
-      : (file.breakTime && file.breakTime.trim() ? file.breakTime.trim() : null);
+      : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
     
-    // Ensure breakTimes is populated from breakTime if empty
     const finalBreakTimes = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes 
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
     
-    const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
-      ...file,
+    const fileData: any = {
+      ...data,
       breakTime: normalizedBreakTime,
       breakTimes: finalBreakTimes,
       id,
@@ -356,19 +421,25 @@ export class DatabaseStorage implements IStorage {
       fileData.groupId = permissions.groupIds[0];
     }
     
-    const [created] = await db
-      .insert(metadataFiles)
-      .values(fileData)
-      .returning();
-    return created;
+    const [created] = await db.insert(metadataFiles).values(fileData).returning();
+
+    if (licenseIds && licenseIds.length > 0) {
+      const links = licenseIds.map(lId => ({
+        metadataFileId: id,
+        licenseId: lId
+      }));
+      await db.insert(metadataToLicenses).values(links);
+    }
+
+    return normalizeMetadataFile(created, licenseIds || []);
   }
 
-  async updateMetadataFile(id: string, file: Partial<InsertMetadataFile>, permissions: UserPermissions): Promise<MetadataFile | undefined> {
+  async updateMetadataFile(id: string, file: Partial<InsertMetadataFile> & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -377,18 +448,17 @@ export class DatabaseStorage implements IStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
+
+    const { licenseIds, ...data } = file;
     
-    // Normalize breakTimes array - filter empty strings and trim
-    const normalizedBreakTimes = (file.breakTimes || [])
+    const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
     
-    // Compute breakTime from normalized breakTimes, or use provided breakTime
     const normalizedBreakTime = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes[0] 
-      : (file.breakTime && file.breakTime.trim() ? file.breakTime.trim() : null);
+      : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
     
-    // Ensure breakTimes is populated from breakTime if empty
     const finalBreakTimes = normalizedBreakTimes.length > 0 
       ? normalizedBreakTimes 
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
@@ -396,14 +466,91 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(metadataFiles)
       .set({
-        ...file,
+        ...data,
         breakTime: normalizedBreakTime,
         breakTimes: finalBreakTimes,
         updatedAt: new Date(),
       })
       .where(and(...whereConditions))
       .returning();
-    return updated;
+
+    if (!updated) return undefined;
+
+    if (licenseIds !== undefined) {
+      await db.delete(metadataToLicenses).where(eq(metadataToLicenses.metadataFileId, id));
+      if (licenseIds.length > 0) {
+        const links = licenseIds.map(lId => ({
+          metadataFileId: id,
+          licenseId: lId
+        }));
+        await db.insert(metadataToLicenses).values(links);
+      }
+    }
+
+    const finalLinks = await db
+      .select()
+      .from(metadataToLicenses)
+      .where(eq(metadataToLicenses.metadataFileId, id));
+    
+    const finalLicenseIds = finalLinks.map(l => l.licenseId);
+    return normalizeMetadataFile(updated, finalLicenseIds);
+  }
+
+  async upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, ...data } = file;
+    let existingFile: MetadataFile | undefined;
+
+    if (originalId) {
+      const visibility = getFileVisibilityConditions(permissions);
+      const whereConditions = [eq(metadataFiles.id, originalId)];
+      
+      if (visibility.type === "own") {
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+      } else if (visibility.type === "group") {
+        if (visibility.groupIds && visibility.groupIds.length > 0) {
+          whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        } else {
+          whereConditions.push(sql`1 = 0`);
+        }
+      }
+
+      const [res] = await db.select().from(metadataFiles).where(and(...whereConditions));
+      existingFile = res;
+    }
+
+    if (!existingFile && data.seriesTitle && data.season && data.episode) {
+      const visibility = getFileVisibilityConditions(permissions);
+      const whereConditions = [
+        eq(metadataFiles.seriesTitle, data.seriesTitle),
+        eq(metadataFiles.season, data.season),
+        eq(metadataFiles.episode, data.episode)
+      ];
+      
+      if (visibility.type === "own") {
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+      } else if (visibility.type === "group") {
+        if (visibility.groupIds && visibility.groupIds.length > 0) {
+          whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        } else {
+          whereConditions.push(sql`1 = 0`);
+        }
+      }
+
+      const [res] = await db.select().from(metadataFiles).where(and(...whereConditions));
+      existingFile = res;
+    }
+
+    if (existingFile) {
+      const updated = await this.updateMetadataFile(existingFile.id, file, permissions);
+      if (!updated) {
+        const newId = await this.consumeNextId();
+        return await this.createMetadataFile(file, newId, permissions);
+      }
+      return updated;
+    } else {
+      const newId = await this.consumeNextId();
+      return await this.createMetadataFile(file, newId, permissions);
+    }
   }
 
   async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {
@@ -415,7 +562,7 @@ export class DatabaseStorage implements IStorage {
         const whereConditions = [eq(metadataFiles.id, update.id)];
         
         if (visibility.type === "own") {
-          whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+          whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
         } else if (visibility.type === "group") {
           if (visibility.groupIds && visibility.groupIds.length > 0) {
             whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -434,11 +581,7 @@ export class DatabaseStorage implements IStorage {
           .where(and(...whereConditions))
           .returning();
         
-        console.log(`[bulkUpdateMetadata] ID: ${update.id}, Data:`, update.data, `Result length: ${result.length}`);
-        
-        if (result.length > 0) {
-          count++;
-        }
+        if (result.length > 0) count++;
       }
       return count;
     });
@@ -449,7 +592,7 @@ export class DatabaseStorage implements IStorage {
     const whereConditions = [eq(metadataFiles.id, id)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -459,24 +602,18 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const result = await db
-      .delete(metadataFiles)
-      .where(and(...whereConditions))
-      .returning();
+    const result = await db.delete(metadataFiles).where(and(...whereConditions)).returning();
     return result.length > 0;
   }
 
   async deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
-      or(
-        eq(metadataFiles.seriesTitle, seriesTitle),
-        eq(metadataFiles.title, seriesTitle)
-      )
+      or(eq(metadataFiles.seriesTitle, seriesTitle), eq(metadataFiles.title, seriesTitle))
     ];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -486,25 +623,19 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const result = await db
-      .delete(metadataFiles)
-      .where(and(...whereConditions))
-      .returning();
+    const result = await db.delete(metadataFiles).where(and(...whereConditions)).returning();
     return result.length;
   }
 
   async deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
-      or(
-        eq(metadataFiles.seriesTitle, seriesTitle),
-        eq(metadataFiles.title, seriesTitle)
-      ),
+      or(eq(metadataFiles.seriesTitle, seriesTitle), eq(metadataFiles.title, seriesTitle)),
       eq(metadataFiles.season, season)
     ];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -514,59 +645,34 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    const result = await db
-      .delete(metadataFiles)
-      .where(and(...whereConditions))
-      .returning();
+    const result = await db.delete(metadataFiles).where(and(...whereConditions)).returning();
     return result.length;
   }
 
   async createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
-      
+      const [setting] = await tx.select().from(settings).where(eq(settings.key, "next_id"));
       let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
+      if (setting) currentId = parseInt(setting.value);
 
-      // Normalize breakTimes array once for the batch - filter empty strings and trim
-      const normalizedBreakTimes = (batch.breakTimes || [])
-        .filter(t => t && typeof t === 'string' && t.trim())
-        .map(t => t.trim());
-      
-      // Compute breakTime from normalized breakTimes, or use provided breakTime
-      const normalizedBreakTime = normalizedBreakTimes.length > 0 
-        ? normalizedBreakTimes[0] 
-        : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
-      
-      // Ensure breakTimes is populated from breakTime if empty
-      const finalBreakTimes = normalizedBreakTimes.length > 0 
-        ? normalizedBreakTimes 
-        : (normalizedBreakTime ? [normalizedBreakTime] : []);
+      const normalizedBreakTimes = (batch.breakTimes || []).filter(t => t && t.trim()).map(t => t.trim());
+      const normalizedBreakTime = normalizedBreakTimes.length > 0 ? normalizedBreakTimes[0] : (batch.breakTime?.trim() || null);
+      const finalBreakTimes = normalizedBreakTimes.length > 0 ? normalizedBreakTimes : (normalizedBreakTime ? [normalizedBreakTime] : []);
 
-      const files: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
+      const files: any[] = [];
       for (let i = 0; i < batch.episodeCount; i++) {
-        const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
+        const fileData: any = {
           id: formatMetadataId(currentId),
           title: batch.title,
           season: batch.season,
           episode: batch.startEpisode + i,
-          duration: (batch.duration || null) as any,
+          duration: batch.duration || null,
           breakTime: normalizedBreakTime,
           breakTimes: finalBreakTimes,
           endCredits: batch.endCredits,
           category: batch.category,
           seasonType: batch.seasonType,
-          contentType: (batch.contentType || null) as any,
+          contentType: batch.contentType || null,
           description: batch.description,
           genre: batch.genre,
           actors: batch.actors,
@@ -585,59 +691,26 @@ export class DatabaseStorage implements IStorage {
           draft: batch.draft ?? 0,
           createdBy: permissions.user.id,
         };
-
-        if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
-          fileData.groupId = permissions.groupIds[0];
-        }
-        
+        if (permissions.fileVisibility === "group" && permissions.groupIds?.length) fileData.groupId = permissions.groupIds[0];
         files.push(fileData);
         currentId++;
       }
-
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
-
-      const created = await tx.insert(metadataFiles).values(files).returning();
-      return created;
+      await tx.update(settings).set({ value: currentId.toString(), updatedAt: new Date() }).where(eq(settings.key, "next_id"));
+      return await tx.insert(metadataFiles).values(files).returning();
     });
   }
 
   async createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
-      
+      const [setting] = await tx.select().from(settings).where(eq(settings.key, "next_id"));
       let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
+      if (setting) currentId = parseInt(setting.value);
 
       const allFiles: any[] = [];
-
       for (const batch of data.batches) {
-        const normalizedBreakTimes = (batch.breakTimes || [])
-          .filter((t: any) => t && typeof t === 'string' && t.trim())
-          .map((t: any) => t.trim());
-        
-        const normalizedBreakTime = normalizedBreakTimes.length > 0 
-          ? normalizedBreakTimes[0] 
-          : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
-        
-        const finalBreakTimes = normalizedBreakTimes.length > 0 
-          ? normalizedBreakTimes 
-          : (normalizedBreakTime ? [normalizedBreakTime] : []);
+        const normalizedBreakTimes = (batch.breakTimes || []).filter(t => t && t.trim()).map(t => t.trim());
+        const normalizedBreakTime = normalizedBreakTimes.length > 0 ? normalizedBreakTimes[0] : (batch.breakTime?.trim() || null);
+        const finalBreakTimes = normalizedBreakTimes.length > 0 ? normalizedBreakTimes : (normalizedBreakTime ? [normalizedBreakTime] : []);
 
         for (const seasonConfig of batch.seasons) {
           for (let i = 0; i < seasonConfig.episodeCount; i++) {
@@ -645,14 +718,14 @@ export class DatabaseStorage implements IStorage {
               id: formatMetadataId(currentId),
               title: batch.title,
               season: seasonConfig.season,
-              episode: seasonConfig.startEpisode + i,
-              duration: batch.duration || "00:00:00",
+              episode: (seasonConfig.startEpisode || 1) + i,
+              duration: batch.duration || null,
               breakTime: normalizedBreakTime,
               breakTimes: finalBreakTimes,
               endCredits: batch.endCredits,
               category: batch.category,
               seasonType: batch.seasonType,
-              contentType: batch.contentType || "Long Form",
+              contentType: batch.contentType || null,
               description: batch.description,
               genre: batch.genre,
               actors: batch.actors,
@@ -673,25 +746,13 @@ export class DatabaseStorage implements IStorage {
               googleDriveLink: batch.googleDriveLink,
               createdBy: permissions.user.id,
             };
-
-            if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
-              fileData.groupId = permissions.groupIds[0];
-            }
-            
+            if (permissions.fileVisibility === "group" && permissions.groupIds?.length) fileData.groupId = permissions.groupIds[0];
             allFiles.push(fileData);
             currentId++;
           }
         }
       }
-
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
-
+      await tx.update(settings).set({ value: currentId.toString(), updatedAt: new Date() }).where(eq(settings.key, "next_id"));
       const created = await tx.insert(metadataFiles).values(allFiles).returning();
 
       if (data.taskDescription && created.length > 0) {
@@ -703,7 +764,6 @@ export class DatabaseStorage implements IStorage {
         }));
         await tx.insert(tasks).values(taskValues);
       }
-
       return created;
     });
   }
@@ -711,575 +771,144 @@ export class DatabaseStorage implements IStorage {
   async getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group") {
+      if (visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      else whereConditions.push(sql`1 = 0`);
     }
-    
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    const totalFiles = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(metadataFiles)
-      .where(whereClause);
-
+    const totalFiles = await db.select({ count: sql<number>`count(*)::int` }).from(metadataFiles).where(whereClause);
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const recentWhereConditions = [...whereConditions, gte(metadataFiles.createdAt, oneDayAgo)];
-    const recentFiles = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(metadataFiles)
-      .where(recentWhereConditions.length > 0 ? and(...recentWhereConditions) : gte(metadataFiles.createdAt, oneDayAgo));
-
-    const uniqueSeries = await db
-      .select({ count: sql<number>`count(distinct title)::int` })
-      .from(metadataFiles)
-      .where(whereClause);
-
-    return {
-      totalFiles: totalFiles[0]?.count || 0,
-      recentFiles: recentFiles[0]?.count || 0,
-      totalSeries: uniqueSeries[0]?.count || 0,
-    };
-  }
-
-  async getUserTags(userId: string, type: string): Promise<UserDefinedTag[]> {
-    return await db
-      .select()
-      .from(userDefinedTags)
-      .where(and(eq(userDefinedTags.userId, userId), eq(userDefinedTags.type, type)))
-      .orderBy(desc(userDefinedTags.createdAt));
-  }
-
-  async createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag> {
-    const [created] = await db
-      .insert(userDefinedTags)
-      .values(data)
-      .returning();
-    return created;
-  }
-
-  async deleteUserTag(id: number, userId: string): Promise<void> {
-    await db
-      .delete(userDefinedTags)
-      .where(and(eq(userDefinedTags.id, id), eq(userDefinedTags.userId, userId)));
+    const recentFiles = await db.select({ count: sql<number>`count(*)::int` }).from(metadataFiles).where(and(whereClause || sql`1=1`, gte(metadataFiles.createdAt, oneDayAgo)));
+    const uniqueSeries = await db.select({ count: sql<number>`count(distinct title)::int` }).from(metadataFiles).where(whereClause);
+    return { totalFiles: totalFiles[0]?.count || 0, recentFiles: recentFiles[0]?.count || 0, totalSeries: uniqueSeries[0]?.count || 0 };
   }
 
   async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.title, seriesTitle)];
-    
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group") {
+      if (visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      else whereConditions.push(sql`1 = 0`);
     }
-    
-    const files = await db
-      .select()
-      .from(metadataFiles)
-      .where(and(...whereConditions))
-      .orderBy(metadataFiles.season, metadataFiles.episode);
+    const files = await db.select().from(metadataFiles).where(and(...whereConditions)).orderBy(metadataFiles.season, metadataFiles.episode);
     return files.map(normalizeMetadataFile);
   }
 
   async getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [
-      eq(metadataFiles.title, seriesTitle),
-      eq(metadataFiles.season, season)
-    ];
-    
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
+    const whereConditions = [eq(metadataFiles.title, seriesTitle), eq(metadataFiles.season, season)];
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group") {
+      if (visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      else whereConditions.push(sql`1 = 0`);
     }
-    
-    const files = await db
-      .select()
-      .from(metadataFiles)
-      .where(and(...whereConditions))
-      .orderBy(metadataFiles.episode);
+    const files = await db.select().from(metadataFiles).where(and(...whereConditions)).orderBy(metadataFiles.episode);
     return files.map(normalizeMetadataFile);
   }
 
   async getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }> {
     const currentFile = await this.getMetadataFile(id, permissions);
-    if (!currentFile || !currentFile.season || !currentFile.episode) {
-      return { prev: null, next: null };
-    }
-
+    if (!currentFile?.season || !currentFile?.episode) return { prev: null, next: null };
     const visibility = getFileVisibilityConditions(permissions);
-    const baseConditions = [
-      eq(metadataFiles.title, currentFile.title),
-      eq(metadataFiles.season, currentFile.season),
-    ];
-    
-    if (visibility.type === "own") {
-      baseConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        baseConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        baseConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
-    }
+    const baseConditions = [eq(metadataFiles.title, currentFile.title), eq(metadataFiles.season, currentFile.season)];
+    if (visibility.type === "own") baseConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group" && visibility.groupIds?.length) baseConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+    else if (visibility.type === "group") return { prev: null, next: null };
 
-    const [prevFile] = await db
-      .select()
-      .from(metadataFiles)
-      .where(
-        and(
-          ...baseConditions,
-          sql`${metadataFiles.episode} < ${currentFile.episode}`
-        )
-      )
-      .orderBy(desc(metadataFiles.episode))
-      .limit(1);
-
-    const [nextFile] = await db
-      .select()
-      .from(metadataFiles)
-      .where(
-        and(
-          ...baseConditions,
-          sql`${metadataFiles.episode} > ${currentFile.episode}`
-        )
-      )
-      .orderBy(metadataFiles.episode)
-      .limit(1);
-
-    return {
-      prev: prevFile ? normalizeMetadataFile(prevFile) : null,
-      next: nextFile ? normalizeMetadataFile(nextFile) : null,
-    };
+    const [prev] = await db.select().from(metadataFiles).where(and(...baseConditions, sql`${metadataFiles.episode} < ${currentFile.episode}`)).orderBy(desc(metadataFiles.episode)).limit(1);
+    const [next] = await db.select().from(metadataFiles).where(and(...baseConditions, sql`${metadataFiles.episode} > ${currentFile.episode}`)).orderBy(metadataFiles.episode).limit(1);
+    return { prev: prev ? normalizeMetadataFile(prev) : null, next: next ? normalizeMetadataFile(next) : null };
   }
 
   async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [
-      or(
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + keyword + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`
-      )
-    ];
-    
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
+    const whereConditions = [or(sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + keyword + '%'})`, sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`)];
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group") {
+      if (visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      else whereConditions.push(sql`1 = 0`);
     }
-    
-    const files = await db
-      .select()
-      .from(metadataFiles)
-      .where(and(...whereConditions))
-      .orderBy(metadataFiles.title, metadataFiles.season, metadataFiles.episode)
-      .limit(100);
+    const files = await db.select().from(metadataFiles).where(and(...whereConditions)).orderBy(metadataFiles.title, metadataFiles.season, metadataFiles.episode).limit(100);
     return files.map(normalizeMetadataFile);
   }
 
   async searchLicenses(keyword: string): Promise<License[]> {
     const trimmed = keyword.trim();
-    if (!trimmed) {
-      return [];
-    }
-
-    return await db
-      .select()
-      .from(licenses)
-      .where(
-        or(
-          sql`LOWER(${licenses.name}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.distributor}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
-        )
-      )
-      .orderBy(desc(licenses.createdAt))
-      .limit(50);
+    if (!trimmed) return [];
+    return await db.select().from(licenses).where(or(sql`LOWER(${licenses.name}) LIKE LOWER(${'%' + trimmed + '%'})`, sql`LOWER(${licenses.distributor}) LIKE LOWER(${'%' + trimmed + '%'})`, sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${'%' + trimmed + '%'})`)).orderBy(desc(licenses.createdAt)).limit(50);
   }
 
   async searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]> {
     const trimmed = keyword.trim();
-    if (!trimmed) {
-      return [];
-    }
-
+    if (!trimmed) return [];
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [
-      or(
-        sql`LOWER(${tasks.description}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
-      )
-    ];
-
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
-    }
-
-    const results = await db
-      .select({
-        task: tasks,
-        metadataFile: metadataFiles,
-      })
-      .from(tasks)
-      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
-      .where(and(...whereConditions))
-      .orderBy(desc(tasks.createdAt))
-      .limit(100);
-
-    return results.map(r => ({
-      ...r.task,
-      metadataFile: normalizeMetadataFile(r.metadataFile),
-    }));
+    const whereConditions = [or(sql`LOWER(${tasks.description}) LIKE LOWER(${'%' + trimmed + '%'})`, sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + trimmed + '%'})`, sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + trimmed + '%'})`)];
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group" && visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+    else if (visibility.type === "group") return [];
+    const results = await db.select({ task: tasks, metadataFile: metadataFiles }).from(tasks).innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id)).where(and(...whereConditions)).orderBy(desc(tasks.createdAt)).limit(100);
+    return results.map(r => ({ ...r.task, metadataFile: normalizeMetadataFile(r.metadataFile) }));
   }
 
-  async listAllUsers(): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(desc(users.createdAt));
-  }
-
-  async updateUserAdminStatus(userId: string, isAdmin: boolean): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        isAdmin: isAdmin ? 1 : 0,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserStatus(userId: string, status: string): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserPermissions(userId: string, permissions: {
-    canReadMetadata: number, 
-    canWriteMetadata: number,
-    canReadLicenses: number,
-    canWriteLicenses: number,
-    canReadTasks: number,
-    canWriteTasks: number,
-    canUseAI: number,
-    canUseAIChat: number
-  }): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        ...permissions,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        password: passwordHash,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        fileVisibility,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserGroups(userId: string, groupIds: string[]): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        groupIds,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined> {
-    const [updated] = await db
-      .update(users)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
-  }
-
-  async deleteUser(userId: string): Promise<boolean> {
-    const result = await db
-      .delete(users)
-      .where(eq(users.id, userId))
-      .returning();
-    return result.length > 0;
-  }
-
-  async getUsersByGroupId(groupId: string): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .where(sql`${groupId} = ANY(${users.groupIds})`);
-  }
-
-  async createGroup(group: InsertGroup): Promise<Group> {
-    const [created] = await db
-      .insert(groups)
-      .values(group)
-      .returning();
-    return created;
-  }
-
-  async getAllGroups(): Promise<Group[]> {
-    return await db
-      .select()
-      .from(groups)
-      .orderBy(groups.name);
-  }
-
-  async deleteGroup(groupId: string): Promise<boolean> {
-    const result = await db
-      .delete(groups)
-      .where(eq(groups.id, groupId))
-      .returning();
-    return result.length > 0;
-  }
-
-  async createLicense(license: InsertLicense): Promise<License> {
-    const [created] = await db.insert(licenses).values(license).returning();
-    return created;
-  }
-
-  async getLicense(id: string): Promise<License | undefined> {
-    const [license] = await db.select().from(licenses).where(eq(licenses.id, id));
-    return license;
-  }
-
-  async listLicenses(): Promise<License[]> {
-    return await db.select().from(licenses).orderBy(desc(licenses.createdAt));
-  }
-
-  async updateLicense(id: string, data: Partial<InsertLicense>): Promise<License | undefined> {
-    const [updated] = await db
-      .update(licenses)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(licenses.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteLicense(id: string): Promise<boolean> {
-    const result = await db.delete(licenses).where(eq(licenses.id, id)).returning();
-    return result.length > 0;
-  }
+  async listAllUsers(): Promise<User[]> { return await db.select().from(users).orderBy(desc(users.createdAt)); }
+  async updateUserAdminStatus(userId: string, isAdmin: boolean): Promise<User | undefined> { const [updated] = await db.update(users).set({ isAdmin: isAdmin ? 1 : 0, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserStatus(userId: string, status: string): Promise<User | undefined> { const [updated] = await db.update(users).set({ status, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserPermissions(userId: string, permissions: any): Promise<User | undefined> { const [updated] = await db.update(users).set({ ...permissions, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserPassword(userId: string, passwordHash: string): Promise<User | undefined> { const [updated] = await db.update(users).set({ password: passwordHash, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined> { const [updated] = await db.update(users).set({ fileVisibility, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserGroups(userId: string, groupIds: string[]): Promise<User | undefined> { const [updated] = await db.update(users).set({ groupIds, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined> { const [updated] = await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, userId)).returning(); return updated; }
+  async deleteUser(userId: string): Promise<boolean> { const result = await db.delete(users).where(eq(users.id, userId)).returning(); return result.length > 0; }
+  async getUsersByGroupId(groupId: string): Promise<User[]> { return await db.select().from(users).where(sql`${groupId} = ANY(${users.groupIds})`); }
+  async createGroup(group: InsertGroup): Promise<Group> { const [created] = await db.insert(groups).values(group).returning(); return created; }
+  async getAllGroups(): Promise<Group[]> { return await db.select().from(groups).orderBy(groups.name); }
+  async deleteGroup(groupId: string): Promise<boolean> { const result = await db.delete(groups).where(eq(groups.id, groupId)).returning(); return result.length > 0; }
+  async createLicense(license: InsertLicense): Promise<License> { const [created] = await db.insert(licenses).values(license).returning(); return created; }
+  async getLicense(id: string): Promise<License | undefined> { const [license] = await db.select().from(licenses).where(eq(licenses.id, id)); return license; }
+  async listLicenses(): Promise<License[]> { return await db.select().from(licenses).orderBy(desc(licenses.createdAt)); }
+  async updateLicense(id: string, data: Partial<InsertLicense>): Promise<License | undefined> { const [updated] = await db.update(licenses).set({ ...data, updatedAt: new Date() }).where(eq(licenses.id, id)).returning(); return updated; }
+  async deleteLicense(id: string): Promise<boolean> { const result = await db.delete(licenses).where(eq(licenses.id, id)).returning(); return result.length > 0; }
 
   async generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
-  
+      const [setting] = await tx.select().from(settings).where(eq(settings.key, "next_id"));
       let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
-  
+      if (setting) currentId = parseInt(setting.value);
       const files: any[] = [];
-      const { licenseId, seriesTitle, seasonStart, seasonEnd, episodesPerSeason } = data;
-  
-      for (let season = seasonStart; season <= seasonEnd; season++) {
-        for (let episode = 1; episode <= episodesPerSeason; episode++) {
-          files.push({
-            id: formatMetadataId(currentId),
-            title: seriesTitle,
-            season: season,
-            episode: episode,
-            licenseId: licenseId,
-            draft: 1,
-            createdBy: userId,
-            duration: "00:00:00", // Default required field
-            contentType: "Long Form", // Default required
-            breakTimes: [],
-            tags: [],
-          });
+      for (let s = data.seasonStart; s <= data.seasonEnd; s++) {
+        for (let e = 1; e <= data.episodesPerSeason; e++) {
+          files.push({ id: formatMetadataId(currentId), title: data.seriesTitle, season: s, episode: e, licenseId: data.licenseId, draft: 1, createdBy: userId, duration: "00:00:00", contentType: "Long Form", breakTimes: [], tags: [] });
           currentId++;
         }
       }
-  
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
-  
-      const created = await tx.insert(metadataFiles).values(files).returning();
-      return created;
+      await tx.update(settings).set({ value: currentId.toString(), updatedAt: new Date() }).where(eq(settings.key, "next_id"));
+      return await tx.insert(metadataFiles).values(files).returning();
     });
   }
 
-  async createTask(taskData: InsertTask & { createdBy: string }): Promise<Task> {
-    const [task] = await db.insert(tasks).values(taskData).returning();
-    return task;
-  }
-
-  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]> {
-    const { metadataFileIds, description, createdBy } = taskData;
-    if (metadataFileIds.length === 0) return [];
-
-    const values = metadataFileIds.map(fileId => ({
-      metadataFileId: fileId,
-      description,
-      status: "pending" as const,
-      createdBy,
-    }));
-
-    return await db.insert(tasks).values(values).returning();
-  }
-
-  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
+  async createTask(taskData: InsertTask & { createdBy: string }): Promise<Task> { const [task] = await db.insert(tasks).values(taskData).returning(); return task; }
+  async bulkCreateTasks(taskData: any): Promise<Task[]> { if (!taskData.metadataFileIds?.length) return []; const values = taskData.metadataFileIds.map((id: string) => ({ metadataFileId: id, description: taskData.description, status: "pending", createdBy: taskData.createdBy })); return await db.insert(tasks).values(values).returning(); }
+  async listTasks(permissions: UserPermissions, status?: string): Promise<any[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
-    if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
-    } else if (visibility.type === "group") {
-      if (visibility.groupIds && visibility.groupIds.length > 0) {
-        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
-        whereConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
-      } else {
-        whereConditions.push(sql`1 = 0`);
-      }
-    }
-
-    if (status) {
-      whereConditions.push(eq(tasks.status, status));
-    }
-    
-    const results = await db
-      .select({
-        task: tasks,
-        metadataFile: metadataFiles,
-      })
-      .from(tasks)
-      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
-      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
-      .orderBy(desc(tasks.createdAt));
-
-    return results.map(r => ({
-      ...r.task,
-      metadataFile: normalizeMetadataFile(r.metadataFile)
-    }));
+    if (visibility.type === "own") whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+    else if (visibility.type === "group" && visibility.groupIds?.length) whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+    else if (visibility.type === "group") return [];
+    if (status) whereConditions.push(eq(tasks.status, status));
+    const results = await db.select({ task: tasks, metadataFile: metadataFiles }).from(tasks).innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id)).where(whereConditions.length ? and(...whereConditions) : undefined).orderBy(desc(tasks.createdAt));
+    return results.map(r => ({ ...r.task, metadataFile: normalizeMetadataFile(r.metadataFile) }));
   }
-
-  async getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]> {
-    return await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.metadataFileId, fileId))
-      .orderBy(desc(tasks.createdAt));
-  }
-
-  async updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined> {
-    const [updated] = await db
-      .update(tasks)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(tasks.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteTask(id: number): Promise<boolean> {
-    const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
-    return result.length > 0;
-  }
-
-  async getSetting(key: string): Promise<Setting | undefined> {
-    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
-    return setting;
-  }
-
-  async setSetting(key: string, value: string): Promise<Setting> {
-    const [setting] = await db
-      .insert(settings)
-      .values({ key, value })
-      .onConflictDoUpdate({
-        target: settings.key,
-        set: { value, updatedAt: new Date() },
-      })
-      .returning();
-    return setting;
-  }
-
-  async getSettingsByKeys(keys: string[]): Promise<Setting[]> {
-    if (keys.length === 0) return [];
-    return await db.select().from(settings).where(inArray(settings.key, keys));
-  }
+  async getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]> { return await db.select().from(tasks).where(eq(tasks.metadataFileId, fileId)).orderBy(desc(tasks.createdAt)); }
+  async updateTask(id: number, data: any): Promise<Task | undefined> { const [updated] = await db.update(tasks).set({ ...data, updatedAt: new Date() }).where(eq(tasks.id, id)).returning(); return updated; }
+  async deleteTask(id: number): Promise<boolean> { const result = await db.delete(tasks).where(eq(tasks.id, id)).returning(); return result.length > 0; }
+  async getSetting(key: string): Promise<Setting | undefined> { const [setting] = await db.select().from(settings).where(eq(settings.key, key)); return setting; }
+  async setSetting(key: string, value: string): Promise<Setting> { const [setting] = await db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value, updatedAt: new Date() } }).returning(); return setting; }
+  async getSettingsByKeys(keys: string[]): Promise<Setting[]> { if (!keys.length) return []; return await db.select().from(settings).where(inArray(settings.key, keys)); }
+  async getUserTags(userId: string, type: string): Promise<UserDefinedTag[]> { return await db.select().from(userDefinedTags).where(and(eq(userDefinedTags.userId, userId), eq(userDefinedTags.type, type))).orderBy(desc(userDefinedTags.createdAt)); }
+  async createUserTag(data: any): Promise<UserDefinedTag> { const [created] = await db.insert(userDefinedTags).values(data).returning(); return created; }
+  async deleteUserTag(id: number, userId: string): Promise<void> { await db.delete(userDefinedTags).where(and(eq(userDefinedTags.id, id), eq(userDefinedTags.userId, userId))); }
 }
 
 export const storage = new DatabaseStorage();

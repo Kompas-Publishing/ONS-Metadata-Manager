@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
-  LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle
+  LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -68,6 +68,61 @@ export default function Browse() {
   const { canWriteMetadata, canReadMetadata } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const importXlsxMutation = useMutation({
+    mutationFn: async (files: FileList) => {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+      }
+      const res = await fetch("/api/metadata/import-xlsx", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to import XLSX");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      toast({
+        title: "Import successful",
+        description: data.message,
+      });
+      if (data.errors && data.errors.length > 0) {
+        data.errors.slice(0, 3).forEach((err: string) => {
+          toast({
+            title: "Import Warning",
+            description: err,
+            variant: "destructive",
+          });
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImportClick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = ".xlsx";
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files.length > 0) {
+        importXlsxMutation.mutate(files);
+      }
+    };
+    input.click();
+  };
 
   useEffect(() => {
     document.title = "Browse Series | ONS Broadcast Portal";
@@ -209,6 +264,22 @@ export default function Browse() {
         </div>
         {!selectedSeries && (
           <div className="flex items-center gap-2 w-full md:w-auto">
+            {canWriteMetadata && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={handleImportClick}
+                disabled={importXlsxMutation.isPending}
+                data-testid="button-import-xlsx"
+              >
+                {importXlsxMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+                Import XLSX
+              </Button>
+            )}
             <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
               <SelectTrigger className="w-full md:w-[200px]">
                 <SelectValue placeholder="Sort by" />

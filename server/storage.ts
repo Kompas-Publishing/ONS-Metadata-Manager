@@ -45,6 +45,7 @@ export interface IStorage {
   getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses>;
   updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
+  upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses>;
   bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
   deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
@@ -452,7 +453,7 @@ export class DatabaseStorage implements IStorage {
     const whereConditions = [eq(metadataFiles.id, id)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -516,6 +517,75 @@ export class DatabaseStorage implements IStorage {
     const finalLicenseIds = finalLinks.map(l => l.licenseId);
 
     return normalizeMetadataFile(updated, finalLicenseIds);
+  }
+
+  async upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, ...data } = file;
+    let existingFile: MetadataFile | undefined;
+
+    // 1. Try to find by originalId if provided
+    if (originalId) {
+      // For upsert match, we check visibility
+      const visibility = getFileVisibilityConditions(permissions);
+      const whereConditions = [eq(metadataFiles.id, originalId)];
+      
+      if (visibility.type === "own") {
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+      } else if (visibility.type === "group") {
+        if (visibility.groupIds && visibility.groupIds.length > 0) {
+          whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        } else {
+          whereConditions.push(sql`1 = 0`);
+        }
+      }
+
+      const [res] = await db
+        .select()
+        .from(metadataFiles)
+        .where(and(...whereConditions));
+      existingFile = res;
+    }
+
+    // 2. If not found by ID, try to find by series title, season, and episode
+    if (!existingFile && data.seriesTitle && data.season && data.episode) {
+      const visibility = getFileVisibilityConditions(permissions);
+      const whereConditions = [
+        eq(metadataFiles.seriesTitle, data.seriesTitle),
+        eq(metadataFiles.season, data.season),
+        eq(metadataFiles.episode, data.episode)
+      ];
+      
+      if (visibility.type === "own") {
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+      } else if (visibility.type === "group") {
+        if (visibility.groupIds && visibility.groupIds.length > 0) {
+          whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+        } else {
+          whereConditions.push(sql`1 = 0`);
+        }
+      }
+
+      const [res] = await db
+        .select()
+        .from(metadataFiles)
+        .where(and(...whereConditions));
+      existingFile = res;
+    }
+
+    if (existingFile) {
+      // Update
+      const updated = await this.updateMetadataFile(existingFile.id, file, permissions);
+      if (!updated) {
+        // This shouldn't happen given we checked visibility above, but as a fallback
+        const newId = await this.consumeNextId();
+        return await this.createMetadataFile(file, newId, permissions);
+      }
+      return updated;
+    } else {
+      // Create
+      const newId = await this.consumeNextId();
+      return await this.createMetadataFile(file, newId, permissions);
+    }
   }
 
   async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {
