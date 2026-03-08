@@ -29,7 +29,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   try {
     let fileBuffer: Buffer;
     let mimeType: string;
-    let type: string;
+    let type: "license" | "metadata";
     let feedback: string;
     let previousProposals: any[];
 

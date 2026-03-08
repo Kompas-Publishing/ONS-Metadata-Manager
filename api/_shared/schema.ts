@@ -229,7 +229,7 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   googleDriveLink: z.string().optional(),
   subsStatus: z.string().optional(),
   metadataTimesStatus: z.string().optional(),
-  seriesId: z.string().optional(),
+  seriesId: z.string().nullable().optional(),
   draft: z.number().int().min(0).max(1).optional(),
   licenseId: z.string().optional(),
 }).extend({

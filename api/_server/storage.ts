@@ -25,6 +25,7 @@ import {
   type Task,
   type InsertTask,
   type SeriesItem,
+  type Series,
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
@@ -1578,7 +1579,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Settings
-  getSetting(key: string): Promise<Setting | undefined> {
+  async getSetting(key: string): Promise<Setting | undefined> {
     const [setting] = await db.select().from(settings).where(eq(settings.key, key));
     return setting;
   }
