@@ -374,7 +374,9 @@ export default function Browse() {
                         {series.episodeCount} {series.episodeCount === 1 ? "Episode" : "Episodes"}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary">{series.category}</Badge>
+                        {series.category && series.category !== "Unknown" && (
+                          <Badge variant="secondary">{series.category}</Badge>
+                        )}
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                           Added {format(series.lastAddedAt, "dd MMM yyyy")}
                         </span>
@@ -444,7 +446,11 @@ export default function Browse() {
                         onClick={() => setSelectedSeries(series.title)}
                       >
                         <TableCell className="font-medium">{series.title}</TableCell>
-                        <TableCell><Badge variant="outline">{series.category}</Badge></TableCell>
+                        <TableCell>
+                          {series.category && series.category !== "Unknown" ? (
+                            <Badge variant="outline">{series.category}</Badge>
+                          ) : null}
+                        </TableCell>
                         <TableCell>{series.seasonCount}</TableCell>
                         <TableCell>{series.episodeCount}</TableCell>
                         <TableCell className="text-muted-foreground">{format(series.lastAddedAt, "dd-MM-yyyy")}</TableCell>
@@ -481,7 +487,9 @@ export default function Browse() {
           <div>
             <h2 className="text-2xl font-semibold mb-2">{selectedSeriesData?.title}</h2>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary">{selectedSeriesData?.category}</Badge>
+              {selectedSeriesData?.category && selectedSeriesData.category !== "Unknown" && (
+                <Badge variant="secondary">{selectedSeriesData.category}</Badge>
+              )}
               <Badge variant="outline">
                 {selectedSeriesData?.seasonCount} {selectedSeriesData?.seasonCount === 1 ? "Season" : "Seasons"}
               </Badge>
@@ -721,11 +729,44 @@ export default function Browse() {
                               </Link>
                             )}
                             {canWriteMetadata && (
-                              <Link href={`/edit/${episode.id}`}>
-                                <Button size="sm" variant="outline" data-testid={`button-edit-episode-${episode.id}`} title="Edit Episode">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              </Link>
+                              <>
+                                <Link href={`/edit/${episode.id}`}>
+                                  <Button size="sm" variant="outline" data-testid={`button-edit-episode-${episode.id}`} title="Edit Episode">
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </Link>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      data-testid={`button-delete-episode-${episode.id}`}
+                                      title="Delete Episode"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Episode?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete episode <strong>{episode.id}</strong> ({episode.title}). 
+                                        This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteEpisodeMutation.mutate(episode.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
                             )}
                           </div>
                         </div>
