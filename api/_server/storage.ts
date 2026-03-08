@@ -24,7 +24,7 @@ import {
   type LicenseBatchGenerate,
   type Task,
   type InsertTask,
-  type Series,
+  type SeriesItem,
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
@@ -113,10 +113,10 @@ export type IStorage = {
   deleteTask(id: number): Promise<boolean>;
 
   // Series Management
-  getSeriesById(id: string): Promise<Series | undefined>;
-  getSeriesByTitle(title: string): Promise<Series | undefined>;
-  getAllSeries(): Promise<Series[]>;
-  upsertSeries(data: InsertSeries): Promise<Series>;
+  getSeriesById(id: string): Promise<SeriesItem | undefined>;
+  getSeriesByTitle(title: string): Promise<SeriesItem | undefined>;
+  getAllSeries(): Promise<SeriesItem[]>;
+  upsertSeries(data: InsertSeries): Promise<SeriesItem>;
   deleteSeries(id: string): Promise<boolean>;
   linkSeriesToLicense(seriesId: string, licenseId: string, seasonRange?: string): Promise<void>;
   unlinkSeriesFromLicense(seriesId: string, licenseId: string): Promise<void>;
@@ -191,7 +191,7 @@ export class DatabaseStorage {
       .values(userData)
       .onConflictDoUpdate({
         target: users.email,
-        set: {
+        "set": {
           ...userData,
           updatedAt: new Date(),
         },
@@ -1478,27 +1478,27 @@ export class DatabaseStorage {
   }
 
   // Series Management
-  async getSeriesById(id: string): Promise<Series | undefined> {
+  async getSeriesById(id: string): Promise<SeriesItem | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.id, id));
     return item;
   }
 
-  async getSeriesByTitle(title: string): Promise<Series | undefined> {
+  async getSeriesByTitle(title: string): Promise<SeriesItem | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.title, title));
     return item;
   }
 
-  async getAllSeries(): Promise<Series[]> {
+  async getAllSeries(): Promise<SeriesItem[]> {
     return await db.select().from(seriesTable).orderBy(seriesTable.title);
   }
 
-  async upsertSeries(data: InsertSeries): Promise<Series> {
+  async upsertSeries(data: InsertSeries): Promise<SeriesItem> {
     const [item] = await db
       .insert(seriesTable)
       .values(data)
       .onConflictDoUpdate({
         target: seriesTable.title,
-        set: {
+        "set": {
           ...data,
           updatedAt: new Date(),
         },
@@ -1518,7 +1518,7 @@ export class DatabaseStorage {
       .values({ seriesId, licenseId, seasonRange })
       .onConflictDoUpdate({
         target: [seriesToLicenses.seriesId, seriesToLicenses.licenseId],
-        set: { seasonRange },
+        "set": { seasonRange },
       });
   }
 
@@ -1586,7 +1586,7 @@ export class DatabaseStorage {
       .values({ key, value })
       .onConflictDoUpdate({
         target: settings.key,
-        set: { value, updatedAt: new Date() },
+        "set": { value, updatedAt: new Date() },
       })
       .returning();
     return setting;

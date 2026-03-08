@@ -124,7 +124,7 @@ export const seriesTable = pgTable("series", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type Series = typeof seriesTable.$inferSelect;
+export type SeriesItem = typeof seriesTable.$inferSelect;
 export type InsertSeries = typeof seriesTable.$inferInsert;
 
 // Join table for many-to-many Series-License relationship

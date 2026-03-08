@@ -17,6 +17,14 @@ export function signToken(user: User): string {
     email: user.email,
   };
 
+  // @ts-ignore - jsonwebtoken types can be tricky in ESM
+  const sign = (jwt.sign || (jwt as any).default?.sign);
+  if (typeof sign === 'function') {
+    return sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+  }
+  
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
@@ -24,8 +32,12 @@ export function signToken(user: User): string {
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    return payload;
+    // @ts-ignore
+    const verify = (jwt.verify || (jwt as any).default?.verify);
+    if (typeof verify === 'function') {
+      return verify(token, JWT_SECRET) as JWTPayload;
+    }
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
   } catch (error) {
     console.error("JWT verification failed:", error);
     return null;
