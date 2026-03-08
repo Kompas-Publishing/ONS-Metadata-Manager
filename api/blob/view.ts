@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { apiHandler, requireAuth, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import { apiHandler, requireAuth, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler";
 
 /**
  * Proxy endpoint to view private blobs.

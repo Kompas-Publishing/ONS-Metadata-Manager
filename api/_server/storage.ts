@@ -28,13 +28,16 @@ import {
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
-} from "../_shared/schema.js";
-import { db } from "./db.js";
+} from "../_shared/schema";
+import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
+
+export type MetadataUpdateInput = Partial<InsertMetadataFile> & { licenseIds?: string[] };
+export type BulkMetadataUpdate = { id: string, data: MetadataUpdateInput };
 
 export type IStorage = {
   getUser(id: string): Promise<User | undefined>;
@@ -52,7 +55,7 @@ export type IStorage = {
   createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses>;
   updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
   upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses>;
-  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
+  bulkUpdateMetadata(updates: BulkMetadataUpdate[], permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
   deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
   deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number>;
@@ -614,7 +617,7 @@ export class DatabaseStorage {
     }
   }
 
-  async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number> {
+  async bulkUpdateMetadata(updates: BulkMetadataUpdate[], permissions: UserPermissions): Promise<number> {
     const visibility = getFileVisibilityConditions(permissions);
     
     return await db.transaction(async (tx) => {

@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
-import { storage } from "../_server/storage.js";
-import { apiHandler } from "../_lib/apiHandler.js";
-import { signToken } from "../_server/jwt.js";
-import { serialize } from "cookie";
+import { storage } from "../_server/storage";
+import { apiHandler } from "../_lib/apiHandler";
+import { signToken } from "../_server/jwt";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { serialize } = require('cookie');
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== "POST") {

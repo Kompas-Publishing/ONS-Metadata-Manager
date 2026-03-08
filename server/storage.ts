@@ -36,7 +36,7 @@ import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 
-export interface IStorage {
+export type IStorage = {
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -127,7 +127,7 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
   getSettingsByKeys(keys: string[]): Promise<Setting[]>;
-}
+};
 
 function formatMetadataId(num: number): string {
   const segment3 = String(num % 1000).padStart(3, '0');
@@ -165,7 +165,7 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   };
 }
 
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;

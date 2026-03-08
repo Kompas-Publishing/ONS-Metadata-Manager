@@ -1,5 +1,5 @@
-import { storage } from "./storage.js";
-import type { User } from "../_shared/schema.js";
+import { storage } from "./storage";
+import type { User } from "../_shared/schema";
 
 export type UserPermissions = {
   user: User;

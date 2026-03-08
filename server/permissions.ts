@@ -1,7 +1,7 @@
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 
-export interface UserPermissions {
+export type UserPermissions = {
   user: User;
   userId: string;
   isAdmin: boolean;
@@ -15,7 +15,7 @@ export interface UserPermissions {
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
-}
+};
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);

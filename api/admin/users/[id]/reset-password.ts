@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../../../_server/storage.js";
-import { apiHandler, requireAdmin, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
+import { storage } from "../../../_server/storage";
+import { apiHandler, requireAdmin, type AuthenticatedRequest } from "../../../_lib/apiHandler";
 import bcrypt from "bcryptjs";
 
 export default apiHandler(
