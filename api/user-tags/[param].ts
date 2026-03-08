@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { apiHandler, requireAuth, type AuthenticatedRequest } from "../_lib/apiHandler";
+import { storage } from "../_server/storage.js";
+import { apiHandler, requireAuth, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
   requireAuth(async (req: AuthenticatedRequest, res: VercelResponse) => {

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { aiService } from "../_server/ai-service";
-import { withCors, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler";
+import { aiService } from "../_server/ai-service.js";
+import { withCors, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import multer from "multer";
 
 // Multer configuration

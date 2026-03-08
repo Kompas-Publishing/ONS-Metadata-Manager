@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { withCors, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler";
+import { storage } from "../_server/storage.js";
+import { withCors, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   if (req.method !== "POST") {

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler";
-import { batchCreateSchema } from "../_shared/schema";
+import { storage } from "../_server/storage.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import { batchCreateSchema } from "../_shared/schema.js";
 
 export default apiHandler(
   requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {

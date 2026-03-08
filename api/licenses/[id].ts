@@ -1,9 +1,9 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { apiHandler, type AuthenticatedRequest } from "../_lib/apiHandler";
-import { insertLicenseSchema } from "../_shared/schema";
-import { getUserPermissions } from "../_server/permissions";
-import { authenticate } from "../_lib/apiHandler";
+import { storage } from "../_server/storage.js";
+import { apiHandler, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import { insertLicenseSchema } from "../_shared/schema.js";
+import { getUserPermissions } from "../_server/permissions.js";
+import { authenticate } from "../_lib/apiHandler.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   const { id } = req.query;

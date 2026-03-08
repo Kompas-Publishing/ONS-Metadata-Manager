@@ -2,13 +2,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { extname } from "path";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-import { storage } from "./storage";
-import type { UserPermissions } from "./permissions";
+import { storage } from "./storage.js";
+import type { UserPermissions } from "./permissions.js";
 import { 
   insertMetadataFileSchema, 
   insertLicenseSchema, 
   insertTaskSchema 
-} from "../_shared/schema";
+} from "../_shared/schema.js";
 
 export type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool";

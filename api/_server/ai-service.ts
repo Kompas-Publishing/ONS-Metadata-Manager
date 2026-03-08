@@ -1,12 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import { 
   type InsertLicense, 
   type InsertMetadataFile,
   type License,
   type MetadataFile 
-} from "../_shared/schema";
-import { type UserPermissions } from "./permissions";
+} from "../_shared/schema.js";
+import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 

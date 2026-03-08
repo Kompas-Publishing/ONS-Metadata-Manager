@@ -1,10 +1,8 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler";
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const multer = require('multer');
-const XLSX = require('xlsx');
+import { storage } from "../_server/storage.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
+import multer from 'multer';
+import * as XLSX from 'xlsx';
 
 // Initialize multer for file handling
 const upload = multer({

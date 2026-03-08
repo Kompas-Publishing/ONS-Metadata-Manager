@@ -1,8 +1,8 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage";
-import { apiHandler, type AuthenticatedRequest, authenticate } from "../_lib/apiHandler";
-import { licenseBatchGenerateSchema } from "../_shared/schema";
-import { getUserPermissions } from "../_server/permissions";
+import { storage } from "../_server/storage.js";
+import { apiHandler, type AuthenticatedRequest, authenticate } from "../_lib/apiHandler.js";
+import { licenseBatchGenerateSchema } from "../_shared/schema.js";
+import { getUserPermissions } from "../_server/permissions.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   if (req.method !== "POST") {

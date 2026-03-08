@@ -28,10 +28,10 @@ import {
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
-} from "../_shared/schema";
-import { db } from "./db";
+} from "../_shared/schema.js";
+import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
 
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };

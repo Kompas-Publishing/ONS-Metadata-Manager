@@ -1,8 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { apiHandler } from "../_lib/apiHandler";
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { serialize } = require('cookie');
+import { apiHandler } from "../_lib/apiHandler.js";
+import { serialize } from "cookie";
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== "POST") {
