@@ -4,12 +4,12 @@ import type { User } from "../_shared/schema.js";
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET!;
 const JWT_EXPIRES_IN = "7d"; // 7 days to match old session TTL
 
-export interface JWTPayload {
+export type JWTPayload = {
   userId: string;
   email: string;
   iat?: number;
   exp?: number;
-}
+};
 
 export function signToken(user: User): string {
   const payload: JWTPayload = {

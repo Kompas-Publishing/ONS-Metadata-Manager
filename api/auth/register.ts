@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
 import { storage } from "../_server/storage.js";
 import { apiHandler } from "../_lib/apiHandler.js";
+import { signToken } from "../_server/jwt.js";
+import { serialize } from "cookie";
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== "POST") {
@@ -41,8 +43,6 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
     });
 
     // Generate JWT token for auto-login
-    const { signToken } = await import("../_server/jwt.js");
-    const { serialize } = await import("cookie");
     const token = signToken(user);
 
     // Set HTTP-only cookie

@@ -287,7 +287,7 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
           parameters: {
             type: "OBJECT",
             properties: {
-              action: { type: "STRING", enum: ["create", "update"] },
+              action: { type: "STRING", "enum": ["create", "update"] },
               id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
               data: { 
                 type: "OBJECT", 
@@ -304,7 +304,7 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
           parameters: {
             type: "OBJECT",
             properties: {
-              action: { type: "STRING", enum: ["create", "update"] },
+              action: { type: "STRING", "enum": ["create", "update"] },
               id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
               data: { 
                 type: "OBJECT", 

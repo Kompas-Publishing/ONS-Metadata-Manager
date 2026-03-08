@@ -7,7 +7,7 @@ import {
   licenses,
   metadataToLicenses,
   tasks,
-  series,
+  seriesTable,
   seriesToLicenses,
   type User,
   type UpsertUser,
@@ -36,7 +36,7 @@ import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 
-export interface IStorage {
+export type IStorage = {
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -127,7 +127,7 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
   getSettingsByKeys(keys: string[]): Promise<Setting[]>;
-}
+};
 
 function formatMetadataId(num: number): string {
   const segment3 = String(num % 1000).padStart(3, '0');
@@ -165,7 +165,7 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   };
 }
 
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -1479,25 +1479,25 @@ export class DatabaseStorage implements IStorage {
 
   // Series Management
   async getSeriesById(id: string): Promise<Series | undefined> {
-    const [item] = await db.select().from(series).where(eq(series.id, id));
+    const [item] = await db.select().from(seriesTable).where(eq(seriesTable.id, id));
     return item;
   }
 
   async getSeriesByTitle(title: string): Promise<Series | undefined> {
-    const [item] = await db.select().from(series).where(eq(series.title, title));
+    const [item] = await db.select().from(seriesTable).where(eq(seriesTable.title, title));
     return item;
   }
 
   async getAllSeries(): Promise<Series[]> {
-    return await db.select().from(series).orderBy(series.title);
+    return await db.select().from(seriesTable).orderBy(seriesTable.title);
   }
 
   async upsertSeries(data: InsertSeries): Promise<Series> {
     const [item] = await db
-      .insert(series)
+      .insert(seriesTable)
       .values(data)
       .onConflictDoUpdate({
-        target: series.title,
+        target: seriesTable.title,
         set: {
           ...data,
           updatedAt: new Date(),
@@ -1508,7 +1508,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSeries(id: string): Promise<boolean> {
-    const result = await db.delete(series).where(eq(series.id, id)).returning();
+    const result = await db.delete(seriesTable).where(eq(seriesTable.id, id)).returning();
     return result.length > 0;
   }
 

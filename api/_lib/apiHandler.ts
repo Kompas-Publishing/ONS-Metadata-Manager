@@ -4,11 +4,11 @@ import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPa
 import type { User } from "../_shared/schema.js";
 import { getUserPermissions, requirePermission as checkPermission, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
 
-export interface AuthenticatedRequest extends VercelRequest {
+export type AuthenticatedRequest = VercelRequest & {
   user?: User;
   userId?: string;
   permissions?: UserPermissions;
-}
+};
 
 export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void | VercelResponse> | void | VercelResponse;
 

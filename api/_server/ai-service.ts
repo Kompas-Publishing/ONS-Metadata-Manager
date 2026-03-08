@@ -11,10 +11,10 @@ import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 
 export class AiService {
-  private genAI: GoogleGenerativeAI | null = null;
-  private model: string = "gemini-3-pro-preview";
+  genAI: GoogleGenerativeAI | null = null;
+  model: string = "gemini-3-pro-preview";
 
-  private async initialize() {
+  async initialize() {
     const apiKey = (await storage.getSetting("ai_api_key"))?.value;
     const provider = (await storage.getSetting("ai_provider"))?.value;
     const configuredModel = (await storage.getSetting("ai_model"))?.value;
@@ -27,8 +27,7 @@ export class AiService {
     this.model = configuredModel || "gemini-3-pro-preview";
   }
 
-  private async extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {
-    if (mimeType === "text/csv" || mimeType === "text/plain") {
+  async extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {    if (mimeType === "text/csv" || mimeType === "text/plain") {
       return fileBuffer.toString("utf-8");
     } else if (
       mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||

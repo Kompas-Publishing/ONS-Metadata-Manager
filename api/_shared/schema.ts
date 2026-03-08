@@ -113,7 +113,7 @@ export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
 
 // Series table
-export const series = pgTable("series", {
+export const seriesTable = pgTable("series", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull().unique(),
   productionYear: integer("production_year"),
@@ -124,12 +124,12 @@ export const series = pgTable("series", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type Series = typeof series.$inferSelect;
-export type InsertSeries = typeof series.$inferInsert;
+export type Series = typeof seriesTable.$inferSelect;
+export type InsertSeries = typeof seriesTable.$inferInsert;
 
 // Join table for many-to-many Series-License relationship
 export const seriesToLicenses = pgTable("series_to_licenses", {
-  seriesId: varchar("series_id").notNull().references(() => series.id, { onDelete: "cascade" }),
+  seriesId: varchar("series_id").notNull().references(() => seriesTable.id, { onDelete: "cascade" }),
   licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
   seasonRange: text("season_range"), // E.G. "1-4"
 }, (t) => [
@@ -176,7 +176,7 @@ export const metadataFiles = pgTable("metadata_files", {
   googleDriveLink: text("google_drive_link"),
   subsStatus: varchar("subs_status", { length: 50 }).default("Incomplete"),
   metadataTimesStatus: varchar("metadata_times_status", { length: 50 }).default("Incomplete"),
-  seriesId: varchar("series_id").references(() => series.id, { onDelete: "set null" }),
+  seriesId: varchar("series_id").references(() => seriesTable.id, { onDelete: "set null" }),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
   licenseId: varchar("license_id").references(() => licenses.id), // Legacy: Single link to license
   createdBy: varchar("created_by").references(() => users.id),
