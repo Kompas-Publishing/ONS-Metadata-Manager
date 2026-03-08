@@ -176,6 +176,26 @@ export default function Browse() {
     },
   });
 
+  const deleteEpisodeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/metadata/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      toast({
+        title: "Episode deleted",
+        description: "The episode has been permanently removed.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const seriesGroups: { [key: string]: SeriesGroup } = {};
   
   if (files) {

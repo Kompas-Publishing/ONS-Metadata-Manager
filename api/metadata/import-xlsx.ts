@@ -51,68 +51,97 @@ export default apiHandler(
 
           if (data.length < 2) continue;
 
-          const headers = data[0];
+          const headers = data[0].map(h => h?.toString().toLowerCase().trim());
           const rows = data.slice(1);
 
-          const getIndex = (name: string) =>
-            headers.findIndex(
-              (h) => h && h.toString().toLowerCase() === name.toLowerCase(),
-            );
+          const getIndex = (names: string[]) => {
+            for (const name of names) {
+              const idx = headers.findIndex((h) => h === name.toLowerCase() || (h && h.includes(`(${name.toLowerCase()})`)));
+              if (idx !== -1) return idx;
+              
+              // Try exact match or match containing the string (for old format headers like "Title (Clipnaam)")
+              const fuzzyIdx = headers.findIndex(h => h && (h === name.toLowerCase() || h.includes(name.toLowerCase())));
+              if (fuzzyIdx !== -1) return fuzzyIdx;
+            }
+            return -1;
+          };
 
           const idx = {
-            channel: getIndex("Channel"),
-            originalFilename: getIndex("Original filename"),
-            originalId: getIndex("Original ID"),
-            title: getIndex("Title"),
-            description: getIndex("Description nl"),
-            genre: getIndex("Genre"),
-            programRating: getIndex("Program rating"),
-            productionCountry: getIndex("Production country"),
-            seriesTitle: getIndex("Series title nl"),
-            yearOfProduction: getIndex("Year of production"),
-            catchUp: getIndex("CatchUp"),
-            season: getIndex("Season"),
-            episodeCount: getIndex("Number of episodes"),
-            episodeTitle: getIndex("Episode title"),
-            episode: getIndex("Episode number"),
-            episodeDescription: getIndex("Episode description"),
-            duration: getIndex("Duration"),
-            dateStart: getIndex("Start datetime"),
-            dateEnd: getIndex("End datetime"),
-            subtitles: getIndex("subtitles"),
-            subtitlesId: getIndex("Subtitles ID"),
-            segmented: getIndex("Segmented"),
-            contentType: getIndex("Content type"),
-            tags: getIndex("Tags"),
-            audioId: getIndex("Audio ID"),
-            category: getIndex("Category"),
-            seasonType: getIndex("Season Type"),
-            endCredits: getIndex("End Credits"),
-            actors: getIndex("Actors"),
+            channel: getIndex(["Channel", "Zender"]),
+            originalFilename: getIndex(["Original filename", "original_filename"]),
+            originalId: getIndex(["Original ID", "orginal_ID", "original_id"]),
+            title: getIndex(["Title", "Title (Clipnaam)"]),
+            description: getIndex(["Description nl", "description_nl", "description_nl (Omschrijving)"]),
+            genre: getIndex(["Genre", "Program Genre"]),
+            programRating: getIndex(["Program rating", "Program Rating"]),
+            productionCountry: getIndex(["Production country", "production_country"]),
+            seriesTitle: getIndex(["Series title nl", "series_titel_nl", "Serie"]),
+            yearOfProduction: getIndex(["Year of production", "year_of_production"]),
+            catchUp: getIndex(["CatchUp"]),
+            season: getIndex(["Season"]),
+            episodeCount: getIndex(["Number of episodes", "Episode/scene total"]),
+            episodeTitle: getIndex(["Episode title", "EpisodeTitle"]),
+            episode: getIndex(["Episode number", "Episode_num"]),
+            episodeDescription: getIndex(["Episode description", "episode_description"]),
+            duration: getIndex(["Duration", "duration"]),
+            dateStart: getIndex(["Start datetime", "date_start"]),
+            dateEnd: getIndex(["End datetime", "date_end"]),
+            subtitles: getIndex(["subtitles", "Subtitles"]),
+            subtitlesId: getIndex(["Subtitles ID", "Subtitles ID"]),
+            segmented: getIndex(["Segmented", "segmented"]),
+            contentType: getIndex(["Content type", "Content Type"]),
+            tags: getIndex(["Tags"]),
+            audioId: getIndex(["Audio ID"]),
+            category: getIndex(["Category"]),
+            seasonType: getIndex(["Season Type"]),
+            endCredits: getIndex(["End Credits"]),
+            actors: getIndex(["Actors"]),
+            breakTimes: getIndex(["break_times", "Breaktijden"]),
           };
 
           const toIntBool = (val: any) => {
             if (val === undefined || val === null || val === "") return 0;
-            const s = val.toString().toLowerCase();
-            if (s === "yes" || s === "1" || s === "true") return 1;
+            const s = val.toString().toLowerCase().trim();
+            if (s === "yes" || s === "1" || s === "true" || s === "y") return 1;
             return 0;
           };
 
           const parseDate = (val: any) => {
             if (!val) return null;
+            // Handle Excel numeric dates
+            if (typeof val === 'number') {
+               return new Date(Math.round((val - 25569) * 86400 * 1000));
+            }
             const d = new Date(val);
             return isNaN(d.getTime()) ? null : d;
           };
 
+          const formatDuration = (val: any) => {
+            if (!val) return "00:00:00";
+            if (typeof val === 'number') {
+              // Excel time is fraction of a day
+              const totalSeconds = Math.round(val * 86400);
+              const h = Math.floor(totalSeconds / 3600);
+              const m = Math.floor((totalSeconds % 3600) / 60);
+              const s = totalSeconds % 60;
+              return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+            }
+            return val.toString();
+          };
+
           for (const row of rows) {
             try {
-              if (!row[idx.title] && !row[idx.seriesTitle]) continue;
+              if (!row || row.length === 0) continue;
+              
+              // Skip instruction rows
+              const firstCell = row[0]?.toString() || "";
+              if (firstCell.includes("Te vinden in") || firstCell.includes("Uitleg")) continue;
+              
+              const titleValue = row[idx.title]?.toString() || row[idx.seriesTitle]?.toString();
+              if (!titleValue || titleValue.includes("Te vinden in")) continue;
 
               const metadata: any = {
-                title:
-                  row[idx.title]?.toString() ||
-                  row[idx.seriesTitle]?.toString() ||
-                  "Untitled",
+                title: titleValue,
                 channel: row[idx.channel]?.toString() || "ONS",
                 originalFilename: row[idx.originalFilename]?.toString(),
                 description: row[idx.description]?.toString(),
@@ -121,10 +150,11 @@ export default apiHandler(
                       .toString()
                       .split("|")
                       .map((s: string) => s.trim())
+                      .filter(Boolean)
                   : [],
                 programRating: row[idx.programRating]?.toString(),
                 productionCountry: row[idx.productionCountry]?.toString(),
-                seriesTitle: row[idx.seriesTitle]?.toString(),
+                seriesTitle: row[idx.seriesTitle]?.toString() || titleValue,
                 yearOfProduction: row[idx.yearOfProduction]
                   ? parseInt(row[idx.yearOfProduction])
                   : null,
@@ -136,7 +166,7 @@ export default apiHandler(
                 episodeTitle: row[idx.episodeTitle]?.toString(),
                 episode: row[idx.episode] ? parseInt(row[idx.episode]) : null,
                 episodeDescription: row[idx.episodeDescription]?.toString(),
-                duration: row[idx.duration]?.toString() || "00:00:00",
+                duration: formatDuration(row[idx.duration]),
                 dateStart: parseDate(row[idx.dateStart]),
                 dateEnd: parseDate(row[idx.dateEnd]),
                 subtitles: toIntBool(row[idx.subtitles]),
@@ -149,6 +179,7 @@ export default apiHandler(
                       .toString()
                       .split("|")
                       .map((s: string) => s.trim())
+                      .filter(Boolean)
                   : [],
                 audioId: row[idx.audioId]?.toString(),
                 category: row[idx.category]?.toString(),
@@ -159,8 +190,23 @@ export default apiHandler(
                       .toString()
                       .split("|")
                       .map((s: string) => s.trim())
-                      : [],
+                      .filter(Boolean)
+                  : [],
               };
+
+              // Handle breakTimes (supporting multiple columns if named the same or similar)
+              const breakTimes: string[] = [];
+              if (idx.breakTimes !== -1) {
+                // Check multiple columns for Breaktijden
+                headers.forEach((h, i) => {
+                  if (h && h.includes("breaktijden")) {
+                    const bt = formatDuration(row[i]);
+                    if (bt && bt !== "00:00:00") breakTimes.push(bt);
+                  }
+                });
+              }
+              metadata.breakTimes = breakTimes;
+              if (breakTimes.length > 0) metadata.breakTime = breakTimes[0];
 
               const originalId = row[idx.originalId]?.toString();
               const result = await storage.upsertMetadataFile(
