@@ -487,6 +487,23 @@ export default function Browse() {
                   Download Series (XLSX)
                 </Button>
                 {canWriteMetadata && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleImportClick}
+                    disabled={importXlsxMutation.isPending}
+                    data-testid="button-import-xlsx-series"
+                  >
+                    {importXlsxMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    Import (XLSX)
+                  </Button>
+                )}
+                {canWriteMetadata && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
