@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
-  LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2
+  LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2,
+  ExternalLink, Globe, FolderOpen, CheckCircle2, ChevronDown, ChevronUp,
+  Link2, Info
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import type { MetadataFile } from "@shared/schema";
+import type { MetadataFile, Series, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
@@ -42,6 +44,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const handleDownload = (url: string) => {
   const link = document.createElement('a');
@@ -131,6 +138,23 @@ export default function Browse() {
   const { data: files, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
     enabled: canReadMetadata || canWriteMetadata,
+  });
+
+  const [openSeasons, setOpenSeasons] = useState<Record<number, boolean>>({});
+
+  const toggleSeason = (season: number) => {
+    setOpenSeasons((prev) => ({
+      ...prev,
+      [season]: !prev[season],
+    }));
+  };
+
+  const { data: seriesDetails, isLoading: isSeriesDetailsLoading } = useQuery<Series & { 
+    licenses: (License & { seasonRange: string | null })[],
+    tasks: (Task & { metadataFile: MetadataFile })[]
+  }>({
+    queryKey: [`/api/series/by-title/${encodeURIComponent(selectedSeries || "")}`],
+    enabled: !!selectedSeries,
   });
 
   const deleteSeriesMutation = useMutation({
@@ -484,155 +508,264 @@ export default function Browse() {
             Back to All Series
           </Button>
 
-          <div>
-            <h2 className="text-2xl font-semibold mb-2">{selectedSeriesData?.title}</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectedSeriesData?.category && selectedSeriesData.category !== "Unknown" && (
-                <Badge variant="secondary">{selectedSeriesData.category}</Badge>
-              )}
-              <Badge variant="outline">
-                {selectedSeriesData?.seasonCount} {selectedSeriesData?.seasonCount === 1 ? "Season" : "Seasons"}
-              </Badge>
-              <div className="flex gap-2 ml-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(`/api/metadata/download/series/${encodeURIComponent(selectedSeriesData?.title || '')}/xml`)}
-                  data-testid="button-download-series-xml"
-                  className="gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Series (XML)
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(`/api/metadata/download/series/${encodeURIComponent(selectedSeriesData?.title || '')}/xlsx`)}
-                  data-testid="button-download-series-xlsx"
-                  className="gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Series (XLSX)
-                </Button>
-                {canWriteMetadata && (
+          {/* Series Overview Section */}
+          <Card className="p-6 overflow-hidden border-2 border-primary/10 shadow-md">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+              <div className="flex-1 space-y-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-3xl font-bold tracking-tight">{selectedSeriesData?.title}</h2>
+                    {seriesDetails?.productionYear && (
+                      <span className="text-xl text-muted-foreground font-medium">
+                        ({seriesDetails.productionYear})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedSeriesData?.category && selectedSeriesData.category !== "Unknown" && (
+                      <Badge variant="secondary" className="px-3 py-1 text-sm">{selectedSeriesData.category}</Badge>
+                    )}
+                    <Badge variant="outline" className="px-3 py-1 text-sm bg-primary/5 border-primary/20">
+                      {selectedSeriesData?.seasonCount} {selectedSeriesData?.seasonCount === 1 ? "Season" : "Seasons"}
+                    </Badge>
+                    <Badge variant="outline" className="px-3 py-1 text-sm">
+                      {selectedSeriesData?.episodeCount} Episodes
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 pt-2">
+                  {/* Links Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Link2 className="w-4 h-4" /> Links & Resources
+                    </h4>
+                    <div className="space-y-2">
+                      {seriesDetails?.websiteLink ? (
+                        <a 
+                          href={seriesDetails.websiteLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                        >
+                          <Globe className="w-4 h-4" />
+                          Official Website <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No website link set</p>
+                      )}
+
+                      {seriesDetails?.driveLinks && Array.isArray(seriesDetails.driveLinks) && seriesDetails.driveLinks.length > 0 ? (
+                        <div className="space-y-1">
+                          {seriesDetails.driveLinks.map((link: any, idx: number) => (
+                            <a 
+                              key={idx}
+                              href={link.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-sm text-green-700 hover:underline"
+                            >
+                              <FolderOpen className="w-4 h-4 text-green-600" />
+                              {link.name || "Google Drive Folder"} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No drive links set</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Licenses Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4" /> Associated Licenses
+                    </h4>
+                    <div className="space-y-2">
+                      {seriesDetails?.licenses && seriesDetails.licenses.length > 0 ? (
+                        seriesDetails.licenses.map((license) => (
+                          <div key={license.id} className="flex flex-col border-l-2 border-primary/20 pl-3 py-1">
+                            <Link href={`/licenses/${license.id}`} className="text-sm font-medium hover:underline flex items-center gap-1.5">
+                              {license.name}
+                              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                            </Link>
+                            <span className="text-xs text-muted-foreground">
+                              {license.seasonRange ? `Seasons: ${license.seasonRange}` : "All Seasons"}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No licenses linked to this series</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tasks Section */}
+                {seriesDetails?.tasks && seriesDetails.tasks.length > 0 && (
+                  <div className="pt-4 border-t border-dashed">
+                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
+                      <AlertCircle className="w-4 h-4 text-orange-500" /> Pending Tasks
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {seriesDetails.tasks.slice(0, 5).map((task) => (
+                        <Badge key={task.id} variant="outline" className="bg-orange-50 border-orange-200 text-orange-800 text-[10px] py-0.5">
+                          {task.metadataFile?.episode ? `E${task.metadataFile.episode}: ` : ""}{task.description}
+                        </Badge>
+                      ))}
+                      {seriesDetails.tasks.length > 5 && (
+                        <Badge variant="outline" className="text-[10px] py-0.5">
+                          +{seriesDetails.tasks.length - 5} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 md:flex-col md:items-end flex-shrink-0">
+                <div className="flex gap-2 flex-wrap justify-end">
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => handleDownload(`/api/metadata/download/series/${encodeURIComponent(selectedSeriesData?.title || '')}/xml`)}
                     className="gap-2"
-                    onClick={handleImportClick}
-                    disabled={importXlsxMutation.isPending}
-                    data-testid="button-import-xlsx-series"
                   >
-                    {importXlsxMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Upload className="w-4 h-4" />
-                    )}
-                    Import (XLSX)
+                    <Download className="w-4 h-4" />
+                    XML
                   </Button>
-                )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(`/api/metadata/download/series/${encodeURIComponent(selectedSeriesData?.title || '')}/xlsx`)}
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    XLSX
+                  </Button>
+                </div>
+                
                 {canWriteMetadata && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete Series
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently delete all {selectedSeriesData?.episodeCount} episodes across {selectedSeriesData?.seasonCount} seasons for <strong>{selectedSeriesData?.title}</strong>. 
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => selectedSeriesData && deleteSeriesMutation.mutate(selectedSeriesData.title)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleImportClick}
+                      disabled={importXlsxMutation.isPending}
+                    >
+                      {importXlsxMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      Import XLSX
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 text-destructive hover:bg-destructive/10 border-destructive/20"
                         >
-                          Delete Series
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete all {selectedSeriesData?.episodeCount} episodes across {selectedSeriesData?.seasonCount} seasons for <strong>{selectedSeriesData?.title}</strong>. 
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => selectedSeriesData && deleteSeriesMutation.mutate(selectedSeriesData.title)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete Series
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          </Card>
 
           {selectedSeriesData && Object.entries(selectedSeriesData.seasons)
             .sort(([a], [b]) => parseInt(a) - parseInt(b))
             .map(([seasonNum, episodes]) => (
-              <Card key={seasonNum} className="p-6">
-                <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-                  <h3 className="text-xl font-semibold">
-                    Season {seasonNum === "0" ? "Unknown" : seasonNum}
-                  </h3>
-                  <div className="flex gap-2 flex-wrap">
-                    {canWriteMetadata && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLocation(`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`);
-                        }}
-                        data-testid={`button-edit-season-${seasonNum}`}
-                        className="gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Edit All Episodes
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(`/api/metadata/download/season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}/xml`)}
-                      data-testid={`button-download-season-${seasonNum}-xml`}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download (XML)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(`/api/metadata/download/season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}/xlsx`)}
-                      data-testid={`button-download-season-${seasonNum}-xlsx`}
-                      className="gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download (XLSX)
-                    </Button>
-                    {canWriteMetadata && (
-                      <>
+              <Collapsible
+                key={seasonNum}
+                open={openSeasons[parseInt(seasonNum)] ?? true}
+                onOpenChange={() => toggleSeason(parseInt(seasonNum))}
+                className="w-full"
+              >
+                <Card className="overflow-hidden border-primary/5">
+                  <div className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => toggleSeason(parseInt(seasonNum))}>
+                    <div className="flex items-center gap-3">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="p-0 h-8 w-8">
+                          {openSeasons[parseInt(seasonNum)] ?? true ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <h3 className="text-xl font-semibold">
+                        Season {seasonNum === "0" ? "Unknown" : seasonNum}
+                      </h3>
+                      <Badge variant="outline" className="ml-2">
+                        {episodes.length} {episodes.length === 1 ? "Episode" : "Episodes"}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                      {canWriteMetadata && (
                         <Button
                           variant="outline"
                           size="sm"
                           asChild
-                          className="gap-2"
+                          className="gap-2 h-8"
                         >
                           <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`}>
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                             Batch Editor
                           </Link>
                         </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(`/api/metadata/download/season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}/xml`)}
+                        className="gap-2 h-8"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        XML
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(`/api/metadata/download/season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}/xlsx`)}
+                        className="gap-2 h-8"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        XLSX
+                      </Button>
+                      {canWriteMetadata && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="gap-2 text-destructive hover:bg-destructive/10 border-destructive/20 h-8"
                             >
-                              <Trash2 className="w-4 h-4" />
-                              Delete Season
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -657,123 +790,145 @@ export default function Browse() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  {episodes
-                    .sort((a, b) => (a.episode || 0) - (b.episode || 0))
-                    .map((episode) => (
-                      <div
-                        key={episode.id}
-                        className={`p-4 border rounded-lg hover-elevate ${(episode.draft === 1 || episode.draft === '1' || episode.draft === true) ? '!bg-orange-100/80 !border-orange-400' : ''}`}
-                        data-testid={`episode-${episode.id}`}
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            <span className="font-mono text-sm text-muted-foreground min-w-[80px] flex-shrink-0">
-                              {episode.id}
-                            </span>
-                            {episode.episode && (
-                              <span className="text-sm font-medium text-muted-foreground min-w-[60px] flex-shrink-0">
-                                Ep {episode.episode}
-                              </span>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-foreground font-medium">{episode.title}</span>
-                                {episode.duration && (
-                                  <span className="text-sm text-muted-foreground flex-shrink-0">
-                                    {episode.duration}
-                                  </span>
-                                )}
-                              </div>
-                              {episode.episodeTitle && (
-                                <p className="text-sm text-muted-foreground mt-1" data-testid={`episode-title-${episode.id}`}>
-                                  {episode.episodeTitle}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
-                                  <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`episode-draft-${episode.id}`}>
-                                    Draft
+                  
+                  <CollapsibleContent>
+                    <div className="p-0 border-t">
+                      <Table>
+                        <TableHeader className="bg-muted/20">
+                          <TableRow>
+                            <TableHead className="w-[80px]">ID</TableHead>
+                            <TableHead className="w-[60px]">EP</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead className="w-[100px]">Duration</TableHead>
+                            <TableHead className="w-[120px]">Subs Status</TableHead>
+                            <TableHead className="w-[120px]">Metadata</TableHead>
+                            <TableHead className="w-[80px]">Tasks</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {episodes
+                            .sort((a, b) => (a.episode || 0) - (b.episode || 0))
+                            .map((episode) => (
+                              <TableRow 
+                                key={episode.id}
+                                className={(episode.draft === 1 || episode.draft === '1' || episode.draft === true) ? 'bg-orange-50/50 hover:bg-orange-100/50' : ''}
+                              >
+                                <TableCell className="font-mono text-[11px] text-muted-foreground">
+                                  {episode.id}
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  {episode.episode || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-sm line-clamp-1">{episode.episodeTitle || episode.title}</span>
+                                    {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
+                                      <span className="text-[10px] text-orange-600 font-semibold uppercase">Draft</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {episode.duration || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-[10px] font-normal px-1.5 py-0 ${
+                                      episode.subsStatus === 'Complete' 
+                                        ? 'bg-green-50 text-green-700 border-green-200' 
+                                        : episode.subsStatus === 'Not needed'
+                                          ? 'bg-slate-50 text-slate-600 border-slate-200'
+                                          : 'bg-red-50 text-red-700 border-red-200'
+                                    }`}
+                                  >
+                                    {episode.subsStatus || 'Incomplete'}
                                   </Badge>
-                                )}
-                                {episode.channel && (
-                                  <Badge variant="outline" className="gap-1" data-testid={`episode-channel-${episode.id}`}>
-                                    <Tv className="w-3 h-3" />
-                                    {episode.channel}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-[10px] font-normal px-1.5 py-0 ${
+                                      episode.metadataTimesStatus === 'Complete' 
+                                        ? 'bg-green-50 text-green-700 border-green-200' 
+                                        : 'bg-orange-50 text-orange-700 border-orange-200'
+                                    }`}
+                                  >
+                                    {episode.metadataTimesStatus === 'Complete' ? 'Times OK' : 'Times Incl.'}
                                   </Badge>
-                                )}
-                                {episode.programRating && (
-                                  <Badge variant="secondary" data-testid={`episode-rating-${episode.id}`}>
-                                    {episode.programRating}
-                                  </Badge>
-                                )}
-                                {episode.dateStart && episode.dateEnd && (
-                                  <Badge variant="outline" className="gap-1" data-testid={`episode-availability-${episode.id}`}>
-                                    <Calendar className="w-3 h-3" />
-                                    {format(new Date(episode.dateStart), "MMM d")} - {format(new Date(episode.dateEnd), "MMM d, yyyy")}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {canReadMetadata && (
-                              <Link href={`/view/${episode.id}`}>
-                                <Button size="sm" variant="outline" data-testid={`button-view-episode-${episode.id}`} title="View Episode">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              </Link>
-                            )}
-                            {canWriteMetadata && (
-                              <>
-                                <Link href={`/edit/${episode.id}`}>
-                                  <Button size="sm" variant="outline" data-testid={`button-edit-episode-${episode.id}`} title="Edit Episode">
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                </Link>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      data-testid={`button-delete-episode-${episode.id}`}
-                                      title="Delete Episode"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Episode?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will permanently delete episode <strong>{episode.id}</strong> ({episode.title}). 
-                                        This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteEpisodeMutation.mutate(episode.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </Card>
+                                </TableCell>
+                                <TableCell>
+                                  {seriesDetails?.tasks?.some(t => t.metadataFileId === episode.id) ? (
+                                    <div className="flex items-center justify-center">
+                                      <AlertCircle className="w-4 h-4 text-orange-500" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-center opacity-20">
+                                      <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1.5">
+                                    {canReadMetadata && (
+                                      <Link href={`/view/${episode.id}`}>
+                                        <Button size="icon" variant="ghost" className="h-7 w-7" title="View Episode">
+                                          <Eye className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </Link>
+                                    )}
+                                    {canWriteMetadata && (
+                                      <>
+                                        <Link href={`/edit/${episode.id}`}>
+                                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Edit Episode">
+                                            <Edit className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </Link>
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                              title="Delete Episode"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Delete Episode?</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                This will permanently delete episode <strong>{episode.id}</strong>. 
+                                                This action cannot be undone.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                              <AlertDialogAction
+                                                onClick={() => deleteEpisodeMutation.mutate(episode.id)}
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                              >
+                                                Delete
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             ))}
         </div>
       )}

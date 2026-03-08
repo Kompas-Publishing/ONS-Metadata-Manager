@@ -7,6 +7,8 @@ import {
   licenses,
   metadataToLicenses,
   tasks,
+  series,
+  seriesToLicenses,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -22,6 +24,10 @@ import {
   type LicenseBatchGenerate,
   type Task,
   type InsertTask,
+  type Series,
+  type InsertSeries,
+  type SeriesToLicense,
+  type InsertSeriesToLicense,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -105,6 +111,17 @@ export interface IStorage {
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
+
+  // Series Management
+  getSeriesById(id: string): Promise<Series | undefined>;
+  getSeriesByTitle(title: string): Promise<Series | undefined>;
+  getAllSeries(): Promise<Series[]>;
+  upsertSeries(data: InsertSeries): Promise<Series>;
+  deleteSeries(id: string): Promise<boolean>;
+  linkSeriesToLicense(seriesId: string, licenseId: string, seasonRange?: string): Promise<void>;
+  unlinkSeriesFromLicense(seriesId: string, licenseId: string): Promise<void>;
+  getSeriesLicenses(seriesId: string): Promise<(License & { seasonRange: string | null })[]>;
+  getSeriesTasks(seriesId: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
 
   // Settings
   getSetting(key: string): Promise<Setting | undefined>;
@@ -572,19 +589,28 @@ export class DatabaseStorage implements IStorage {
       existingFile = res;
     }
 
+    // 3. Ensure series exists and get its ID
+    let seriesId: string | null = null;
+    const seriesTitle = data.seriesTitle || data.title;
+    if (seriesTitle) {
+      const s = await this.upsertSeries({ title: seriesTitle });
+      seriesId = s.id;
+      data.seriesId = seriesId;
+    }
+
     if (existingFile) {
       // Update
-      const updated = await this.updateMetadataFile(existingFile.id, file, permissions);
+      const updated = await this.updateMetadataFile(existingFile.id, { ...data, licenseIds }, permissions);
       if (!updated) {
         // This shouldn't happen given we checked visibility above, but as a fallback
         const newId = await this.consumeNextId();
-        return await this.createMetadataFile(file, newId, permissions);
+        return await this.createMetadataFile({ ...data, licenseIds }, newId, permissions);
       }
       return updated;
     } else {
       // Create
       const newId = await this.consumeNextId();
-      return await this.createMetadataFile(file, newId, permissions);
+      return await this.createMetadataFile({ ...data, licenseIds }, newId, permissions);
     }
   }
 
@@ -1443,6 +1469,103 @@ export class DatabaseStorage implements IStorage {
   async deleteTask(id: number): Promise<boolean> {
     const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Series Management
+  async getSeriesById(id: string): Promise<Series | undefined> {
+    const [item] = await db.select().from(series).where(eq(series.id, id));
+    return item;
+  }
+
+  async getSeriesByTitle(title: string): Promise<Series | undefined> {
+    const [item] = await db.select().from(series).where(eq(series.title, title));
+    return item;
+  }
+
+  async getAllSeries(): Promise<Series[]> {
+    return await db.select().from(series).orderBy(series.title);
+  }
+
+  async upsertSeries(data: InsertSeries): Promise<Series> {
+    const [item] = await db
+      .insert(series)
+      .values(data)
+      .onConflictDoUpdate({
+        target: series.title,
+        set: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return item;
+  }
+
+  async deleteSeries(id: string): Promise<boolean> {
+    const result = await db.delete(series).where(eq(series.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async linkSeriesToLicense(seriesId: string, licenseId: string, seasonRange?: string): Promise<void> {
+    await db
+      .insert(seriesToLicenses)
+      .values({ seriesId, licenseId, seasonRange })
+      .onConflictDoUpdate({
+        target: [seriesToLicenses.seriesId, seriesToLicenses.licenseId],
+        set: { seasonRange },
+      });
+  }
+
+  async unlinkSeriesFromLicense(seriesId: string, licenseId: string): Promise<void> {
+    await db
+      .delete(seriesToLicenses)
+      .where(and(eq(seriesToLicenses.seriesId, seriesId), eq(seriesToLicenses.licenseId, licenseId)));
+  }
+
+  async getSeriesLicenses(seriesId: string): Promise<(License & { seasonRange: string | null })[]> {
+    const results = await db
+      .select({
+        license: licenses,
+        seasonRange: seriesToLicenses.seasonRange,
+      })
+      .from(seriesToLicenses)
+      .innerJoin(licenses, eq(seriesToLicenses.licenseId, licenses.id))
+      .where(eq(seriesToLicenses.seriesId, seriesId));
+
+    return results.map(r => ({
+      ...r.license,
+      seasonRange: r.seasonRange,
+    }));
+  }
+
+  async getSeriesTasks(seriesId: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]> {
+    const visibility = getFileVisibilityConditions(permissions);
+    const whereConditions = [eq(metadataFiles.seriesId, seriesId)];
+    
+    if (visibility.type === "own") {
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      } else {
+        whereConditions.push(sql`1 = 0`);
+      }
+    }
+
+    const results = await db
+      .select({
+        task: tasks,
+        metadataFile: metadataFiles,
+      })
+      .from(tasks)
+      .innerJoin(metadataFiles, eq(tasks.metadataFileId, metadataFiles.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(tasks.createdAt));
+
+    return results.map(r => ({
+      ...r.task,
+      metadataFile: normalizeMetadataFile(r.metadataFile)
+    }));
   }
 
   async getSetting(key: string): Promise<Setting | undefined> {

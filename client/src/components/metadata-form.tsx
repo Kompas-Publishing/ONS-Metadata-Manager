@@ -130,6 +130,8 @@ export function MetadataForm({
       originalFilename: "",
       subtitlesId: "",
       googleDriveLink: "",
+      subsStatus: "Incomplete",
+      metadataTimesStatus: "Incomplete",
       catchUp: undefined,
       segmented: undefined,
       subtitles: undefined,
@@ -206,36 +208,65 @@ export function MetadataForm({
                 </p>
               </div>
             )}
-
-            <div className="border-t pt-8">
-              <h3 className="text-xl font-semibold mb-6 flex items-center gap-2">
-                <FileKey className="w-5 h-5 text-muted-foreground" />
-                Contract & License
-              </h3>
-              <div className="grid grid-cols-1 gap-6 max-w-md">
-                <FormField
-                  control={form.control}
-                  name="licenseIds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>License Association</FormLabel>
-                      <MultiSelect
-                        options={licenseOptions}
-                        value={licenseOptions.filter(opt => field.value?.includes(opt.value))}
-                        onChange={(selectedOptions) => field.onChange(selectedOptions.map(opt => opt.value))}
-                        placeholder="Select licenses..."
-                        disabled={readOnly}
-                      />
-                      <FormDescription>
-                        Link this file to one or more content licenses/contracts.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
           </fieldset>
+
+          <div className="border-t pt-8">
+            <h3 className="text-xl font-semibold mb-6">Status Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="subsStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subtitles Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={readOnly}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Incomplete">Incomplete</SelectItem>
+                        <SelectItem value="Complete">Complete</SelectItem>
+                        <SelectItem value="Not needed">Not needed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="metadataTimesStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Metadata Times Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={readOnly}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Incomplete">Incomplete</SelectItem>
+                        <SelectItem value="Complete">Complete</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
           <div className="border-t pt-8">
             <h3 className="text-xl font-semibold mb-6">Basic Information</h3>
@@ -418,43 +449,6 @@ export function MetadataForm({
                   )}
                 />
               </fieldset>
-
-              <FormField
-                control={form.control}
-                name="googleDriveLink"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Google Drive Link</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input
-                          placeholder="https://drive.google.com/..."
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="input-google-drive-link"
-                          readOnly={readOnly}
-                          className={cn(readOnly && "bg-muted font-mono text-xs")}
-                        />
-                      </FormControl>
-                      {field.value && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="shrink-0 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                          onClick={() => window.open(field.value, '_blank', 'noopener,noreferrer')}
-                        >
-                          <SiGoogledrive className="w-4 h-4 mr-2 text-[#4285F4]" />
-                          Open Assets
-                        </Button>
-                      )}
-                    </div>
-                    <FormDescription>
-                      Link to promotional material, thumbnails, or videos
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <fieldset disabled={readOnly} className="contents">
                 <FormField

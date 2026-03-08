@@ -112,6 +112,33 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
 export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
 
+// Series table
+export const series = pgTable("series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull().unique(),
+  productionYear: integer("production_year"),
+  driveLinks: jsonb("drive_links").default(sql`'[]'::jsonb`).notNull(), // Array of { name: string, url: string }
+  websiteLink: text("website_link"),
+  subsFromDistributor: integer("subs_from_distributor").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Series = typeof series.$inferSelect;
+export type InsertSeries = typeof series.$inferInsert;
+
+// Join table for many-to-many Series-License relationship
+export const seriesToLicenses = pgTable("series_to_licenses", {
+  seriesId: varchar("series_id").notNull().references(() => series.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  seasonRange: text("season_range"), // E.G. "1-4"
+}, (t) => [
+  index("series_license_idx").on(t.seriesId, t.licenseId),
+]);
+
+export type SeriesToLicense = typeof seriesToLicenses.$inferSelect;
+export type InsertSeriesToLicense = typeof seriesToLicenses.$inferInsert;
+
 // Metadata files table
 export const metadataFiles = pgTable("metadata_files", {
   id: varchar("id").primaryKey(), // e.g., "77362"
@@ -147,6 +174,9 @@ export const metadataFiles = pgTable("metadata_files", {
   subtitles: integer("subtitles"), // Subtitle availability (0 or 1 as boolean)
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
   googleDriveLink: text("google_drive_link"),
+  subsStatus: varchar("subs_status", { length: 50 }).default("Incomplete"),
+  metadataTimesStatus: varchar("metadata_times_status", { length: 50 }).default("Incomplete"),
+  seriesId: varchar("series_id").references(() => series.id, { onDelete: "set null" }),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
   licenseId: varchar("license_id").references(() => licenses.id), // Legacy: Single link to license
   createdBy: varchar("created_by").references(() => users.id),
@@ -196,6 +226,9 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   subtitles: z.number().int().min(0).max(1).optional(),
   subtitlesId: z.string().optional(),
   googleDriveLink: z.string().optional(),
+  subsStatus: z.string().optional(),
+  metadataTimesStatus: z.string().optional(),
+  seriesId: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
   licenseId: z.string().optional(),
 }).extend({
@@ -352,4 +385,3 @@ export const insertTaskSchema = createInsertSchema(tasks, {
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
-

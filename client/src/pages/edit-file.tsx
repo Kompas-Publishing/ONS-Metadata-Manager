@@ -143,9 +143,13 @@ export default function EditFile() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Edit Metadata File</h1>
+        <h1 className="text-3xl font-semibold text-foreground">
+          {file.seriesTitle || file.title}
+          {file.season && ` S${file.season}`}
+          {file.episode && ` E${file.episode}`}
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Update the metadata for file ID: <span className="font-mono">{file.id}</span>
+          Editing metadata for file ID: <span className="font-mono">{file.id}</span>
         </p>
       </div>
 

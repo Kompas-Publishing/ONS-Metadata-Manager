@@ -156,7 +156,11 @@ export default function ViewFile() {
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">View Metadata File</h1>
+          <h1 className="text-3xl font-semibold text-foreground">
+            {file.seriesTitle || file.title}
+            {file.season && ` S${file.season}`}
+            {file.episode && ` E${file.episode}`}
+          </h1>
           <p className="text-muted-foreground mt-2">
             File ID: <span className="font-mono">{file.id}</span>
           </p>

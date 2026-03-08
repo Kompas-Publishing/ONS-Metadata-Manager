@@ -540,6 +540,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Series API
+  app.get("/api/series", isAuthenticated, async (req: any, res) => {
+    try {
+      const items = await storage.getAllSeries();
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching series:", error);
+      res.status(500).json({ message: "Failed to fetch series" });
+    }
+  });
+
+  app.get("/api/series/by-title/:title", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const { allowed, permissions, reason } = await requirePermission(
+        userId,
+        "metadata",
+        "read",
+      );
+
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+
+      const { title } = req.params;
+      const item = await storage.getSeriesByTitle(title);
+      if (!item) {
+        return res.status(404).json({ message: "Series not found" });
+      }
+
+      const [licenses, tasks] = await Promise.all([
+        storage.getSeriesLicenses(item.id),
+        storage.getSeriesTasks(item.id, permissions!)
+      ]);
+
+      res.json({
+        ...item,
+        licenses,
+        tasks
+      });
+    } catch (error) {
+      console.error("Error fetching series by title:", error);
+      res.status(500).json({ message: "Failed to fetch series" });
+    }
+  });
+
+  app.patch("/api/series/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(
+        userId,
+        "metadata",
+        "write",
+      );
+
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+
+      const { id } = req.params;
+      const { productionYear, driveLinks, websiteLink, subsFromDistributor } = req.body;
+      
+      const updated = await storage.upsertSeries({
+        id,
+        title: "", // Not used for update due to ID PK but Drizzle might require it in type
+        productionYear,
+        driveLinks,
+        websiteLink,
+        subsFromDistributor
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating series:", error);
+      res.status(500).json({ message: "Failed to update series" });
+    }
+  });
+
+  app.post("/api/series/:id/licenses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(
+        userId,
+        "metadata",
+        "write",
+      );
+
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+
+      const { id } = req.params;
+      const { licenseId, seasonRange } = req.body;
+      
+      await storage.linkSeriesToLicense(id, licenseId, seasonRange);
+      res.json({ message: "License linked successfully" });
+    } catch (error) {
+      console.error("Error linking license to series:", error);
+      res.status(500).json({ message: "Failed to link license" });
+    }
+  });
+
+  app.delete("/api/series/:id/licenses/:licenseId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(
+        userId,
+        "metadata",
+        "write",
+      );
+
+      if (!allowed) {
+        return res.status(403).json({ message: reason });
+      }
+
+      const { id, licenseId } = req.params;
+      await storage.unlinkSeriesFromLicense(id, licenseId);
+      res.json({ message: "License unlinked successfully" });
+    } catch (error) {
+      console.error("Error unlinking license from series:", error);
+      res.status(500).json({ message: "Failed to unlink license" });
+    }
+  });
+
   app.get("/api/metadata/next-id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
