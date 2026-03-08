@@ -90,6 +90,8 @@ Data Rules:
 - Comparison: If an entry in CANDIDATES matches the name and distributor AND has overlapping or identical dates, propose an "update" with that ID.
 - NEW LICENSE TERMS: If the dates (start/end) are significantly different from the CANDIDATES (e.g., a new contract for a different year), propose a "create" action even if the name matches.
 - Season Rule: If a season is 0 or missing, set it to 1.
+- Production Year: Extract the original production year of the series or movie if available.
+- Subtitles: Determine if ONS receives the subtitles from the distributor or needs to create/buy them. Set "subsFromDistributor" to 1 if the contract states ONS gets them, otherwise 0.
 
 JSON Schema (MATCH EXACT DATABASE FIELDS):
 {
@@ -108,6 +110,8 @@ JSON Schema (MATCH EXACT DATABASE FIELDS):
         "licenseStart": "YYYY-MM-DD",
         "licenseEnd": "YYYY-MM-DD",
         "allowedRuns": number, (STRICTLY A NUMBER)
+        "productionYear": number,
+        "subsFromDistributor": 0 | 1,
         "description": "string",
         "notes": "string", (Include legal context or variation in rules here)
         "content_items": [{ "title": "string", "episodes": number, "season": number }]

@@ -72,6 +72,8 @@ export default function CreateLicense() {
       imdbLink: "",
       googleDriveLink: "",
       notes: "",
+      productionYear: undefined,
+      subsFromDistributor: 0,
       metadataIds: [],
       newBatches: [],
     },
@@ -245,6 +247,23 @@ export default function CreateLicense() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="subsFromDistributor"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
+                          />
+                        </FormControl>
+                        <div className="leading-none">
+                          <FormLabel>Subtitles from Distributor (Ondertiteling inclusief)</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
@@ -354,6 +373,26 @@ export default function CreateLicense() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="productionYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Production Year (Productiejaar)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 2023" 
+                          {...field} 
+                          value={field.value || ""} 
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

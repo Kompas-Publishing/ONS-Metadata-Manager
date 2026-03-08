@@ -185,10 +185,13 @@ export default function ViewLicense() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Distributor (Rechten)</p>
                 <p className="text-lg font-semibold">{license.distributor || "-"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Production Year (Productiejaar)</p>
+                <p className="text-lg font-semibold">{license.productionYear || "-"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">License Fee (Licentievergoeding)</p>
@@ -214,6 +217,18 @@ export default function ViewLicense() {
                     <Badge variant="outline" className="text-base px-3">{license.contentRating}</Badge>
                   ) : (
                     <p className="text-lg font-semibold">-</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Subtitles (Ondertiteling)</p>
+                <div>
+                  {license.subsFromDistributor === 1 ? (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200">
+                      From Distributor
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">Own Creation</Badge>
                   )}
                 </div>
               </div>
