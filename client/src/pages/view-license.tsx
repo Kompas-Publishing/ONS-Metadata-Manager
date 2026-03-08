@@ -185,6 +185,7 @@ export default function ViewLicense() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Distributor (Rechten)</p>
                 <p className="text-lg font-semibold">{license.distributor || "-"}</p>
