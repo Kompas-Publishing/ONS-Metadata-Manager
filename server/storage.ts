@@ -453,7 +453,7 @@ export class DatabaseStorage implements IStorage {
     const whereConditions = [eq(metadataFiles.id, id)];
     
     if (visibility.type === "own") {
-      whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+      whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
       if (visibility.groupIds && visibility.groupIds.length > 0) {
         whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -530,7 +530,7 @@ export class DatabaseStorage implements IStorage {
       const whereConditions = [eq(metadataFiles.id, originalId)];
       
       if (visibility.type === "own") {
-        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
       } else if (visibility.type === "group") {
         if (visibility.groupIds && visibility.groupIds.length > 0) {
           whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
@@ -556,7 +556,7 @@ export class DatabaseStorage implements IStorage {
       ];
       
       if (visibility.type === "own") {
-        whereConditions.push(eq(metadataFiles.createdBy, visibility.user.id));
+        whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
       } else if (visibility.type === "group") {
         if (visibility.groupIds && visibility.groupIds.length > 0) {
           whereConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));

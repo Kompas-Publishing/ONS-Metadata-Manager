@@ -2,8 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { storage } from "../_server/storage.js";
 import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPayload } from "../_server/jwt.js";
 import type { User } from "../_shared/schema.js";
-import { getUserPermissions, requirePermission as checkPermission } from "../_server/permissions.js";
-import type { UserPermissions, PermissionFeature, PermissionAction } from "../_shared/types.js";
+import { getUserPermissions, requirePermission as checkPermission, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
 
 export interface AuthenticatedRequest extends VercelRequest {
   user?: User;

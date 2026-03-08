@@ -1,5 +1,21 @@
 import { storage } from "./storage.js";
-import type { UserPermissions, PermissionFeature, PermissionAction } from "../_shared/types.js";
+import type { User } from "../_shared/schema.js";
+
+export interface UserPermissions {
+  user: User;
+  userId: string;
+  isAdmin: boolean;
+  isActive: boolean;
+  permissions: {
+    metadata: { read: boolean; write: boolean };
+    licenses: { read: boolean; write: boolean };
+    tasks: { read: boolean; write: boolean };
+    ai: boolean;
+    aiChat: boolean;
+  };
+  fileVisibility: "own" | "all" | "group";
+  groupIds: string[];
+}
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);
@@ -13,6 +29,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
   return {
     user,
+    userId,
     isAdmin,
     isActive,
     permissions: {
@@ -35,6 +52,9 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     groupIds: user.groupIds || [],
   };
 }
+
+export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat";
+export type PermissionAction = "read" | "write";
 
 export async function requirePermission(
   userId: string, 
@@ -68,5 +88,58 @@ export async function requirePermission(
     allowed,
     permissions,
     reason: allowed ? undefined : `No ${action} permission for ${feature}`
+  };
+}
+
+/**
+ * Validates that a URL belongs to Vercel Blob storage.
+ * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
+ */
+export function isValidBlobUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    
+    const hostname = parsed.hostname.toLowerCase();
+    // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
+    // This is the most robust way to prevent SSRF and token leakage.
+    return (
+      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
+      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function getFileVisibilityConditions(permissions: UserPermissions) {
+  if (permissions.isAdmin) {
+    return {
+      type: "all" as const,
+      userId: permissions.user.id,
+      groupId: null,
+    };
+  }
+
+  if (permissions.fileVisibility === "all") {
+    return {
+      type: "all" as const,
+      userId: permissions.user.id,
+      groupId: null,
+    };
+  }
+
+  if (permissions.fileVisibility === "group") {
+    return {
+      type: "group" as const,
+      userId: permissions.user.id,
+      groupIds: permissions.groupIds,
+    };
+  }
+
+  return {
+    type: "own" as const,
+    userId: permissions.user.id,
+    groupId: null,
   };
 }

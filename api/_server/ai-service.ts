@@ -6,8 +6,9 @@ import {
   type License,
   type MetadataFile 
 } from "../_shared/schema.js";
-import { type UserPermissions } from "../_shared/types.js";
+import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 export class AiService {
   private genAI: GoogleGenerativeAI | null = null;
@@ -283,7 +284,7 @@ JSON Schema:
         "genre": ["string"],
         "actors": ["string"],
         "productionCountry": "string",
-        "year_of_production": number,
+        "yearOfProduction": number,
         "originalFilename": "string",
         "programRating": "string",
         "channel": "string",

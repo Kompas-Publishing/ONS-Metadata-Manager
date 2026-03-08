@@ -3,6 +3,7 @@ import type { User } from "@shared/schema";
 
 export interface UserPermissions {
   user: User;
+  userId: string;
   isAdmin: boolean;
   isActive: boolean;
   permissions: {
@@ -28,6 +29,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
   return {
     user,
+    userId,
     isAdmin,
     isActive,
     permissions: {

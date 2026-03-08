@@ -3,7 +3,7 @@ import { extname } from "path";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { storage } from "./storage.js";
-import type { UserPermissions } from "../_shared/types.js";
+import type { UserPermissions } from "./permissions.js";
 import { 
   insertMetadataFileSchema, 
   insertLicenseSchema, 

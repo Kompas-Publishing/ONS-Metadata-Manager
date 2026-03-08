@@ -144,12 +144,20 @@ export const metadataFiles = pgTable("metadata_files", {
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
   googleDriveLink: text("google_drive_link"),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
-  licenseId: varchar("license_id").references(() => licenses.id), // Link to license
+  licenseId: varchar("license_id").references(() => licenses.id), // Legacy: Single link to license
   createdBy: varchar("created_by").references(() => users.id),
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// Join table for many-to-many Metadata-License relationship
+export const metadataToLicenses = pgTable("metadata_to_licenses", {
+  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id),
+}, (t) => [
+  index("metadata_license_idx").on(t.metadataFileId, t.licenseId),
+]);
 
 export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   title: z.string().min(1, "Title is required"),
@@ -186,6 +194,8 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
   licenseId: z.string().optional(),
+}).extend({
+  licenseIds: z.array(z.string()).optional(), // Support for multiple licenses
 }).omit({
   id: true,
   createdBy: true,
