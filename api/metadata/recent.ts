@@ -9,7 +9,7 @@ export default apiHandler(
     }
 
     try {
-      const files = await storage.getRecentMetadataFiles(10, req.permissions!);
+      const files = await storage.getRecentMetadataFiles(10, req.userPermissions!);
       res.json(files);
     } catch (error) {
       console.error("Error fetching recent files:", error);

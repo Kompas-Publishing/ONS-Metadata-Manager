@@ -13,7 +13,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const permissions = await getUserPermissions(userId);
-  if (!permissions || !permissions.permissions.licenses.write) {
+  if (!permissions || !permissions.features.licenses.write) {
     return res.status(403).json({ message: "No write permission for licenses" });
   }
 

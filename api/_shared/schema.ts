@@ -20,7 +20,7 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (sessionTable) => [index("IDX_session_expire").on(sessionTable.expire)],
 );
 
 // Groups table for group-based file visibility
@@ -125,6 +125,7 @@ export const seriesTable = pgTable("series", {
 });
 
 export type SeriesItem = typeof seriesTable.$inferSelect;
+export type Series = SeriesItem;
 export type InsertSeries = typeof seriesTable.$inferInsert;
 
 // Join table for many-to-many Series-License relationship
@@ -132,8 +133,8 @@ export const seriesToLicenses = pgTable("series_to_licenses", {
   seriesId: varchar("series_id").notNull().references(() => seriesTable.id, { onDelete: "cascade" }),
   licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
   seasonRange: text("season_range"), // E.G. "1-4"
-}, (t) => [
-  index("series_license_idx").on(t.seriesId, t.licenseId),
+}, (table) => [
+  index("series_license_idx").on(table.seriesId, table.licenseId),
 ]);
 
 export type SeriesToLicense = typeof seriesToLicenses.$inferSelect;
@@ -189,8 +190,8 @@ export const metadataFiles = pgTable("metadata_files", {
 export const metadataToLicenses = pgTable("metadata_to_licenses", {
   metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
   licenseId: varchar("license_id").notNull().references(() => licenses.id),
-}, (t) => [
-  index("metadata_license_idx").on(t.metadataFileId, t.licenseId),
+}, (table) => [
+  index("metadata_license_idx").on(table.metadataFileId, table.licenseId),
 ]);
 
 export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
@@ -205,14 +206,14 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   actors: z.array(z.string()).optional(),
   genre: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional().default([]),
-  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
+  seasonType: z["enum"](["Winter", "Summer", "Autumn", "Spring"]).optional(),
   contentType: z.string().min(1, "Content Type is required"),
-  category: z.enum(["Series", "Movie", "Documentary"]).optional(),
+  category: z["enum"](["Series", "Movie", "Documentary"]).optional(),
   // New field validations
   channel: z.string().optional(),
   audioId: z.string().optional(),
   originalFilename: z.string().optional(),
-  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
+  programRating: z["enum"](["AL", "6", "9", "12", "16", "18"]).optional(),
   productionCountry: z.string().optional(),
   seriesTitle: z.string().optional(),
   yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
@@ -265,13 +266,13 @@ export type BatchSeason = z.infer<typeof batchSeasonSchema>;
 
 export const enhancedBatchCreateSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
+  category: z["enum"](["Series", "Movie", "Documentary"]).default("Series"),
   seasons: z.array(batchSeasonSchema).min(1, "At least one season is required"),
   duration: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
   breakTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).nullable().optional(),
   breakTimes: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)).optional().default([]),
   endCredits: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
-  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
+  seasonType: z["enum"](["Winter", "Summer", "Autumn", "Spring"]).optional(),
   contentType: z.string().optional(),
   description: z.string().optional(),
   genre: z.array(z.string()).optional().default([]),
@@ -279,7 +280,7 @@ export const enhancedBatchCreateSchema = z.object({
   channel: z.string().optional().default("ONS"),
   audioId: z.string().optional(),
   seriesTitle: z.string().optional(),
-  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
+  programRating: z["enum"](["AL", "6", "9", "12", "16", "18"]).optional(),
   productionCountry: z.string().optional(),
   yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
   catchUp: z.number().int().min(0).max(1).optional(),
@@ -310,8 +311,8 @@ export const batchCreateSchema = z.object({
   breakTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).nullable().optional(),
   breakTimes: z.array(z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)).optional().default([]),
   endCredits: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/).or(z.literal("")).optional(),
-  category: z.enum(["Series", "Movie", "Documentary"]).default("Series"),
-  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
+  category: z["enum"](["Series", "Movie", "Documentary"]).default("Series"),
+  seasonType: z["enum"](["Winter", "Summer", "Autumn", "Spring"]).optional(),
   contentType: z.string().optional(),
   // Batch-level fields that apply to all episodes
   description: z.string().optional(),
@@ -320,7 +321,7 @@ export const batchCreateSchema = z.object({
   channel: z.string().optional(),
   audioId: z.string().optional(),
   seriesTitle: z.string().optional(),
-  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
+  programRating: z["enum"](["AL", "6", "9", "12", "16", "18"]).optional(),
   productionCountry: z.string().optional(),
   yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
   catchUp: z.number().int().min(0).max(1).optional(),
@@ -354,7 +355,7 @@ export const userDefinedTags = pgTable("user_defined_tags", {
 
 export const insertUserDefinedTagSchema = createInsertSchema(userDefinedTags, {
   userId: z.string(),
-  type: z.enum(["genre", "contentType", "tags"]),
+  type: z["enum"](["genre", "contentType", "tags"]),
   value: z.string().min(1).max(100),
 }).omit({ id: true, createdAt: true });
 
@@ -375,7 +376,7 @@ export const tasks = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasks, {
   metadataFileId: z.string().min(1),
   description: z.string().min(1, "Description is required"),
-  status: z.enum(["pending", "completed"]).optional(),
+  status: z["enum"](["pending", "completed"]).optional(),
 }).omit({
   id: true,
   createdBy: true,

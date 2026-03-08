@@ -153,7 +153,7 @@ export default function Dashboard() {
                       key={file.id}
                       className={cn(
                         "group flex items-center justify-between p-4 border rounded-xl transition-all hover:border-primary/30 hover:shadow-md",
-                        (file.draft === 1 || file.draft === '1' || file.draft === true) && "bg-orange-50/50 border-orange-200"
+                        file.draft === 1 && "bg-orange-50/50 border-orange-200"
                       )}
                     >
                       <div className="flex-1 min-w-0 pr-4">
@@ -166,7 +166,7 @@ export default function Dashboard() {
                               S{file.season}E{file.episode}
                             </Badge>
                           )}
-                          {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
+                          {file.draft === 1 && (
                             <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5">
                               Draft
                             </Badge>
@@ -199,7 +199,7 @@ export default function Dashboard() {
                   <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                   <p className="text-muted-foreground font-medium">No metadata files yet</p>
                   <Link href="/create">
-                    <Button variant="link" className="text-primary">Create your first record</Button>
+                    <Button variant="ghost" className="text-primary">Create your first record</Button>
                   </Link>
                 </div>
               )}

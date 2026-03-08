@@ -387,7 +387,7 @@ export default function ViewLicense() {
               <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">No content linked to this license yet.</p>
               {canWriteLicenses && (
-                <Button variant="link" asChild>
+                <Button variant="ghost" asChild>
                   <Link href={`/licenses/${id}/edit`}>Add content now</Link>
                 </Button>
               )}

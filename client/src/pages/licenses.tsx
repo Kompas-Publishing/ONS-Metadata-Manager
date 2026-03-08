@@ -316,7 +316,7 @@ export default function Licenses() {
                         {isExpired ? (
                           <Badge variant="destructive" className="w-20 justify-center">Expired</Badge>
                         ) : (
-                          <Badge variant="active" className="w-20 justify-center bg-green-100 text-green-800 border-green-200">Active</Badge>
+                          <Badge variant="secondary" className="w-20 justify-center bg-green-100 text-green-800 border-green-200">Active</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

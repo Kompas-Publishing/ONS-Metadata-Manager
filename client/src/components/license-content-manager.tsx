@@ -312,6 +312,9 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
                       channel: "ONS",
                       draft: 1,
                       licenseId: licenseId,
+                      breakTimes: [],
+                      actors: [],
+                      genre: [],
                     })}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add Another Batch

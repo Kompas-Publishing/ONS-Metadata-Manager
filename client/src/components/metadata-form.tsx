@@ -179,7 +179,7 @@ export function MetadataForm({
   const handleSubmit = (data: InsertMetadataFile & { licenseIds?: string[] }) => {
     const convertedData = {
       ...data,
-      licenseId: data.licenseIds && data.licenseIds.length > 0 ? data.licenseIds[0] : null, // Set primary legacy ID
+      licenseId: data.licenseIds && data.licenseIds.length > 0 ? data.licenseIds[0] : undefined, // Set primary legacy ID
       breakTime:
         data.breakTimes && data.breakTimes.length > 0 ? data.breakTimes[0] : "",
       breakTimes: data.breakTimes || [],

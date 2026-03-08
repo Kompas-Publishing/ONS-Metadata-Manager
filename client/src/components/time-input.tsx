@@ -5,6 +5,7 @@ interface TimeInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   'data-testid'?: string;
+  disabled?: boolean;
 }
 
 const formatTimeInput = (input: string): string => {
@@ -82,7 +83,7 @@ const formatTimeInput = (input: string): string => {
   return formatted;
 };
 
-export function TimeInput({ value = '', onChange, placeholder, 'data-testid': dataTestId }: TimeInputProps) {
+export function TimeInput({ value = '', onChange, placeholder, 'data-testid': dataTestId, disabled }: TimeInputProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     const formatted = formatTimeInput(inputValue);
@@ -96,6 +97,7 @@ export function TimeInput({ value = '', onChange, placeholder, 'data-testid': da
       onChange={handleChange}
       placeholder={placeholder}
       data-testid={dataTestId}
+      disabled={disabled}
     />
   );
 }

@@ -401,10 +401,10 @@ You help users manage metadata, licenses, and tasks.
 You have access to tools to search the database and propose changes.
 
 PERMISSION RULES:
-- Metadata Read: ${permissions.permissions.metadata.read ? "ALLOWED" : "DENIED"}
-- Metadata Write: ${permissions.permissions.metadata.write ? "ALLOWED" : "DENIED"}
-- License Read: ${permissions.permissions.licenses.read ? "ALLOWED" : "DENIED"}
-- License Write: ${permissions.permissions.licenses.write ? "ALLOWED" : "DENIED"}
+- Metadata Read: ${permissions.features.metadata.read ? "ALLOWED" : "DENIED"}
+- Metadata Write: ${permissions.features.metadata.write ? "ALLOWED" : "DENIED"}
+- License Read: ${permissions.features.licenses.read ? "ALLOWED" : "DENIED"}
+- License Write: ${permissions.features.licenses.write ? "ALLOWED" : "DENIED"}
 
 LANGUAGE RULES:
 - IMPORTANT: All descriptions (description, episodeDescription) MUST be in Dutch (Nederlands).
@@ -518,7 +518,7 @@ Always be professional and helpful.`;
             }
             break;
           case "searchMetadata":
-            if (!permissions.permissions.metadata.read) {
+            if (!permissions.features.metadata.read) {
               result = { error: "Permission denied: Cannot read metadata." };
             } else {
               result = await storage.searchMetadata(call.args.query as string, permissions);
@@ -526,7 +526,7 @@ Always be professional and helpful.`;
             break;
             
           case "searchLicenses":
-            if (!permissions.permissions.licenses.read) {
+            if (!permissions.features.licenses.read) {
               result = { error: "Permission denied: Cannot read licenses." };
             } else {
               result = await storage.searchLicenses(call.args.query as string);
@@ -534,7 +534,7 @@ Always be professional and helpful.`;
             break;
             
           case "proposeMetadataChange":
-            if (!permissions.permissions.metadata.write) {
+            if (!permissions.features.metadata.write) {
               result = { error: "Permission denied: Cannot write metadata." };
             } else {
               proposals.push({
@@ -549,7 +549,7 @@ Always be professional and helpful.`;
             break;
 
           case "proposeLicenseChange":
-            if (!permissions.permissions.licenses.write) {
+            if (!permissions.features.licenses.write) {
               result = { error: "Permission denied: Cannot write licenses." };
             } else {
               proposals.push({
@@ -625,7 +625,7 @@ export async function executeChatProposal(
   userId: string
 ) {
   if (proposal.type === "metadata") {
-    if (!permissions.permissions.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
+    if (!permissions.features.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
     
     const normalizedData = normalizeMetadataData(proposal.data);
     const { licenseIds, ...dataWithoutLicenses } = normalizedData as any;
@@ -647,7 +647,7 @@ export async function executeChatProposal(
       }, permissions);
     }
   } else if (proposal.type === "license") {
-    if (!permissions.permissions.licenses.write) throw new Error("Permission denied: Cannot write licenses.");
+    if (!permissions.features.licenses.write) throw new Error("Permission denied: Cannot write licenses.");
 
     if (proposal.action === "create") {
       const validation = insertLicenseSchema.safeParse(proposal.data);

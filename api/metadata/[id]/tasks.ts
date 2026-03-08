@@ -16,7 +16,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
   const permissions = await getUserPermissions(userId);
-  if (!permissions || !permissions.permissions.tasks.read) return res.status(403).json({ message: "No read permission for tasks" });
+  if (!permissions || !permissions.features.tasks.read) return res.status(403).json({ message: "No read permission for tasks" });
 
   try {
     const tasks = await storage.getTasksByFileId(fileId, permissions);

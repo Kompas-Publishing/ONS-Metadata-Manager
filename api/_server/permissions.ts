@@ -1,12 +1,12 @@
 import { storage } from "./storage.js";
 import type { User } from "../_shared/schema.js";
 
-export type UserPermissions = {
+export interface UserPermissions {
   user: User;
   userId: string;
   isAdmin: boolean;
   isActive: boolean;
-  permissions: {
+  features: {
     metadata: { read: boolean; write: boolean };
     licenses: { read: boolean; write: boolean };
     tasks: { read: boolean; write: boolean };
@@ -15,7 +15,7 @@ export type UserPermissions = {
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
-};
+}
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);
@@ -32,7 +32,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     userId,
     isAdmin,
     isActive,
-    permissions: {
+    features: {
       metadata: {
         read: isAdmin || (isActive && user.canReadMetadata === 1),
         write: isAdmin || (isActive && user.canWriteMetadata === 1),
@@ -77,11 +77,11 @@ export async function requirePermission(
 
   let allowed = false;
   if (feature === "ai") {
-    allowed = permissions.permissions.ai;
+    allowed = permissions.features.ai;
   } else if (feature === "aiChat") {
-    allowed = permissions.permissions.aiChat;
+    allowed = permissions.features.aiChat;
   } else {
-    allowed = permissions.permissions[feature][action];
+    allowed = permissions.features[feature][action];
   }
   
   return {

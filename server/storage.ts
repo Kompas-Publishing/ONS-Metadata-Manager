@@ -14,6 +14,7 @@ import {
   type MetadataFile,
   type InsertMetadataFile,
   type BatchCreate,
+  type EnhancedBatchCreate,
   type Setting,
   type UserDefinedTag,
   type InsertUserDefinedTag,
@@ -24,7 +25,7 @@ import {
   type LicenseBatchGenerate,
   type Task,
   type InsertTask,
-  type SeriesItem,
+  type Series,
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
@@ -113,10 +114,10 @@ export type IStorage = {
   deleteTask(id: number): Promise<boolean>;
 
   // Series Management
-  getSeriesById(id: string): Promise<SeriesItem | undefined>;
-  getSeriesByTitle(title: string): Promise<SeriesItem | undefined>;
-  getAllSeries(): Promise<SeriesItem[]>;
-  upsertSeries(data: InsertSeries): Promise<SeriesItem>;
+  getSeriesById(id: string): Promise<Series | undefined>;
+  getSeriesByTitle(title: string): Promise<Series | undefined>;
+  getAllSeries(): Promise<Series[]>;
+  upsertSeries(data: InsertSeries): Promise<Series>;
   deleteSeries(id: string): Promise<boolean>;
   linkSeriesToLicense(seriesId: string, licenseId: string, seasonRange?: string): Promise<void>;
   unlinkSeriesFromLicense(seriesId: string, licenseId: string): Promise<void>;
@@ -1001,7 +1002,7 @@ export class DatabaseStorage {
       .from(metadataFiles)
       .where(and(...whereConditions))
       .orderBy(metadataFiles.season, metadataFiles.episode);
-    return files.map(normalizeMetadataFile);
+    return files.map(file => normalizeMetadataFile(file));
   }
 
   async getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]> {
@@ -1027,7 +1028,7 @@ export class DatabaseStorage {
       .from(metadataFiles)
       .where(and(...whereConditions))
       .orderBy(metadataFiles.episode);
-    return files.map(normalizeMetadataFile);
+    return files.map(file => normalizeMetadataFile(file));
   }
 
   async getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }> {
@@ -1109,7 +1110,7 @@ export class DatabaseStorage {
       .where(and(...whereConditions))
       .orderBy(metadataFiles.title, metadataFiles.season, metadataFiles.episode)
       .limit(100);
-    return files.map(normalizeMetadataFile);
+    return files.map(file => normalizeMetadataFile(file));
   }
 
   async searchLicenses(keyword: string): Promise<License[]> {
@@ -1472,21 +1473,21 @@ export class DatabaseStorage {
   }
 
   // Series Management
-  async getSeriesById(id: string): Promise<SeriesItem | undefined> {
+  async getSeriesById(id: string): Promise<Series | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.id, id));
     return item;
   }
 
-  async getSeriesByTitle(title: string): Promise<SeriesItem | undefined> {
+  async getSeriesByTitle(title: string): Promise<Series | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.title, title));
     return item;
   }
 
-  async getAllSeries(): Promise<SeriesItem[]> {
+  async getAllSeries(): Promise<Series[]> {
     return await db.select().from(seriesTable).orderBy(seriesTable.title);
   }
 
-  async upsertSeries(data: InsertSeries): Promise<SeriesItem> {
+  async upsertSeries(data: InsertSeries): Promise<Series> {
     const [item] = await db
       .insert(seriesTable)
       .values(data)

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import type { MetadataFile, Series, License, Task } from "@shared/schema";
+import type { MetadataFile, SeriesItem, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
@@ -149,7 +149,7 @@ export default function Browse() {
     }));
   };
 
-  const { data: seriesDetails, isLoading: isSeriesDetailsLoading } = useQuery<Series & { 
+  const { data: seriesDetails, isLoading: isSeriesDetailsLoading } = useQuery<SeriesItem & { 
     licenses: (License & { seasonRange: string | null })[],
     tasks: (Task & { metadataFile: MetadataFile })[]
   }>({
@@ -815,7 +815,7 @@ export default function Browse() {
                             .map((episode) => (
                               <TableRow 
                                 key={episode.id}
-                                className={(episode.draft === 1 || episode.draft === '1' || episode.draft === true) ? 'bg-orange-50/50 hover:bg-orange-100/50' : ''}
+                                className={episode.draft === 1 ? 'bg-orange-50/50 hover:bg-orange-100/50' : ''}
                               >
                                 <TableCell className="font-mono text-[11px] text-muted-foreground">
                                   {episode.id}
@@ -826,7 +826,7 @@ export default function Browse() {
                                 <TableCell>
                                   <div className="flex flex-col">
                                     <span className="font-medium text-sm line-clamp-1">{episode.episodeTitle || episode.title}</span>
-                                    {(episode.draft === 1 || episode.draft === '1' || episode.draft === true) && (
+                                    {episode.draft === 1 && (
                                       <span className="text-[10px] text-orange-600 font-semibold uppercase">Draft</span>
                                     )}
                                   </div>

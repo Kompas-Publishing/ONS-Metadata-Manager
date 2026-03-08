@@ -168,7 +168,7 @@ async function processFile(filePath: string, isExpiredFile: boolean) {
   console.log(`Analyzing ${groups.size} potential licenses...`);
 
   let count = 0;
-  for (const group of groups.values()) {
+  for (const group of Array.from(groups.values())) {
     // FILTER LOGIC:
     // 1. Has a known distributor (not empty, not "Unknown")
     // 2. OR has a valid license fee

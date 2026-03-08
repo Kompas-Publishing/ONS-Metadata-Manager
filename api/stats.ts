@@ -9,7 +9,7 @@ export default apiHandler(
     }
 
     try {
-      const stats = await storage.getStats(req.permissions!);
+      const stats = await storage.getStats(req.userPermissions!);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching stats:", error);

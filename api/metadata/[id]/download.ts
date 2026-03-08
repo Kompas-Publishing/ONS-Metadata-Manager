@@ -17,7 +17,7 @@ export default apiHandler(
         return res.status(400).json({ message: "Invalid ID" });
       }
 
-      const file = await storage.getMetadataFile(id, req.permissions!);
+      const file = await storage.getMetadataFile(id, req.userPermissions!);
       if (!file) {
         return res.status(404).json({ message: "File not found" });
       }

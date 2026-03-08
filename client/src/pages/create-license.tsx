@@ -511,6 +511,9 @@ export default function CreateLicense() {
                           seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
                           channel: "ONS",
                           draft: 1,
+                          breakTimes: [],
+                          actors: [],
+                          genre: [],
                         })}
                       >
                         <Plus className="w-4 h-4 mr-2" /> Add a Batch

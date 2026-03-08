@@ -39,7 +39,7 @@ export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 export type MetadataUpdateInput = Partial<InsertMetadataFile> & { licenseIds?: string[] };
 export type BulkMetadataUpdate = { id: string, data: MetadataUpdateInput };
 
-export type IStorage = {
+export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -116,10 +116,10 @@ export type IStorage = {
   deleteTask(id: number): Promise<boolean>;
 
   // Series Management
-  getSeriesById(id: string): Promise<SeriesItem | undefined>;
-  getSeriesByTitle(title: string): Promise<SeriesItem | undefined>;
-  getAllSeries(): Promise<SeriesItem[]>;
-  upsertSeries(data: InsertSeries): Promise<SeriesItem>;
+  getSeriesById(id: string): Promise<Series | undefined>;
+  getSeriesByTitle(title: string): Promise<Series | undefined>;
+  getAllSeries(): Promise<Series[]>;
+  upsertSeries(data: InsertSeries): Promise<Series>;
   deleteSeries(id: string): Promise<boolean>;
   linkSeriesToLicense(seriesId: string, licenseId: string, seasonRange?: string): Promise<void>;
   unlinkSeriesFromLicense(seriesId: string, licenseId: string): Promise<void>;
@@ -130,7 +130,7 @@ export type IStorage = {
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
   getSettingsByKeys(keys: string[]): Promise<Setting[]>;
-};
+}
 
 function formatMetadataId(num: number): string {
   const segment3 = String(num % 1000).padStart(3, '0');
@@ -168,7 +168,7 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   };
 }
 
-export class DatabaseStorage {
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -1481,21 +1481,21 @@ export class DatabaseStorage {
   }
 
   // Series Management
-  async getSeriesById(id: string): Promise<SeriesItem | undefined> {
+  async getSeriesById(id: string): Promise<Series | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.id, id));
     return item;
   }
 
-  async getSeriesByTitle(title: string): Promise<SeriesItem | undefined> {
+  async getSeriesByTitle(title: string): Promise<Series | undefined> {
     const [item] = await db.select().from(seriesTable).where(eq(seriesTable.title, title));
     return item;
   }
 
-  async getAllSeries(): Promise<SeriesItem[]> {
+  async getAllSeries(): Promise<Series[]> {
     return await db.select().from(seriesTable).orderBy(seriesTable.title);
   }
 
-  async upsertSeries(data: InsertSeries): Promise<SeriesItem> {
+  async upsertSeries(data: InsertSeries): Promise<Series> {
     const [item] = await db
       .insert(seriesTable)
       .values(data)

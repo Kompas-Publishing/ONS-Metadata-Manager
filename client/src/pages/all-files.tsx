@@ -276,7 +276,7 @@ export default function AllFiles() {
             {filteredFiles.map((file) => (
               <div
                 key={file.id}
-                className={`p-4 border rounded-lg hover-elevate ${(file.draft === 1 || file.draft === '1' || file.draft === true) ? '!bg-orange-100/80 !border-orange-400' : ''}`}
+                className={`p-4 border rounded-lg hover-elevate ${file.draft === 1 ? '!bg-orange-100/80 !border-orange-400' : ''}`}
                 data-testid={`file-row-${file.id}`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -314,7 +314,7 @@ export default function AllFiles() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
+                      {file.draft === 1 && (
                         <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`file-draft-${file.id}`}>
                           Draft
                         </Badge>

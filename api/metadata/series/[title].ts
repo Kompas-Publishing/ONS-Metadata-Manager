@@ -3,9 +3,9 @@ import { storage } from "../../../_server/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
-  const { title } = req.query;
+  const { title: itemTitle } = req.query;
 
-  if (!title || typeof title !== "string") {
+  if (!itemTitle || typeof itemTitle !== "string") {
     return res.status(400).json({ message: "Invalid title" });
   }
 
@@ -13,14 +13,14 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "DELETE") {
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const decodedTitle = decodeURIComponent(title);
+        const decodedTitle = decodeURIComponent(itemTitle);
         const count = await storage.deleteMetadataBySeries(
           decodedTitle,
-          req.permissions!
+          req.userPermissions!
         );
         res.json({ message: `Deleted ${count} files for series: ${decodedTitle}`, count });
       } catch (error) {
-        console.error(`[DELETE metadata/series/${title}] Error:`, error);
+        console.error(`[DELETE metadata/series/${itemTitle}] Error:`, error);
         res.status(500).json({ message: "Failed to delete series metadata" });
       }
     })(req, res);

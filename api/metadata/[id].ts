@@ -14,8 +14,8 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "GET") {
     return requirePermission("metadata", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.permissions);
-        const file = await storage.getMetadataFile(id, req.permissions!);
+        console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.userPermissions);
+        const file = await storage.getMetadataFile(id, req.userPermissions!);
         console.log(`[GET metadata/${id}] File found:`, !!file);
         if (!file) {
           return res.status(404).json({ message: "File not found" });
@@ -32,7 +32,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "PATCH") {
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const permissions = req.permissions!;
+        const permissions = req.userPermissions!;
 
         // Check if file exists and user can see it
         const existingFile = await storage.getMetadataFile(id, permissions);
@@ -81,7 +81,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "DELETE") {
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const permissions = req.permissions!;
+        const permissions = req.userPermissions!;
 
         // Check if file exists and user can see it
         const existingFile = await storage.getMetadataFile(id, permissions);

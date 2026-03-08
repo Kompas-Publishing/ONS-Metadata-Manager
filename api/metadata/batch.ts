@@ -21,7 +21,7 @@ export default apiHandler(
 
       const files = await storage.createBatchMetadataFiles(
         validation.data,
-        req.permissions!,
+        req.userPermissions!,
       );
 
       res.json({

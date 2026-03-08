@@ -3,6 +3,11 @@ import { storage } from "../_server/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import { z } from "zod";
 
+const updateTaskSchema = z.object({
+  status: z["enum"](["pending", "completed"]).optional(),
+  description: z.string().optional(),
+});
+
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   const taskId = parseInt(req.query.id as string);
   if (isNaN(taskId)) return res.status(400).json({ message: "Invalid task ID" });
@@ -10,11 +15,6 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "PATCH") {
     return requirePermission("tasks", "write")(async (req, res) => {
       try {
-        const updateTaskSchema = z.object({
-          status: z.enum(["pending", "completed"]).optional(),
-          description: z.string().optional(),
-        });
-
         const validation = updateTaskSchema.partial().safeParse(req.body);
         if (!validation.success) {
           return res.status(400).json({

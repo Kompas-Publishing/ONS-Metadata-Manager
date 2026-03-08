@@ -18,7 +18,7 @@ export default apiHandler(
       // Update all selected metadata files to point to this license
       const count = await storage.bulkUpdateMetadata(
         metadataIds.map((id: string) => ({ id, data: { licenseId } })),
-        req.permissions!
+        req.userPermissions!
       );
 
       res.json({ message: "Metadata linked to license successfully", count });

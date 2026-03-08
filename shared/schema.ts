@@ -125,6 +125,7 @@ export const seriesTable = pgTable("series", {
 });
 
 export type SeriesItem = typeof seriesTable.$inferSelect;
+export type Series = SeriesItem;
 export type InsertSeries = typeof seriesTable.$inferInsert;
 
 // Join table for many-to-many Series-License relationship

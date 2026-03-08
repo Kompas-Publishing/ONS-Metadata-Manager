@@ -49,7 +49,7 @@ export default apiHandler(
         };
       }
 
-      const result = await runAiChat(messages, req.permissions!, { debug, attachment });
+      const result = await runAiChat(messages, req.userPermissions!, { debug, attachment });
       return res.json(result);
     } catch (error: any) {
       console.error("Error in AI chat:", error);

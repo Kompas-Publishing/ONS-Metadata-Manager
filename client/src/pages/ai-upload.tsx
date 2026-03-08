@@ -287,7 +287,7 @@ export default function AiUpload() {
             <Card className="p-12 text-center text-muted-foreground">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
               <p>No actionable data found in the uploaded file.</p>
-              <Button variant="link" onClick={() => setProposals(null)}>Try another file</Button>
+              <Button variant="ghost" onClick={() => setProposals(null)}>Try another file</Button>
             </Card>
           ) : (
             <ScrollArea className="h-[calc(100vh-250px)]">

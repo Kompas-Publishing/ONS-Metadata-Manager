@@ -53,10 +53,10 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
           duration: data.duration || "00:00:00",
           contentType: data.contentType || "Long Form",
         };
-        const file = await storage.createMetadataFile(metadataToCreate, nextId, req.permissions!);
+        const file = await storage.createMetadataFile(metadataToCreate, nextId, req.userPermissions!);
         return res.json({ message: "Metadata file created successfully", id: file.id });
       } else if (action === "update") {
-        const file = await storage.updateMetadataFile(data.id, data, req.permissions!);
+        const file = await storage.updateMetadataFile(data.id, data, req.userPermissions!);
         return res.json({ message: "Metadata file updated successfully", id: file?.id });
       }
     }

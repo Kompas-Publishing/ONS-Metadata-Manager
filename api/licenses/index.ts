@@ -13,7 +13,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (!permissions) return res.status(403).json({ message: "Unauthorized" });
 
   if (req.method === "GET") {
-    if (!permissions.permissions.licenses.read) {
+    if (!permissions.features.licenses.read) {
       return res.status(403).json({ message: "No read permission for licenses" });
     }
     try {
@@ -26,7 +26,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   }
 
   if (req.method === "POST") {
-    if (!permissions.permissions.licenses.write) {
+    if (!permissions.features.licenses.write) {
       return res.status(403).json({ message: "No write permission for licenses" });
     }
     try {

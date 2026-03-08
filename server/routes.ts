@@ -1220,7 +1220,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
-        "edit",
+        "metadata",
+        "write",
       );
 
       if (!allowed) {
@@ -1270,7 +1271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
-        "delete",
+        "metadata",
+        "write",
       );
 
       if (!allowed) {
@@ -1467,7 +1469,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
-        "edit",
+        "metadata",
+        "write",
       );
 
       if (!allowed) {
@@ -1490,9 +1493,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { licenseId, metadataIds } = validation.data;
 
+      const dataUpdate: Partial<InsertMetadataFile> = { licenseId: licenseId || undefined };
+
       // Update all selected metadata files to point to this license
       await storage.bulkUpdateMetadata(
-        metadataIds.map(id => ({ id, data: { licenseId } })),
+        metadataIds.map(id => ({ id, data: dataUpdate })),
         permissions!
       );
 
@@ -2521,7 +2526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const result = await aiService.parseLicenseContract(fileBuffer, mimeType);
           proposals = result.proposals || [];
         } else if (type === "metadata") {
-          const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, permissions);
+          const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, permissions!);
           proposals = result.proposals;
         }
 
@@ -2583,7 +2588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type,
           previousProposals,
           feedback,
-          permissions
+          permissions!
         );
 
         res.json({ proposals: result.proposals });
@@ -2651,10 +2656,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               duration: data.duration || "00:00:00",
               contentType: data.contentType || "Long Form",
             };
-            const file = await storage.createMetadataFile(metadataToCreate, nextId, permissions);
+            const file = await storage.createMetadataFile(metadataToCreate, nextId, permissions!);
             return res.json({ message: "Metadata file created successfully", id: file.id });
           } else if (action === "update") {
-            const file = await storage.updateMetadataFile(data.id, data, permissions);
+            const file = await storage.updateMetadataFile(data.id, data, permissions!);
             return res.json({ message: "Metadata file updated successfully", id: file?.id });
           }
         }

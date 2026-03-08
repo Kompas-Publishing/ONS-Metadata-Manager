@@ -4,11 +4,11 @@ import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPa
 import type { User } from "../_shared/schema.js";
 import { getUserPermissions, requirePermission as checkPermission, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
 
-export type AuthenticatedRequest = VercelRequest & {
+export interface AuthenticatedRequest extends VercelRequest {
   user?: User;
   userId?: string;
-  permissions?: UserPermissions;
-};
+  userPermissions?: UserPermissions;
+}
 
 export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void | VercelResponse> | void | VercelResponse;
 
@@ -96,7 +96,7 @@ export function requirePermission(feature: PermissionFeature, action: Permission
         return res.status(statusCode).json({ message: reason });
       }
 
-      req.permissions = permissions || undefined;
+      req.userPermissions = permissions || undefined;
       return handler(req, res);
     };
   };
@@ -115,7 +115,7 @@ export function requireAdmin(handler: ApiHandler): ApiHandler {
     }
 
     const permissions = await getUserPermissions(user.id);
-    req.permissions = permissions || undefined;
+    req.userPermissions = permissions || undefined;
 
     return handler(req, res);
   };

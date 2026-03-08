@@ -11,9 +11,9 @@ export default apiHandler(
     }
 
     try {
-      const { title, season, format } = req.query;
+      const { title: itemTitle, season: seasonValue, format } = req.query;
 
-      if (!title || typeof title !== "string") {
+      if (!itemTitle || typeof itemTitle !== "string") {
         return res.status(400).json({ message: "Invalid title" });
       }
 
@@ -25,12 +25,12 @@ export default apiHandler(
         return res.status(400).json({ message: "Invalid format" });
       }
 
-      const seasonNum = parseInt(season);
+      const seasonNum = parseInt(seasonValue);
       if (isNaN(seasonNum)) {
         return res.status(400).json({ message: "Season must be a number" });
       }
 
-      const files = await storage.getMetadataBySeason(title, seasonNum, req.permissions!);
+      const files = await storage.getMetadataBySeason(title, seasonNum, req.userPermissions!);
 
       if (!files || files.length === 0) {
         return res.status(404).json({ message: "No files found for this season" });
@@ -41,7 +41,7 @@ export default apiHandler(
       if (format === "xml") {
         const xml = buildSeriesXml(transformedFiles, 'season');
 
-        const filename = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
+        const filename = `${itemTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
         res.setHeader("Content-Type", "application/xml");
         res.setHeader(
           "Content-Disposition",
@@ -52,7 +52,7 @@ export default apiHandler(
         const wb = buildMetadataXlsx(files);
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-        const filename = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
+        const filename = `${itemTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader(
           "Content-Disposition",
@@ -60,7 +60,7 @@ export default apiHandler(
         );
         res.send(buffer);
       } else {
-        const filename = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
+        const filename = `${itemTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_s${season}`;
         res.setHeader("Content-Type", "application/json");
         res.setHeader(
           "Content-Disposition",

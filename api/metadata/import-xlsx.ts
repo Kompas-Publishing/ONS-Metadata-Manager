@@ -211,7 +211,7 @@ export default apiHandler(
               const originalId = row[idx.originalId]?.toString();
               const result = await storage.upsertMetadataFile(
                 metadata,
-                req.permissions!,
+                req.userPermissions!,
                 originalId,
               );
               results.push(result);

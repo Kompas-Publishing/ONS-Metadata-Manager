@@ -10,7 +10,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
       try {
         const { licenseId } = req.query;
         const files = await storage.getAllMetadataFiles(
-          req.permissions!,
+          req.userPermissions!,
           typeof licenseId === "string" ? licenseId : undefined
         );
         res.json(files);
@@ -26,7 +26,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
         const userId = req.user!.id;
-        const permissions = req.permissions!;
+        const permissions = req.userPermissions!;
 
         const parsed = insertMetadataFileSchema.safeParse(req.body);
         if (!parsed.success) {

@@ -19,7 +19,7 @@ export default apiHandler(
           batches: req.body.batches,
           taskDescription: req.body.taskDescription
         },
-        req.permissions!,
+        req.userPermissions!,
       );
 
       res.json({

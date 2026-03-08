@@ -7,8 +7,8 @@ export default apiHandler(
     if (req.method === "GET") {
       try {
         const { status } = req.query;
-        // requirePermission sets req.permissions
-        const tasks = await storage.listTasks(req.permissions!, typeof status === "string" ? status : undefined);
+        // requirePermission sets req.userPermissions
+        const tasks = await storage.listTasks(req.userPermissions!, typeof status === "string" ? status : undefined);
         return res.json(tasks);
       } catch (error) {
         console.error("Error fetching tasks:", error);

@@ -86,7 +86,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       type,
       previousProposals,
       feedback,
-      req.permissions
+      req.userPermissions
     );
 
     return res.status(200).json({ proposals: result.proposals });

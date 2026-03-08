@@ -76,7 +76,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       const result = await aiService.parseLicenseContract(fileBuffer, mimeType);
       proposals = result.proposals || [];
     } else if (type === "metadata") {
-      const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, req.permissions!);
+      const result = await aiService.parseMetadataDocument(fileBuffer, mimeType, req.userPermissions!);
       proposals = result.proposals;
     }
 
