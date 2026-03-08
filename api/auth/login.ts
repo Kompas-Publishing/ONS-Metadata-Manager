@@ -58,7 +58,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
 
     res.setHeader('Set-Cookie', cookie);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: removedPassword, ...userWithoutPassword } = user;
     res.json({
       user: userWithoutPassword,
       token, // Also send in response for Authorization header usage

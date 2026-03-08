@@ -9,7 +9,7 @@ import {
   Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
   LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2,
   ExternalLink, Globe, FolderOpen, CheckCircle2, ChevronDown, ChevronUp,
-  Link2, Info
+  Link2, Info, ShieldCheck
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
