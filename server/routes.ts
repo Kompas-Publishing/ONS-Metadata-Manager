@@ -607,14 +607,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { productionYear, driveLinks, websiteLink, subsFromDistributor } = req.body;
       
-      const updated = await storage.upsertSeries({
-        id,
-        title: "", // Not used for update due to ID PK but Drizzle might require it in type
+      const updated = await storage.updateSeries(id, {
         productionYear,
         driveLinks,
         websiteLink,
         subsFromDistributor
       });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Series not found" });
+      }
       
       res.json(updated);
     } catch (error) {
