@@ -20,12 +20,15 @@ import {
   Trash2,
   Layers,
   Database,
-  CheckSquare
+  CheckSquare,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import type { Task, MetadataFile, MultiBatchCreate } from "@shared/schema";
 import { multiBatchCreateSchema } from "@shared/schema";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -42,6 +45,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
@@ -78,11 +88,49 @@ export default function Tasks() {
   const [activeAddTab, setActiveAddTab] = useState<"existing" | "new">("existing");
   const [selectedExistingIds, setSelectedExistingIds] = useState<string[]>([]);
   const [taskDescription, setTaskDescription] = useState("");
+  const [taskDeadline, setTaskDeadline] = useState<Date | undefined>(undefined);
 
   const { data: tasks, isLoading } = useQuery<TaskWithFile[]>({
     queryKey: ["/api/tasks"],
     enabled: canReadTasks || canWriteTasks,
   });
+
+  // Grouping logic
+  const groupedTasks = useMemo(() => {
+    if (!tasks) return {};
+    
+    const filtered = tasks.filter((t) => {
+      const matchesSearch = 
+        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.metadataFile.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.metadataFileId.includes(searchTerm);
+      
+      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+      const matchesDesc = descFilter === "all" || t.description === descFilter;
+
+      return matchesSearch && matchesStatus && matchesDesc;
+    });
+
+    const groups: Record<string, Record<number, TaskWithFile[]>> = {};
+    
+    filtered.forEach(task => {
+      const title = task.metadataFile.title || "Uncategorized";
+      const season = task.metadataFile.season || 0;
+      
+      if (!groups[title]) groups[title] = {};
+      if (!groups[title][season]) groups[title][season] = [];
+      
+      groups[title][season].push(task);
+    });
+    
+    return groups;
+  }, [tasks, searchTerm, statusFilter, descFilter]);
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Form for New Assets tab
   const batchForm = useForm<MultiBatchCreate & { taskDescription: string }>({
@@ -148,7 +196,7 @@ export default function Tasks() {
   });
 
   const bulkAddMutation = useMutation({
-    mutationFn: async (data: { metadataFileIds: string[], description: string }) => {
+    mutationFn: async (data: { metadataFileIds: string[], description: string, deadline?: Date }) => {
       await apiRequest("POST", "/api/tasks/bulk", data);
     },
     onSuccess: () => {
@@ -156,6 +204,7 @@ export default function Tasks() {
       setIsAddDialogOpen(false);
       setSelectedExistingIds([]);
       setTaskDescription("");
+      setTaskDeadline(undefined);
       toast({ title: "Success", description: "Tasks assigned successfully." });
     },
   });
@@ -185,7 +234,8 @@ export default function Tasks() {
       }
       bulkAddMutation.mutate({
         metadataFileIds: selectedExistingIds,
-        description: taskDescription
+        description: taskDescription,
+        deadline: taskDeadline
       });
     } else {
       batchForm.handleSubmit((data) => {
@@ -260,20 +310,47 @@ export default function Tasks() {
                 </TabsList>
 
                 <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
-                  <div className="space-y-2">
-                    <Label>Task Description</Label>
-                    <Select value={taskDescription} onValueChange={setTaskDescription}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a task description" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PREDEFINED_DESCRIPTIONS.map((desc) => (
-                          <SelectItem key={desc} value={desc}>
-                            {desc}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Task Description</Label>
+                      <Select value={taskDescription} onValueChange={setTaskDescription}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a task description" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PREDEFINED_DESCRIPTIONS.map((desc) => (
+                            <SelectItem key={desc} value={desc}>
+                              {desc}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Deadline (Optional)</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !taskDeadline && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {taskDeadline ? format(taskDeadline, "PPP") : <span>Set deadline</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={taskDeadline}
+                            onSelect={setTaskDeadline}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <Label className="mb-2 block">Select Files</Label>
@@ -403,83 +480,124 @@ export default function Tasks() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
-            <Card key={task.id} className={cn(
-              "transition-all",
-              task.status === "completed" ? "bg-muted/40 opacity-80" : "bg-card hover:shadow-md"
-            )}>
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
-                  <Checkbox 
-                    checked={task.status === "completed"}
-                    onCheckedChange={(checked) => {
-                      toggleMutation.mutate({ 
-                        id: task.id, 
-                        status: checked ? "completed" : "pending" 
-                      });
-                    }}
-                    className="h-5 w-5"
-                    disabled={!canWriteTasks}
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={cn(
-                        "font-semibold text-lg leading-none",
-                        task.status === "completed" && "line-through text-muted-foreground"
-                      )}>
-                        {task.description}
-                      </span>
-                      {task.status === "completed" ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> Done
+      <div className="space-y-6">
+        {Object.keys(groupedTasks).length > 0 ? (
+          Object.entries(groupedTasks)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([title, seasons]) => {
+              const totalPending = Object.values(seasons).flat().filter(t => t.status === 'pending').length;
+              const isGroupOpen = openGroups[title] ?? true;
+
+              return (
+                <div key={title} className="space-y-3">
+                  <div 
+                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg cursor-pointer hover:bg-muted/60 transition-colors"
+                    onClick={() => toggleGroup(title)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isGroupOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+                      {totalPending > 0 && (
+                        <Badge variant="destructive" className="animate-pulse">
+                          {totalPending} pending
                         </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                          <Clock className="w-3 h-3 mr-1" /> Pending
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {task.metadataFile.title}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        ID: <span className="font-mono">{task.metadataFileId}</span>
-                      </span>
-                      {task.metadataFile.season && (
-                        <span>S{task.metadataFile.season} E{task.metadataFile.episode}</span>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {canReadMetadata && (
-                    <Button variant="ghost" size="icon" asChild title="View File">
-                      <Link href={`/view/${task.metadataFileId}`}>
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                  )}
-                  {canWriteTasks && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-destructive hover:bg-destructive/10"
-                      title="Delete Task"
-                      onClick={() => {
-                        if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  {isGroupOpen && (
+                    <div className="pl-4 space-y-6 border-l-2 border-muted ml-2 pt-2">
+                      {Object.entries(seasons)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([season, seasonTasks]) => (
+                          <div key={`${title}-${season}`} className="space-y-3">
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                              <CheckSquare className="w-3.5 h-3.5" />
+                              {season === "0" ? "Single Item / Unknown" : `Season ${season}`}
+                            </h3>
+                            <div className="grid grid-cols-1 gap-3">
+                              {seasonTasks.map((task) => (
+                                <Card key={task.id} className={cn(
+                                  "transition-all",
+                                  task.status === "completed" ? "bg-muted/40 opacity-80" : "bg-card hover:shadow-md"
+                                )}>
+                                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                      <Checkbox 
+                                        checked={task.status === "completed"}
+                                        onCheckedChange={(checked) => {
+                                          toggleMutation.mutate({ 
+                                            id: task.id, 
+                                            status: checked ? "completed" : "pending" 
+                                          });
+                                        }}
+                                        className="h-5 w-5"
+                                        disabled={!canWriteTasks}
+                                      />
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <span className={cn(
+                                            "font-semibold text-lg leading-none",
+                                            task.status === "completed" && "line-through text-muted-foreground"
+                                          )}>
+                                            {task.description}
+                                          </span>
+                                          {task.deadline && (
+                                            <Badge variant="outline" className={cn(
+                                              "text-[10px] font-mono",
+                                              new Date(task.deadline) < new Date() && task.status !== 'completed' ? "border-destructive text-destructive bg-destructive/5" : ""
+                                            )}>
+                                              Due: {format(new Date(task.deadline), "dd-MM-yyyy")}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                          <span className="flex items-center gap-1">
+                                            ID: <span className="font-mono text-[10px]">{task.metadataFileId}</span>
+                                          </span>
+                                          {task.metadataFile.episode && (
+                                            <span className="font-medium text-foreground">Episode {task.metadataFile.episode}</span>
+                                          )}
+                                          {task.metadataFile.episodeTitle && (
+                                            <span className="italic">"{task.metadataFile.episodeTitle}"</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {canReadMetadata && (
+                                        <Button variant="ghost" size="icon" asChild title="View File">
+                                          <Link href={`/view/${task.metadataFileId}`}>
+                                            <ExternalLink className="w-4 h-4" />
+                                          </Link>
+                                        </Button>
+                                      )}
+                                      {canWriteTasks && (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="text-destructive hover:bg-destructive/10"
+                                          title="Delete Task"
+                                          onClick={() => {
+                                            if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
+                                          }}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              );
+            })
         ) : (
           <div className="text-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
             <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />

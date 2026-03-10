@@ -9,7 +9,7 @@ import {
   Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
   LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2,
   ExternalLink, Globe, FolderOpen, CheckCircle2, ChevronDown, ChevronUp,
-  Link2, Info, ShieldCheck
+  Link2, Info, ShieldCheck, X
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -141,6 +141,8 @@ export default function Browse() {
   });
 
   const [openSeasons, setOpenSeasons] = useState<Record<number, boolean>>({});
+  const [isEditingSeries, setIsEditingSeries] = useState(false);
+  const [editSeriesData, setEditSeriesData] = useState<Partial<SeriesItem>>({});
 
   const toggleSeason = (season: number) => {
     setOpenSeasons((prev) => ({
@@ -155,6 +157,57 @@ export default function Browse() {
   }>({
     queryKey: [`/api/series/by-title/${encodeURIComponent(selectedSeries || "")}`],
     enabled: !!selectedSeries,
+  });
+
+  const updateSeriesMutation = useMutation({
+    mutationFn: async (data: Partial<SeriesItem>) => {
+      if (!seriesDetails?.id) throw new Error("Series ID not found");
+      const res = await apiRequest("PATCH", `/api/series/${seriesDetails.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/series/by-title/${encodeURIComponent(selectedSeries || "")}`] });
+      toast({
+        title: "Series updated",
+        description: "Series details have been successfully updated.",
+      });
+      setIsEditingSeries(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const linkLicenseMutation = useMutation({
+    mutationFn: async ({ licenseId, seasonRange }: { licenseId: string, seasonRange?: string }) => {
+      if (!seriesDetails?.id) throw new Error("Series ID not found");
+      await apiRequest("POST", `/api/series/${seriesDetails.id}/licenses`, { licenseId, seasonRange });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/series/by-title/${encodeURIComponent(selectedSeries || "")}`] });
+      toast({
+        title: "License linked",
+        description: "License has been linked to the series.",
+      });
+    },
+  });
+
+  const unlinkLicenseMutation = useMutation({
+    mutationFn: async (licenseId: string) => {
+      if (!seriesDetails?.id) throw new Error("Series ID not found");
+      await apiRequest("DELETE", `/api/series/${seriesDetails.id}/licenses/${licenseId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/series/by-title/${encodeURIComponent(selectedSeries || "")}`] });
+      toast({
+        title: "License unlinked",
+        description: "License has been unlinked from the series.",
+      });
+    },
   });
 
   const deleteSeriesMutation = useMutation({
@@ -520,6 +573,23 @@ export default function Browse() {
                         ({seriesDetails.productionYear})
                       </span>
                     )}
+                    {canWriteMetadata && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditSeriesData({
+                            productionYear: seriesDetails?.productionYear,
+                            websiteLink: seriesDetails?.websiteLink,
+                            driveLinks: seriesDetails?.driveLinks || []
+                          });
+                          setIsEditingSeries(true);
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {selectedSeriesData?.category && selectedSeriesData.category !== "Unknown" && (
@@ -578,9 +648,21 @@ export default function Browse() {
 
                   {/* Licenses Section */}
                   <div className="space-y-3">
-                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4" /> Associated Licenses
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4" /> Associated Licenses
+                      </h4>
+                      {canWriteMetadata && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-[10px] uppercase font-bold text-primary"
+                          onClick={() => setIsEditingSeries(true)}
+                        >
+                          Manage
+                        </Button>
+                      )}
+                    </div>
                     <div className="space-y-2">
                       {seriesDetails?.licenses && seriesDetails.licenses.length > 0 ? (
                         seriesDetails.licenses.map((license) => (
@@ -611,6 +693,11 @@ export default function Browse() {
                       {seriesDetails.tasks.slice(0, 5).map((task) => (
                         <Badge key={task.id} variant="outline" className="bg-orange-50 border-orange-200 text-orange-800 text-[10px] py-0.5">
                           {task.metadataFile?.episode ? `E${task.metadataFile.episode}: ` : ""}{task.description}
+                          {task.deadline && (
+                            <span className="ml-1.5 opacity-70 font-mono">
+                              (Due: {format(new Date(task.deadline), "dd-MM")})
+                            </span>
+                          )}
                         </Badge>
                       ))}
                       {seriesDetails.tasks.length > 5 && (
@@ -622,6 +709,131 @@ export default function Browse() {
                   </div>
                 )}
               </div>
+              
+              {/* Edit Dialog */}
+              <AlertDialog open={isEditingSeries} onOpenChange={setIsEditingSeries}>
+                <AlertDialogContent className="max-w-2xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Edit Series Details: {selectedSeriesData?.title}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Update series-level metadata, links, and associated licenses.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  
+                  <div className="grid gap-6 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Production Year</label>
+                        <Input 
+                          type="number" 
+                          value={editSeriesData.productionYear || ""} 
+                          onChange={(e) => setEditSeriesData({...editSeriesData, productionYear: parseInt(e.target.value) || undefined})}
+                          placeholder="e.g. 2024"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Official Website</label>
+                        <Input 
+                          value={editSeriesData.websiteLink || ""} 
+                          onChange={(e) => setEditSeriesData({...editSeriesData, websiteLink: e.target.value})}
+                          placeholder="https://example.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold">Google Drive Links</h4>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            const currentLinks = Array.isArray(editSeriesData.driveLinks) ? editSeriesData.driveLinks : [];
+                            setEditSeriesData({
+                              ...editSeriesData, 
+                              driveLinks: [...currentLinks, { name: "", url: "" }]
+                            });
+                          }}
+                        >
+                          Add Link
+                        </Button>
+                      </div>
+                      <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
+                        {Array.isArray(editSeriesData.driveLinks) && editSeriesData.driveLinks.map((link: any, idx: number) => (
+                          <div key={idx} className="flex gap-2">
+                            <Input 
+                              placeholder="Name (e.g. Season 1)" 
+                              value={link.name} 
+                              className="flex-1"
+                              onChange={(e) => {
+                                const newLinks = [...(editSeriesData.driveLinks as any[])];
+                                newLinks[idx].name = e.target.value;
+                                setEditSeriesData({...editSeriesData, driveLinks: newLinks});
+                              }}
+                            />
+                            <Input 
+                              placeholder="Google Drive URL" 
+                              value={link.url} 
+                              className="flex-[2]"
+                              onChange={(e) => {
+                                const newLinks = [...(editSeriesData.driveLinks as any[])];
+                                newLinks[idx].url = e.target.value;
+                                setEditSeriesData({...editSeriesData, driveLinks: newLinks});
+                              }}
+                            />
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => {
+                                const newLinks = (editSeriesData.driveLinks as any[]).filter((_, i) => i !== idx);
+                                setEditSeriesData({...editSeriesData, driveLinks: newLinks});
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t">
+                      <h4 className="text-sm font-semibold">Associated Licenses</h4>
+                      <div className="space-y-3">
+                        {seriesDetails?.licenses?.map((license) => (
+                          <div key={license.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-md">
+                            <div>
+                              <p className="text-sm font-medium">{license.name}</p>
+                              <p className="text-xs text-muted-foreground">{license.seasonRange || "All Seasons"}</p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-destructive h-8"
+                              onClick={() => unlinkLicenseMutation.mutate(license.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                        <LinkLicenseForm 
+                          onLink={(licenseId, range) => linkLicenseMutation.mutate({ licenseId, seasonRange: range })}
+                          existingLicenseIds={seriesDetails?.licenses?.map(l => l.id) || []}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setIsEditingSeries(false)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={() => updateSeriesMutation.mutate(editSeriesData)}
+                      disabled={updateSeriesMutation.isPending}
+                    >
+                      {updateSeriesMutation.isPending ? "Saving..." : "Save Changes"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               <div className="flex flex-wrap gap-2 md:flex-col md:items-end flex-shrink-0">
                 <div className="flex gap-2 flex-wrap justify-end">
@@ -861,15 +1073,42 @@ export default function Browse() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  {seriesDetails?.tasks?.some(t => t.metadataFileId === episode.id) ? (
-                                    <div className="flex items-center justify-center">
-                                      <AlertCircle className="w-4 h-4 text-orange-500" />
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-center opacity-20">
-                                      <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    const episodeTasks = seriesDetails?.tasks?.filter(t => t.metadataFileId === episode.id) || [];
+                                    if (episodeTasks.length === 0) {
+                                      return (
+                                        <div className="flex items-center justify-center opacity-20">
+                                          <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+                                      );
+                                    }
+                                    const pendingCount = episodeTasks.filter(t => t.status === 'pending').length;
+                                    return (
+                                      <div className="flex flex-col items-center justify-center gap-0.5 group relative">
+                                        <div className="flex items-center gap-1">
+                                          <AlertCircle className={`w-4 h-4 ${pendingCount > 0 ? 'text-orange-500' : 'text-green-500'}`} />
+                                          <span className="text-[10px] font-bold">{episodeTasks.length}</span>
+                                        </div>
+                                        {/* Simple Tooltip on hover */}
+                                        <div className="absolute bottom-full mb-2 hidden group-hover:block z-50 min-w-[150px] bg-popover text-popover-foreground p-2 rounded shadow-lg border border-border text-xs">
+                                          <div className="space-y-1.5">
+                                            {episodeTasks.map(t => (
+                                              <div key={t.id} className="flex flex-col border-b border-border last:border-0 pb-1 last:pb-0">
+                                                <span className={t.status === 'completed' ? 'line-through opacity-50' : ''}>
+                                                  • {t.description}
+                                                </span>
+                                                {t.deadline && (
+                                                  <span className="text-[10px] text-muted-foreground ml-2 italic">
+                                                    Due: {format(new Date(t.deadline), "dd-MM-yyyy")}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1.5">
@@ -932,6 +1171,55 @@ export default function Browse() {
             ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function LinkLicenseForm({ onLink, existingLicenseIds }: { 
+  onLink: (licenseId: string, range?: string) => void,
+  existingLicenseIds: string[]
+}) {
+  const [selectedLicenseId, setSelectedLicenseId] = useState<string>("");
+  const [seasonRange, setSeasonRange] = useState<string>("");
+
+  const { data: licenses } = useQuery<License[]>({
+    queryKey: ["/api/licenses"],
+  });
+
+  const availableLicenses = licenses?.filter(l => !existingLicenseIds.includes(l.id)) || [];
+
+  return (
+    <div className="flex flex-col gap-3 p-3 border rounded-md bg-muted/20">
+      <p className="text-xs font-semibold uppercase text-muted-foreground">Link New License</p>
+      <div className="flex gap-2">
+        <Select value={selectedLicenseId} onValueChange={setSelectedLicenseId}>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Select license..." />
+          </SelectTrigger>
+          <SelectContent>
+            {availableLicenses.map((l) => (
+              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input 
+          placeholder="Seasons (e.g. 1-4)" 
+          className="w-[120px]"
+          value={seasonRange}
+          onChange={(e) => setSeasonRange(e.target.value)}
+        />
+        <Button 
+          size="sm" 
+          disabled={!selectedLicenseId}
+          onClick={() => {
+            onLink(selectedLicenseId, seasonRange);
+            setSelectedLicenseId("");
+            setSeasonRange("");
+          }}
+        >
+          Link
+        </Button>
+      </div>
     </div>
   );
 }

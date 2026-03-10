@@ -2886,6 +2886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({
         metadataFileIds: z.array(z.string()).min(1),
         description: z.string().min(1),
+        deadline: z.coerce.date().optional(),
       });
 
       const validation = schema.safeParse(req.body);

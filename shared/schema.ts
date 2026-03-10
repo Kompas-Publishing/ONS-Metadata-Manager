@@ -291,6 +291,7 @@ export const enhancedBatchCreateSchema = z.object({
   googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional().default(1),
   licenseId: z.string().optional(),
+  taskDescription: z.string().optional(),
 });
 
 export type EnhancedBatchCreate = z.infer<typeof enhancedBatchCreateSchema>;
@@ -331,6 +332,7 @@ export const batchCreateSchema = z.object({
   segmented: z.number().int().min(0).max(1).optional(),
   googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
+  taskDescription: z.string().optional(),
 });
 
 export type BatchCreate = z.infer<typeof batchCreateSchema>;
@@ -368,6 +370,7 @@ export const tasks = pgTable("tasks", {
   metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
   description: text("description").notNull(), // e.g., "heeft meta nodig"
   status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, completed
+  deadline: timestamp("deadline"), // Optional deadline for the task
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -377,6 +380,7 @@ export const insertTaskSchema = createInsertSchema(tasks, {
   metadataFileId: z.string().min(1),
   description: z.string().min(1, "Description is required"),
   status: z.enum(["pending", "completed"]).optional(),
+  deadline: z.coerce.date().optional(),
 }).omit({
   id: true,
   createdBy: true,

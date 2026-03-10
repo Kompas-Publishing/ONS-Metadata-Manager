@@ -195,7 +195,34 @@ export function MetadataForm({
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
         <div className="space-y-8">
           <fieldset disabled={readOnly} className="contents">
-            {generatedId && (
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 p-6 border-b bg-muted/20 -mx-6 -mt-8 mb-8">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest">Metadata Editor</p>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {form.watch("seriesTitle") || form.watch("title") || "Untitled Content"}
+                </h2>
+                {(form.watch("season") || form.watch("episode")) && (
+                  <p className="text-muted-foreground font-medium">
+                    {form.watch("season") ? `Season ${form.watch("season")}` : ""}
+                    {form.watch("season") && form.watch("episode") ? " • " : ""}
+                    {form.watch("episode") ? `Episode ${form.watch("episode")}` : ""}
+                    {form.watch("episodeTitle") ? `: ${form.watch("episodeTitle")}` : ""}
+                  </p>
+                )}
+              </div>
+              {generatedId && (
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                    Internal ID
+                  </p>
+                  <p className="text-lg font-mono font-bold text-foreground">
+                    {generatedId}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {generatedId && false && ( // Hidden original ID display as we have the new header
               <div className="p-6 border rounded-lg bg-card">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
                   Generated ID

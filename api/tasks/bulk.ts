@@ -16,6 +16,7 @@ export default apiHandler(
       const bulkSchema = z.object({
         metadataFileIds: z.array(z.string()).min(1),
         description: z.string().min(1),
+        deadline: z.coerce.date().optional(),
       });
 
       const validation = bulkSchema.safeParse(req.body);

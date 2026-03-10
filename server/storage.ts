@@ -420,8 +420,8 @@ export class DatabaseStorage {
     return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
-    const { licenseIds, ...data } = file;
+  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[]; taskDescription?: string }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, taskDescription, ...data } = file;
     
     // Normalize breakTimes array - filter empty strings and trim
     const normalizedBreakTimes = (data.breakTimes || [])
@@ -461,6 +461,16 @@ export class DatabaseStorage {
         licenseId: lId
       }));
       await db.insert(metadataToLicenses).values(links);
+    }
+
+    // Create task if description provided
+    if (taskDescription) {
+      await db.insert(tasks).values({
+        metadataFileId: id,
+        description: taskDescription,
+        status: "pending",
+        createdBy: permissions.userId,
+      });
     }
 
     return normalizeMetadataFile(created, licenseIds || []);
@@ -812,6 +822,18 @@ export class DatabaseStorage {
         .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(files).returning();
+      
+      // Create tasks if description provided
+      if (batch.taskDescription && created.length > 0) {
+        const taskValues = created.map(file => ({
+          metadataFileId: file.id,
+          description: batch.taskDescription!,
+          status: "pending" as const,
+          createdBy: permissions.userId,
+        }));
+        await tx.insert(tasks).values(taskValues);
+      }
+
       return created;
     });
   }
@@ -1399,14 +1421,15 @@ export class DatabaseStorage {
     return task;
   }
 
-  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]> {
-    const { metadataFileIds, description, createdBy } = taskData;
+  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, deadline?: Date | null, createdBy: string }): Promise<Task[]> {
+    const { metadataFileIds, description, deadline, createdBy } = taskData;
     if (metadataFileIds.length === 0) return [];
 
     const values = metadataFileIds.map(fileId => ({
       metadataFileId: fileId,
       description,
       status: "pending" as const,
+      deadline,
       createdBy,
     }));
 
@@ -1500,6 +1523,15 @@ export class DatabaseStorage {
       })
       .returning();
     return item;
+  }
+
+  async updateSeries(id: string, data: Partial<InsertSeries>): Promise<Series | undefined> {
+    const [updated] = await db
+      .update(seriesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(seriesTable.id, id))
+      .returning();
+    return updated;
   }
 
   async deleteSeries(id: string): Promise<boolean> {

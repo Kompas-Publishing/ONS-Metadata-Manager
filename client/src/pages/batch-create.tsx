@@ -81,6 +81,7 @@ export default function BatchCreate() {
       contentType: undefined,
       seasonType: undefined,
       draft: 1,
+      taskDescription: "",
     },
   });
 
@@ -318,6 +319,26 @@ export default function BatchCreate() {
                   </FormControl>
                   <FormDescription>
                     This description will be applied to all episodes
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="taskDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Automatic Task Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. Needs metadata, Needs subtitles"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    If provided, a task will be automatically created for every episode in this batch
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
