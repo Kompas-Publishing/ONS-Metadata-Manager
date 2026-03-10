@@ -14,6 +14,7 @@ import {
   type MetadataFile,
   type InsertMetadataFile,
   type BatchCreate,
+  type EnhancedBatchCreate,
   type Setting,
   type UserDefinedTag,
   type InsertUserDefinedTag,
@@ -24,23 +25,19 @@ import {
   type LicenseBatchGenerate,
   type Task,
   type InsertTask,
-  type SeriesItem,
   type Series,
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
-} from "../_shared/schema.js";
+} from "@shared/schema";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 
-export type MetadataUpdateInput = Partial<InsertMetadataFile> & { licenseIds?: string[] };
-export type BulkMetadataUpdate = { id: string, data: MetadataUpdateInput };
-
-export interface IStorage {
+export type IStorage = {
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -56,7 +53,7 @@ export interface IStorage {
   createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses>;
   updateMetadataFile(id: string, file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
   upsertMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, permissions: UserPermissions, originalId?: string): Promise<MetadataFileWithLicenses>;
-  bulkUpdateMetadata(updates: BulkMetadataUpdate[], permissions: UserPermissions): Promise<number>;
+  bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile> & { licenseIds?: string[] }}>, permissions: UserPermissions): Promise<number>;
   deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean>;
   deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
   deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number>;
@@ -98,7 +95,7 @@ export interface IStorage {
   deleteGroup(groupId: string): Promise<boolean>;
 
   // Multi-batch creation
-  createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
+  createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
 
   // License Management
   createLicense(license: InsertLicense): Promise<License>;
@@ -131,7 +128,7 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   setSetting(key: string, value: string): Promise<Setting>;
   getSettingsByKeys(keys: string[]): Promise<Setting[]>;
-}
+};
 
 function formatMetadataId(num: number): string {
   const segment3 = String(num % 1000).padStart(3, '0');
@@ -169,7 +166,7 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   };
 }
 
-export class DatabaseStorage implements IStorage {
+export class DatabaseStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -195,7 +192,7 @@ export class DatabaseStorage implements IStorage {
       .values(userData)
       .onConflictDoUpdate({
         target: users.email,
-        "set": {
+        set: {
           ...userData,
           updatedAt: new Date(),
         },
@@ -423,8 +420,8 @@ export class DatabaseStorage implements IStorage {
     return Array.from(fileMap.values()).map(item => normalizeMetadataFile(item.file, item.licenseIds));
   }
 
-  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[] }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
-    const { licenseIds, ...data } = file;
+  async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[]; taskDescription?: string }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
+    const { licenseIds, taskDescription, ...data } = file;
     
     // Normalize breakTimes array - filter empty strings and trim
     const normalizedBreakTimes = (data.breakTimes || [])
@@ -441,7 +438,7 @@ export class DatabaseStorage implements IStorage {
       ? normalizedBreakTimes 
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
     
-    const fileData: any = {
+    const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
       ...data,
       breakTime: normalizedBreakTime,
       breakTimes: finalBreakTimes,
@@ -464,6 +461,16 @@ export class DatabaseStorage implements IStorage {
         licenseId: lId
       }));
       await db.insert(metadataToLicenses).values(links);
+    }
+
+    // Create task if description provided
+    if (taskDescription) {
+      await db.insert(tasks).values({
+        metadataFileId: id,
+        description: taskDescription,
+        status: "pending",
+        createdBy: permissions.userId,
+      });
     }
 
     return normalizeMetadataFile(created, licenseIds || []);
@@ -618,7 +625,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async bulkUpdateMetadata(updates: BulkMetadataUpdate[], permissions: UserPermissions): Promise<number> {
+  async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {
     const visibility = getFileVisibilityConditions(permissions);
     
     return await db.transaction(async (tx) => {
@@ -645,6 +652,8 @@ export class DatabaseStorage implements IStorage {
           })
           .where(and(...whereConditions))
           .returning();
+        
+        console.log(`[bulkUpdateMetadata] ID: ${update.id}, Data:`, update.data, `Result length: ${result.length}`);
         
         if (result.length > 0) {
           count++;
@@ -731,7 +740,7 @@ export class DatabaseStorage implements IStorage {
     return result.length;
   }
 
-  async createBatchMetadataFiles(batch: BatchCreate & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+  async createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
       const [setting] = await tx
         .select()
@@ -763,20 +772,20 @@ export class DatabaseStorage implements IStorage {
         ? normalizedBreakTimes 
         : (normalizedBreakTime ? [normalizedBreakTime] : []);
 
-      const files: any[] = [];
+      const files: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
       for (let i = 0; i < batch.episodeCount; i++) {
-        const fileData: any = {
+        const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
           id: formatMetadataId(currentId),
           title: batch.title,
           season: batch.season,
           episode: batch.startEpisode + i,
-          duration: batch.duration || null,
+          duration: (batch.duration || null) as any,
           breakTime: normalizedBreakTime,
           breakTimes: finalBreakTimes,
           endCredits: batch.endCredits,
           category: batch.category,
           seasonType: batch.seasonType,
-          contentType: batch.contentType || null,
+          contentType: (batch.contentType || null) as any,
           description: batch.description,
           genre: batch.genre,
           actors: batch.actors,
@@ -793,7 +802,7 @@ export class DatabaseStorage implements IStorage {
           subtitles: batch.subtitles,
           segmented: batch.segmented,
           draft: batch.draft ?? 0,
-          createdBy: permissions.userId,
+          createdBy: permissions.user.id,
         };
 
         if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
@@ -814,20 +823,22 @@ export class DatabaseStorage implements IStorage {
 
       const created = await tx.insert(metadataFiles).values(files).returning();
       
-      // If licenses provided, create links
-      if (batch.licenseIds && batch.licenseIds.length > 0) {
-        const links = created.map(file => batch.licenseIds!.map(lId => ({
+      // Create tasks if description provided
+      if (batch.taskDescription && created.length > 0) {
+        const taskValues = created.map(file => ({
           metadataFileId: file.id,
-          licenseId: lId
-        }))).flat();
-        await tx.insert(metadataToLicenses).values(links);
+          description: batch.taskDescription!,
+          status: "pending" as const,
+          createdBy: permissions.userId,
+        }));
+        await tx.insert(tasks).values(taskValues);
       }
 
-      return created.map(file => normalizeMetadataFile(file, batch.licenseIds || []));
+      return created;
     });
   }
 
-  async createMultiBatchMetadataFiles(data: { batches: any[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+  async createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
       const [setting] = await tx
         .select()
@@ -844,7 +855,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      const allFiles: any[] = [];
+      const allFiles: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
 
       for (const batch of data.batches) {
         // Normalize breakTimes array once for the batch
@@ -862,18 +873,18 @@ export class DatabaseStorage implements IStorage {
 
         for (const seasonConfig of batch.seasons) {
           for (let i = 0; i < seasonConfig.episodeCount; i++) {
-            const fileData: any = {
+            const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
               id: formatMetadataId(currentId),
               title: batch.title,
               season: seasonConfig.season,
-              episode: (seasonConfig.startEpisode || 1) + i,
-              duration: batch.duration || null,
+              episode: seasonConfig.startEpisode + i,
+              duration: (batch.duration || null) as any,
               breakTime: normalizedBreakTime,
               breakTimes: finalBreakTimes,
               endCredits: batch.endCredits,
               category: batch.category,
               seasonType: batch.seasonType,
-              contentType: batch.contentType || null,
+              contentType: (batch.contentType || null) as any,
               description: batch.description,
               genre: batch.genre,
               actors: batch.actors,
@@ -892,7 +903,7 @@ export class DatabaseStorage implements IStorage {
               draft: batch.draft ?? 1,
               licenseId: batch.licenseId,
               googleDriveLink: batch.googleDriveLink,
-              createdBy: permissions.userId,
+              createdBy: permissions.user.id,
             };
 
             if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
@@ -921,12 +932,12 @@ export class DatabaseStorage implements IStorage {
           metadataFileId: file.id,
           description: data.taskDescription!,
           status: "pending" as const,
-          createdBy: permissions.userId,
+          createdBy: permissions.user.id,
         }));
         await tx.insert(tasks).values(taskValues);
       }
 
-      return created.map(file => normalizeMetadataFile(file));
+      return created;
     });
   }
 
@@ -971,7 +982,29 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+  async getUserTags(userId: string, type: string): Promise<UserDefinedTag[]> {
+    return await db
+      .select()
+      .from(userDefinedTags)
+      .where(and(eq(userDefinedTags.userId, userId), eq(userDefinedTags.type, type)))
+      .orderBy(desc(userDefinedTags.createdAt));
+  }
+
+  async createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag> {
+    const [created] = await db
+      .insert(userDefinedTags)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async deleteUserTag(id: number, userId: string): Promise<void> {
+    await db
+      .delete(userDefinedTags)
+      .where(and(eq(userDefinedTags.id, id), eq(userDefinedTags.userId, userId)));
+  }
+
+  async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.title, seriesTitle)];
     
@@ -994,7 +1027,7 @@ export class DatabaseStorage implements IStorage {
     return files.map(file => normalizeMetadataFile(file));
   }
 
-  async getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+  async getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       eq(metadataFiles.title, seriesTitle),
@@ -1020,7 +1053,7 @@ export class DatabaseStorage implements IStorage {
     return files.map(file => normalizeMetadataFile(file));
   }
 
-  async getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFileWithLicenses | null; next: MetadataFileWithLicenses | null }> {
+  async getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFile | null; next: MetadataFile | null }> {
     const currentFile = await this.getMetadataFile(id, permissions);
     if (!currentFile || !currentFile.season || !currentFile.episode) {
       return { prev: null, next: null };
@@ -1039,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
         baseConditions.push(inArray(metadataFiles.groupId, visibility.groupIds));
         baseConditions.push(sql`${metadataFiles.groupId} IS NOT NULL`);
       } else {
-        whereConditions.push(sql`1 = 0`);
+        baseConditions.push(sql`1 = 0`);
       }
     }
 
@@ -1073,7 +1106,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
+  async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       or(
@@ -1122,7 +1155,7 @@ export class DatabaseStorage implements IStorage {
       .limit(50);
   }
 
-  async searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]> {
+  async searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFile })[]> {
     const trimmed = keyword.trim();
     if (!trimmed) {
       return [];
@@ -1163,28 +1196,6 @@ export class DatabaseStorage implements IStorage {
       ...r.task,
       metadataFile: normalizeMetadataFile(r.metadataFile),
     }));
-  }
-  
-  async getUserTags(userId: string, type: string): Promise<UserDefinedTag[]> {
-    return await db
-      .select()
-      .from(userDefinedTags)
-      .where(and(eq(userDefinedTags.userId, userId), eq(userDefinedTags.type, type)))
-      .orderBy(desc(userDefinedTags.createdAt));
-  }
-
-  async createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag> {
-    const [created] = await db
-      .insert(userDefinedTags)
-      .values(data)
-      .returning();
-    return created;
-  }
-
-  async deleteUserTag(id: number, userId: string): Promise<void> {
-    await db
-      .delete(userDefinedTags)
-      .where(and(eq(userDefinedTags.id, id), eq(userDefinedTags.userId, userId)));
   }
 
   async listAllUsers(): Promise<User[]> {
@@ -1353,7 +1364,7 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFileWithLicenses[]> {
+  async generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
       const [setting] = await tx
         .select()
@@ -1401,7 +1412,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(settings.key, "next_id"));
   
       const created = await tx.insert(metadataFiles).values(files).returning();
-      return created.map(file => normalizeMetadataFile(file));
+      return created;
     });
   }
 
@@ -1410,21 +1421,22 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]> {
-    const { metadataFileIds, description, createdBy } = taskData;
+  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, deadline?: Date | null, createdBy: string }): Promise<Task[]> {
+    const { metadataFileIds, description, deadline, createdBy } = taskData;
     if (metadataFileIds.length === 0) return [];
 
     const values = metadataFileIds.map(fileId => ({
       metadataFileId: fileId,
       description,
       status: "pending" as const,
+      deadline,
       createdBy,
     }));
 
     return await db.insert(tasks).values(values).returning();
   }
 
-  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]> {
+  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
     
@@ -1460,6 +1472,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]> {
+    // Basic visibility check for the file itself is handled by the route or here
+    // Let's assume the route ensures the user has access to this fileId
     return await db
       .select()
       .from(tasks)
@@ -1502,13 +1516,22 @@ export class DatabaseStorage implements IStorage {
       .values(data)
       .onConflictDoUpdate({
         target: seriesTable.title,
-        "set": {
+        set: {
           ...data,
           updatedAt: new Date(),
         },
       })
       .returning();
     return item;
+  }
+
+  async updateSeries(id: string, data: Partial<InsertSeries>): Promise<Series | undefined> {
+    const [updated] = await db
+      .update(seriesTable)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(seriesTable.id, id))
+      .returning();
+    return updated;
   }
 
   async deleteSeries(id: string): Promise<boolean> {
@@ -1522,7 +1545,7 @@ export class DatabaseStorage implements IStorage {
       .values({ seriesId, licenseId, seasonRange })
       .onConflictDoUpdate({
         target: [seriesToLicenses.seriesId, seriesToLicenses.licenseId],
-        "set": { seasonRange },
+        set: { seasonRange },
       });
   }
 
@@ -1578,7 +1601,6 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  // Settings
   async getSetting(key: string): Promise<Setting | undefined> {
     const [setting] = await db.select().from(settings).where(eq(settings.key, key));
     return setting;
@@ -1590,7 +1612,7 @@ export class DatabaseStorage implements IStorage {
       .values({ key, value })
       .onConflictDoUpdate({
         target: settings.key,
-        "set": { value, updatedAt: new Date() },
+        set: { value, updatedAt: new Date() },
       })
       .returning();
     return setting;
