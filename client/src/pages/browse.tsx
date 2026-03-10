@@ -578,6 +578,7 @@ export default function Browse() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        disabled={isSeriesDetailsLoading || !seriesDetails}
                         onClick={() => {
                           setEditSeriesData({
                             productionYear: seriesDetails?.productionYear,
@@ -657,7 +658,15 @@ export default function Browse() {
                           variant="ghost" 
                           size="sm" 
                           className="h-6 text-[10px] uppercase font-bold text-primary"
-                          onClick={() => setIsEditingSeries(true)}
+                          disabled={isSeriesDetailsLoading || !seriesDetails}
+                          onClick={() => {
+                            setEditSeriesData({
+                              productionYear: seriesDetails?.productionYear,
+                              websiteLink: seriesDetails?.websiteLink,
+                              driveLinks: seriesDetails?.driveLinks || []
+                            });
+                            setIsEditingSeries(true);
+                          }}
                         >
                           Manage
                         </Button>

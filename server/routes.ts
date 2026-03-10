@@ -565,9 +565,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { title } = req.params;
-      const item = await storage.getSeriesByTitle(title);
+      
+      let item = await storage.getSeriesByTitle(title);
+      
       if (!item) {
-        return res.status(404).json({ message: "Series not found" });
+        // Auto-create series if it doesn't exist yet (handles legacy data)
+        item = await storage.upsertSeries({
+          title: title,
+        });
       }
 
       const [licenses, tasks] = await Promise.all([
