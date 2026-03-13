@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
-import { executeChatProposal } from "../../../_server/ai-chat.js";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
+import { executeChatProposal } from "../../_server/ai-chat.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 export default apiHandler(
   requirePermission("aiChat")(async (req: AuthenticatedRequest, res: VercelResponse) => {

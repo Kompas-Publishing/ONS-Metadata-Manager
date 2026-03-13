@@ -134,7 +134,7 @@ export const seriesToLicenses = pgTable("series_to_licenses", {
   licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
   seasonRange: text("season_range"), // E.G. "1-4"
 }, (t) => [
-  index("series_license_idx").on(t.seriesId, t.licenseId),
+  uniqueIndex("series_license_unique_idx").on(t.seriesId, t.licenseId),
 ]);
 
 export type SeriesToLicense = typeof seriesToLicenses.$inferSelect;
@@ -188,10 +188,10 @@ export const metadataFiles = pgTable("metadata_files", {
 
 // Join table for many-to-many Metadata-License relationship
 export const metadataToLicenses = pgTable("metadata_to_licenses", {
-  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
-  licenseId: varchar("license_id").notNull().references(() => licenses.id),
+  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
 }, (t) => [
-  index("metadata_license_idx").on(t.metadataFileId, t.licenseId),
+  uniqueIndex("metadata_license_unique_idx").on(t.metadataFileId, t.licenseId),
 ]);
 
 export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
