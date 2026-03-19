@@ -618,10 +618,10 @@ export default function Browse() {
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                        >
+                          >
                           <Globe className="w-4 h-4" />
-                          ONS Website <ExternalLink className="w-3 h-3" />
-                        </a>
+                          Website ONS <ExternalLink className="w-3 h-3" />
+                          </a>
                       ) : (
                         <p className="text-sm text-muted-foreground italic">No website link set</p>
                       )}
@@ -723,7 +723,7 @@ export default function Browse() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Official Website</label>
+                        <label className="text-sm font-medium">Website ONS</label>
                         <Input 
                           value={editSeriesData.websiteLink || ""} 
                           onChange={(e) => setEditSeriesData({...editSeriesData, websiteLink: e.target.value})}

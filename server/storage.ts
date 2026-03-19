@@ -439,8 +439,17 @@ export class DatabaseStorage {
       ? normalizedBreakTimes 
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
     
-    const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
+    // Ensure seriesId is set if seriesTitle or title is available
+    let seriesId = data.seriesId;
+    const seriesTitle = data.seriesTitle || data.title;
+    if (!seriesId && seriesTitle) {
+      const s = await this.upsertSeries({ title: seriesTitle });
+      seriesId = s.id;
+    }
+
+    const fileData: any = {
       ...data,
+      seriesId,
       breakTime: normalizedBreakTime,
       breakTimes: finalBreakTimes,
       id,
@@ -509,10 +518,19 @@ export class DatabaseStorage {
       ? normalizedBreakTimes 
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
     
+    // Ensure seriesId is set if seriesTitle or title is available
+    let seriesId = data.seriesId;
+    const seriesTitle = data.seriesTitle || data.title;
+    if (!seriesId && seriesTitle) {
+      const s = await this.upsertSeries({ title: seriesTitle });
+      seriesId = s.id;
+    }
+
     const [updated] = await db
       .update(metadataFiles)
       .set({
         ...data,
+        seriesId,
         breakTime: normalizedBreakTime,
         breakTimes: finalBreakTimes,
         updatedAt: new Date(),

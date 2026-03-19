@@ -262,70 +262,6 @@ export function MetadataForm({
           </fieldset>
 
           <div className="border-t pt-8">
-            <h3 className="text-xl font-semibold mb-6">Status Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField
-                control={form.control}
-                name="subsStatus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subtitles Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={readOnly}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Incomplete">Incomplete</SelectItem>
-                        <SelectItem value="Complete">Complete</SelectItem>
-                        <SelectItem value="Not needed">Not needed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="metadataTimesStatus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Metadata Times Status (Auto-calculated)</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={true}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="bg-muted/50">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Incomplete">Incomplete</SelectItem>
-                        <SelectItem value="MISSING">MISSING</SelectItem>
-                        <SelectItem value="Duration Missing">Duration Missing</SelectItem>
-                        <SelectItem value="Breaktimes Missing">Breaktimes Missing</SelectItem>
-                        <SelectItem value="Complete">Complete</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription className="text-[10px]">
-                      Based on Duration and Breaktimes
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
-          <div className="border-t pt-8">
             <h3 className="text-xl font-semibold mb-6">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <fieldset disabled={readOnly} className="contents">
@@ -1123,70 +1059,101 @@ export function MetadataForm({
             </div>
 
             <div className="border-t pt-8">
-              <h3 className="text-xl font-semibold mb-6">Flags</h3>
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="catchUp"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-catch-up"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Catch-Up</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+              <h3 className="text-xl font-semibold mb-6">Flags & Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="catchUp"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-catch-up"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Catch-Up</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="segmented"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-segmented"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Segmented</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="segmented"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-segmented"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Segmented</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="subtitles"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-subtitles"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Subtitles</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="subtitles"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-subtitles"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Subtitles</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="subsStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subtitles Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={readOnly}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Incomplete">Incomplete</SelectItem>
+                            <SelectItem value="Complete">Complete</SelectItem>
+                            <SelectItem value="Not needed">Not needed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             </div>
 
