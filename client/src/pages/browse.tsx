@@ -653,24 +653,6 @@ export default function Browse() {
                       <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4" /> Associated Licenses
                       </h4>
-                      {canWriteMetadata && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-6 text-[10px] uppercase font-bold text-primary"
-                          disabled={isSeriesDetailsLoading || !seriesDetails}
-                          onClick={() => {
-                            setEditSeriesData({
-                              productionYear: seriesDetails?.productionYear,
-                              websiteLink: seriesDetails?.websiteLink,
-                              driveLinks: seriesDetails?.driveLinks || []
-                            });
-                            setIsEditingSeries(true);
-                          }}
-                        >
-                          Manage
-                        </Button>
-                      )}
                     </div>
                     <div className="space-y-2">
                       {seriesDetails?.licenses && seriesDetails.licenses.length > 0 ? (
