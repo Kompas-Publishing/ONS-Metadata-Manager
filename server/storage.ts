@@ -112,6 +112,7 @@ export type IStorage = {
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
+  bulkDeleteTasks(ids: number[]): Promise<boolean>;
 
   // Series Management
   getSeriesById(id: string): Promise<Series | undefined>;
@@ -1492,6 +1493,12 @@ export class DatabaseStorage {
 
   async deleteTask(id: number): Promise<boolean> {
     const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async bulkDeleteTasks(ids: number[]): Promise<boolean> {
+    if (ids.length === 0) return true;
+    const result = await db.delete(tasks).where(inArray(tasks.id, ids)).returning();
     return result.length > 0;
   }
 

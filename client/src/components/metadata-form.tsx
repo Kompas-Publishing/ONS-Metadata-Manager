@@ -144,6 +144,30 @@ export function MetadataForm({
 
   const actors = form.watch("actors") || [];
   const breakTimes = form.watch("breakTimes") || [];
+  const duration = form.watch("duration");
+
+  // Automatic calculation of metadataTimesStatus
+  const metadataTimesStatus = form.watch("metadataTimesStatus");
+  const hasDuration = !!duration && duration !== "00:00:00";
+  const hasBreakTimes = breakTimes.length > 0;
+
+  useEffect(() => {
+    if (readOnly) return;
+    
+    let newStatus = "Incomplete";
+    if (hasDuration && hasBreakTimes) {
+      newStatus = "Complete";
+    } else if (hasDuration || hasBreakTimes) {
+      const missing = !hasDuration ? "Duration" : "Breaktimes";
+      newStatus = `${missing} Missing`;
+    } else {
+      newStatus = "MISSING";
+    }
+
+    if (metadataTimesStatus !== newStatus) {
+      form.setValue("metadataTimesStatus", newStatus);
+    }
+  }, [hasDuration, hasBreakTimes, metadataTimesStatus, form, readOnly]);
 
   const addActor = () => {
     if (actorInput.trim()) {
@@ -272,22 +296,28 @@ export function MetadataForm({
                 name="metadataTimesStatus"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Metadata Times Status</FormLabel>
+                    <FormLabel>Metadata Times Status (Auto-calculated)</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
-                      disabled={readOnly}
+                      disabled={true}
                     >
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
+                        <SelectTrigger className="bg-muted/50">
+                          <SelectValue placeholder="Status" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Incomplete">Incomplete</SelectItem>
+                        <SelectItem value="MISSING">MISSING</SelectItem>
+                        <SelectItem value="Duration Missing">Duration Missing</SelectItem>
+                        <SelectItem value="Breaktimes Missing">Breaktimes Missing</SelectItem>
                         <SelectItem value="Complete">Complete</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormDescription className="text-[10px]">
+                      Based on Duration and Breaktimes
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

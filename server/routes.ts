@@ -2963,6 +2963,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/tasks/bulk-delete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const { allowed, reason } = await requirePermission(userId, "tasks", "write");
+      if (!allowed) return res.status(403).json({ message: reason });
+
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        return res.status(400).json({ message: "IDs must be an array" });
+      }
+
+      await storage.bulkDeleteTasks(ids.map(id => parseInt(id)));
+      res.json({ message: "Tasks deleted successfully" });
+    } catch (error) {
+      console.error("Error bulk deleting tasks:", error);
+      res.status(500).json({ message: "Failed to bulk delete tasks" });
+    }
+  });
+
   // Vercel Blob upload handshake
   app.post("/api/blob/upload", isAuthenticated, async (req, res) => {
     try {

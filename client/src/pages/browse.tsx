@@ -620,7 +620,7 @@ export default function Browse() {
                           className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                         >
                           <Globe className="w-4 h-4" />
-                          Official Website <ExternalLink className="w-3 h-3" />
+                          ONS Website <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : (
                         <p className="text-sm text-muted-foreground italic">No website link set</p>
@@ -1068,16 +1068,29 @@ export default function Browse() {
                                     const episodeTasks = seriesDetails?.tasks?.filter(t => t.metadataFileId === episode.id) || [];
                                     if (episodeTasks.length === 0) {
                                       return (
-                                        <div className="flex items-center justify-center opacity-20">
-                                          <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+                                        <div className="flex items-center justify-center opacity-40">
+                                          <CheckCircle2 className="w-4 h-4 text-green-500" />
                                         </div>
                                       );
                                     }
                                     const pendingCount = episodeTasks.filter(t => t.status === 'pending').length;
+                                    const completedCount = episodeTasks.length - pendingCount;
+
+                                    let statusColor = "text-green-500";
+                                    if (pendingCount > 0 && completedCount > 0) {
+                                      statusColor = "text-orange-500";
+                                    } else if (pendingCount > 0) {
+                                      statusColor = "text-red-500";
+                                    }
+
                                     return (
                                       <div className="flex flex-col items-center justify-center gap-0.5 group relative">
                                         <div className="flex items-center gap-1">
-                                          <AlertCircle className={`w-4 h-4 ${pendingCount > 0 ? 'text-orange-500' : 'text-green-500'}`} />
+                                          {pendingCount === 0 ? (
+                                            <CheckCircle2 className={`w-4 h-4 ${statusColor}`} />
+                                          ) : (
+                                            <AlertCircle className={`w-4 h-4 ${statusColor}`} />
+                                          )}
                                           <span className="text-[10px] font-bold">{episodeTasks.length}</span>
                                         </div>
                                         {/* Simple Tooltip on hover */}
@@ -1100,8 +1113,7 @@ export default function Browse() {
                                       </div>
                                     );
                                   })()}
-                                </TableCell>
-                                <TableCell className="text-right">
+                                </TableCell>                                <TableCell className="text-right">
                                   <div className="flex justify-end gap-1.5">
                                     {canReadMetadata && (
                                       <Link href={`/view/${episode.id}`}>

@@ -186,6 +186,8 @@ export default function EditFile() {
             audioId: file.audioId ?? "",
             originalFilename: file.originalFilename ?? "",
             googleDriveLink: file.googleDriveLink ?? "",
+            subsStatus: file.subsStatus ?? "Incomplete",
+            metadataTimesStatus: file.metadataTimesStatus ?? "Incomplete",
             draft: file.draft ?? 0,
             licenseIds: file.licenseIds || (file.licenseId ? [file.licenseId] : []),
           }}

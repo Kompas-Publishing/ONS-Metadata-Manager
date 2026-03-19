@@ -61,11 +61,23 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 const PREDEFINED_DESCRIPTIONS = [
   "heeft meta nodig",
   "heeft subs nodig",
   "heeft QC nodig",
-  "is klaar voor export",
+  "verzenden naar OD",
 ] as const;
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
@@ -193,6 +205,19 @@ export default function Tasks() {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({ title: "Success", description: "Task deleted" });
     },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await apiRequest("POST", "/api/tasks/bulk-delete", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Success", description: "Tasks deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete tasks", variant: "destructive" });
+    }
   });
 
   const bulkAddMutation = useMutation({
@@ -491,7 +516,7 @@ export default function Tasks() {
               return (
                 <div key={title} className="space-y-3">
                   <div 
-                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg cursor-pointer hover:bg-muted/60 transition-colors"
+                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg cursor-pointer hover:bg-muted/60 transition-colors group/series"
                     onClick={() => toggleGroup(title)}
                   >
                     <div className="flex items-center gap-3">
@@ -503,6 +528,41 @@ export default function Tasks() {
                         </Badge>
                       )}
                     </div>
+                    {canWriteTasks && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="opacity-0 group-hover/series:opacity-100 text-destructive hover:bg-destructive/10 h-8 gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete All Series Tasks
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete all tasks for {title}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete all tasks associated with any episode of <strong>{title}</strong>.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => {
+                                const allIds = Object.values(seasons).flat().map(t => t.id);
+                                bulkDeleteMutation.mutate(allIds);
+                              }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete Tasks
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
 
                   {isGroupOpen && (
@@ -511,10 +571,43 @@ export default function Tasks() {
                         .sort(([a], [b]) => parseInt(a) - parseInt(b))
                         .map(([season, seasonTasks]) => (
                           <div key={`${title}-${season}`} className="space-y-3">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                              <CheckSquare className="w-3.5 h-3.5" />
-                              {season === "0" ? "Single Item / Unknown" : `Season ${season}`}
-                            </h3>
+                            <div className="flex items-center justify-between group/season">
+                              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <CheckSquare className="w-3.5 h-3.5" />
+                                {season === "0" ? "Single Item / Unknown" : `Season ${season}`}
+                              </h3>
+                              {canWriteTasks && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="opacity-0 group-hover/season:opacity-100 text-destructive hover:bg-destructive/10 h-7 text-[10px] gap-1.5"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Delete Season Tasks
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete season tasks?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Delete all tasks for <strong>{title} Season {season}</strong>?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => bulkDeleteMutation.mutate(seasonTasks.map(t => t.id))}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                             <div className="grid grid-cols-1 gap-3">
                               {seasonTasks.map((task) => (
                                 <Card key={task.id} className={cn(
@@ -574,17 +667,35 @@ export default function Tasks() {
                                         </Button>
                                       )}
                                       {canWriteTasks && (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="text-destructive hover:bg-destructive/10"
-                                          title="Delete Task"
-                                          onClick={() => {
-                                            if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
-                                          }}
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="text-destructive hover:bg-destructive/10"
+                                              title="Delete Task"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Are you sure you want to delete this task?
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                              <AlertDialogAction 
+                                                onClick={() => deleteMutation.mutate(task.id)}
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                              >
+                                                Delete
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
                                       )}
                                     </div>
                                   </CardContent>
