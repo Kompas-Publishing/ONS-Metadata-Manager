@@ -2,13 +2,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { extname } from "path";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-import { storage } from "./storage";
-import type { UserPermissions } from "./permissions";
-import { 
-  insertMetadataFileSchema, 
-  insertLicenseSchema, 
-  insertTaskSchema 
-} from "@shared/schema";
+import { storage } from "./storage.js";
+import type { UserPermissions } from "./permissions.js";
+import {
+  insertMetadataFileSchema,
+  insertLicenseSchema,
+  insertTaskSchema
+} from "./schema.js";
 
 export type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool";
@@ -191,10 +191,10 @@ async function buildAttachmentParts(attachment: ChatAttachment) {
  */
 function normalizeMetadataData(data: Record<string, any>): Record<string, any> {
   const normalized = { ...data };
-  
+
   // Fields that MUST be arrays in the database
   const arrayFields = ['genre', 'actors', 'tags', 'breakTimes'];
-  
+
   for (const field of arrayFields) {
     if (normalized[field] !== undefined && normalized[field] !== null) {
       if (typeof normalized[field] === 'string') {
@@ -227,7 +227,7 @@ function normalizeMetadataData(data: Record<string, any>): Record<string, any> {
       delete normalized[badKey];
     }
   }
-  
+
   return normalized;
 }
 
@@ -244,7 +244,7 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
   // Use the configured model or fallback
   const modelName = modelOverride || configuredModel || DEFAULT_CHAT_MODEL;
-  
+
   const tools: any[] = [
     {
       functionDeclarations: [
@@ -289,8 +289,8 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
             properties: {
               action: { type: "STRING", enum: ["create", "update"] },
               id: { type: "STRING", description: "The ID of the file to update (required for action='update')" },
-              data: { 
-                type: "OBJECT", 
+              data: {
+                type: "OBJECT",
                 description: "The metadata fields to set. Use database field names like 'title', 'season', 'episode', 'duration', 'description', 'genre', 'actors', 'yearOfProduction', etc."
               },
               explanation: { type: "STRING", description: "Explain why you are proposing this change (e.g. 'Found missing duration on IMDb')" }
@@ -306,8 +306,8 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
             properties: {
               action: { type: "STRING", enum: ["create", "update"] },
               id: { type: "STRING", description: "The ID of the license to update (required for action='update')" },
-              data: { 
-                type: "OBJECT", 
+              data: {
+                type: "OBJECT",
                 description: "The license fields to set. Use database field names like 'name', 'distributor', 'licenseStart', 'licenseEnd', 'allowedRuns', etc."
               },
               explanation: { type: "STRING", description: "Explain why you are proposing this change." }
@@ -396,7 +396,7 @@ export async function runAiChat(
   permissions: UserPermissions,
   options?: { debug?: boolean; attachment?: ChatAttachment }
 ) {
-  const systemPrompt = `You are the ONS Broadcast Portal Assistant. 
+  const systemPrompt = `You are the ONS Broadcast Portal Assistant.
 You help users manage metadata, licenses, and tasks.
 You have access to tools to search the database and propose changes.
 
@@ -416,7 +416,7 @@ DATA TYPE RULES:
 - Use EXACT database field names: 'seriesTitle', 'productionCountry', 'yearOfProduction', 'episodeTitle', 'episodeDescription'.
 
 TOOL USAGE RULES:
-- If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS. 
+- If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS.
 - DO NOT just say "I have updated it" or "I will do it". You MUST call the 'proposeMetadataChange' or 'proposeLicenseChange' tool for EACH item you intend to change.
 - If updating multiple episodes, call the tool multiple times (once for each episode).
 - After calling a tool, summarize what you've done and inform the user you have created a proposal for them to review.
@@ -427,7 +427,7 @@ GENERAL RULES:
 - IMPORTANT: You MUST generate a text response AFTER calling tools. Never leave the final response blank.
 - If a user asks for something they don't have permission for, politely explain that you cannot access that information.
 - When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
-- If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
+- If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools.
 - Changes are NOT applied automatically; they are shown to the user as proposals to accept or reject.
 - ALWAYS provide a text response explaining what you found or what you proposed. NEVER return an empty message.
 
@@ -489,15 +489,15 @@ Always be professional and helpful.`;
 
   // Handle function calls in a loop to allow multiple steps
   let functionCalls = response.response.functionCalls();
-  
+
   while (functionCalls && functionCalls.length > 0) {
     const toolResults: any[] = [];
-    
+
     for (const call of functionCalls) {
       if (options?.debug) {
         debugLogs.push({ type: "tool_call", name: call.name, args: call.args });
       }
-      
+
       let result: any;
       try {
         switch (call.name) {
@@ -524,7 +524,7 @@ Always be professional and helpful.`;
               result = await storage.searchMetadata(call.args.query as string, permissions);
             }
             break;
-            
+
           case "searchLicenses":
             if (!permissions.features.licenses.read) {
               result = { error: "Permission denied: Cannot read licenses." };
@@ -532,7 +532,7 @@ Always be professional and helpful.`;
               result = await storage.searchLicenses(call.args.query as string);
             }
             break;
-            
+
           case "proposeMetadataChange":
             if (!permissions.features.metadata.write) {
               result = { error: "Permission denied: Cannot write metadata." };
@@ -562,7 +562,7 @@ Always be professional and helpful.`;
               result = { status: "Proposal recorded. Inform the user." };
             }
             break;
-            
+
           default:
             result = { error: "Unknown tool." };
         }
@@ -626,14 +626,14 @@ export async function executeChatProposal(
 ) {
   if (proposal.type === "metadata") {
     if (!permissions.features.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
-    
+
     const normalizedData = normalizeMetadataData(proposal.data);
     const { licenseIds, ...dataWithoutLicenses } = normalizedData as any;
 
     if (proposal.action === "create") {
       const validation = insertMetadataFileSchema.safeParse(normalizedData);
       if (!validation.success) throw new Error("Validation failed: " + JSON.stringify(validation.error.errors));
-      
+
       const nextId = await storage.consumeNextId();
       return await storage.createMetadataFile({
         ...validation.data,
@@ -658,6 +658,6 @@ export async function executeChatProposal(
       return await storage.updateLicense(proposal.id, proposal.data);
     }
   }
-  
+
   throw new Error(`Unsupported proposal type: ${proposal.type}`);
 }

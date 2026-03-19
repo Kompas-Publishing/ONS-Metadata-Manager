@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
-import { storage } from "../_server/storage.js";
-import { signToken } from "../_server/jwt.js";
+import { storage } from "../../shared/storage.js";
+import { signToken } from "../../shared/jwt.js";
 import { apiHandler } from "../_lib/apiHandler.js";
 import { serialize } from "cookie";
 

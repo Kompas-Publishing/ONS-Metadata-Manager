@@ -2,8 +2,8 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import bcrypt from "bcryptjs";
-import { type User } from "@shared/schema";
-import { type IStorage } from "./storage";
+import { type User } from "./schema.js";
+import { type IStorage } from "./storage.js";
 
 export function setupPassport(storage: IStorage) {
   passport.serializeUser((user: Express.User, done) => {

@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { runAiChat } from "../../_server/ai-chat.js";
+import { runAiChat } from "../../../shared/ai-chat.js";
 import { apiHandler, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 export default apiHandler(

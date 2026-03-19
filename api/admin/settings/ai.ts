@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../_server/storage.js";
+import { storage } from "../../../shared/storage.js";
 import { requireAdmin, withCors, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 async function handler(req: AuthenticatedRequest, res: VercelResponse) {

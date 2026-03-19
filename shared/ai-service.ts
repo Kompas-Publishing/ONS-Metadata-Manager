@@ -5,7 +5,7 @@ import {
   type InsertMetadataFile,
   type License,
   type MetadataFile
-} from "../_shared/schema.js";
+} from "./schema.js";
 import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";

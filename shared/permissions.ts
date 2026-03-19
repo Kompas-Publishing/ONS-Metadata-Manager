@@ -1,7 +1,7 @@
-import { storage } from "./storage";
-import type { User } from "@shared/schema";
+import { storage } from "./storage.js";
+import type { User } from "./schema.js";
 
-export type UserPermissions = {
+export interface UserPermissions {
   user: User;
   userId: string;
   isAdmin: boolean;
@@ -15,11 +15,11 @@ export type UserPermissions = {
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
-};
+}
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);
-  
+
   if (!user) {
     return null;
   }
@@ -57,12 +57,12 @@ export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiCh
 export type PermissionAction = "read" | "write";
 
 export async function requirePermission(
-  userId: string, 
+  userId: string,
   feature: PermissionFeature,
   action: PermissionAction = "read"
 ): Promise<{ allowed: boolean; permissions: UserPermissions | null; reason?: string }> {
   const permissions = await getUserPermissions(userId);
-  
+
   if (!permissions) {
     return { allowed: false, permissions: null, reason: "User not found" };
   }
@@ -83,7 +83,7 @@ export async function requirePermission(
   } else {
     allowed = permissions.features[feature][action];
   }
-  
+
   return {
     allowed,
     permissions,

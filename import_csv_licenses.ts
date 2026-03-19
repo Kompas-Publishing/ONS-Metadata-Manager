@@ -5,8 +5,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const XLSX = require('xlsx');
 
-import { db } from './db';
-import { licenses } from '../shared/schema';
+import { db } from './shared/db.js';
+import { licenses } from './shared/schema.js';
 import { eq, like } from 'drizzle-orm';
 
 // Paths to the CSV files

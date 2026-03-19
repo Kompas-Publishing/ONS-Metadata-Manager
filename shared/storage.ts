@@ -29,10 +29,10 @@ import {
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
-} from "@shared/schema";
-import { db } from "./db";
+} from "./schema.js";
+import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
-import { UserPermissions, getFileVisibilityConditions } from "./permissions";
+import { UserPermissions, getFileVisibilityConditions } from "./permissions.js";
 
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
@@ -43,7 +43,7 @@ export type IStorage = {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: Omit<UpsertUser, 'id'>): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   peekNextId(): Promise<string>;
   consumeNextId(): Promise<string>;
   getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined>;
@@ -65,16 +65,16 @@ export type IStorage = {
   searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   searchLicenses(keyword: string): Promise<License[]>;
   searchTasks(keyword: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
-  
+
   getUserTags(userId: string, type: string): Promise<UserDefinedTag[]>;
   createUserTag(data: InsertUserDefinedTag): Promise<UserDefinedTag>;
   deleteUserTag(id: number, userId: string): Promise<void>;
-  
+
   listAllUsers(): Promise<User[]>;
   updateUserAdminStatus(userId: string, isAdmin: boolean): Promise<User | undefined>;
   updateUserStatus(userId: string, status: string): Promise<User | undefined>;
   updateUserPermissions(userId: string, permissions: {
-    canReadMetadata: number, 
+    canReadMetadata: number,
     canWriteMetadata: number,
     canReadLicenses: number,
     canWriteLicenses: number,
@@ -89,7 +89,7 @@ export type IStorage = {
   updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined>;
   deleteUser(userId: string): Promise<boolean>;
   getUsersByGroupId(groupId: string): Promise<User[]>;
-  
+
   createGroup(group: InsertGroup): Promise<Group>;
   getAllGroups(): Promise<Group[]>;
   deleteGroup(groupId: string): Promise<boolean>;
@@ -152,7 +152,7 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   // Normalize breakTimes and ensure breakTime is synced
   const breakTimes = file.breakTimes || (file.breakTime ? [file.breakTime] : []);
   const breakTime = breakTimes.length > 0 ? breakTimes[0] : file.breakTime;
-  
+
   // Combine legacy licenseId with many-to-many licenseIds
   const licenseIds = [...linkedLicenseIds];
   if (file.licenseId && !licenseIds.includes(file.licenseId)) {
@@ -207,7 +207,7 @@ export class DatabaseStorage {
       .select()
       .from(settings)
       .where(eq(settings.key, "next_id"));
-    
+
     let nextId = 77362;
     if (setting) {
       nextId = parseInt(setting.value);
@@ -263,7 +263,7 @@ export class DatabaseStorage {
   async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -274,7 +274,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const results = await db
       .select({
         file: metadataFiles,
@@ -298,10 +298,10 @@ export class DatabaseStorage {
     if (ids.length === 0) {
       return [];
     }
-    
+
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [inArray(metadataFiles.id, ids)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -312,7 +312,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const results = await db
       .select({
         file: metadataFiles,
@@ -339,7 +339,7 @@ export class DatabaseStorage {
   async getAllMetadataFiles(permissions: UserPermissions, licenseId?: string): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -358,7 +358,7 @@ export class DatabaseStorage {
         sql`${metadataFiles.id} IN (SELECT metadata_file_id FROM metadata_to_licenses WHERE license_id = ${licenseId})`
       ));
     }
-    
+
     const results = await db
       .select({
         file: metadataFiles,
@@ -385,7 +385,7 @@ export class DatabaseStorage {
   async getRecentMetadataFiles(limit: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -396,7 +396,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const results = await db
       .select({
         file: metadataFiles,
@@ -423,22 +423,22 @@ export class DatabaseStorage {
 
   async createMetadataFile(file: InsertMetadataFile & { licenseIds?: string[]; taskDescription?: string }, id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses> {
     const { licenseIds, taskDescription, ...data } = file;
-    
+
     // Normalize breakTimes array - filter empty strings and trim
     const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
-    
+
     // Compute breakTime from normalized breakTimes, or use provided breakTime
-    const normalizedBreakTime = normalizedBreakTimes.length > 0 
-      ? normalizedBreakTimes[0] 
+    const normalizedBreakTime = normalizedBreakTimes.length > 0
+      ? normalizedBreakTimes[0]
       : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
-    
+
     // Ensure breakTimes is populated from breakTime if empty
-    const finalBreakTimes = normalizedBreakTimes.length > 0 
-      ? normalizedBreakTimes 
+    const finalBreakTimes = normalizedBreakTimes.length > 0
+      ? normalizedBreakTimes
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
-    
+
     // Ensure seriesId is set if seriesTitle or title is available
     let seriesId = data.seriesId;
     const seriesTitle = data.seriesTitle || data.title;
@@ -455,11 +455,11 @@ export class DatabaseStorage {
       id,
       createdBy: permissions.userId,
     };
-    
+
     if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
       fileData.groupId = permissions.groupIds[0];
     }
-    
+
     const [created] = await db
       .insert(metadataFiles)
       .values(fileData)
@@ -489,7 +489,7 @@ export class DatabaseStorage {
   async updateMetadataFile(id: string, file: Partial<InsertMetadataFile> & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -502,22 +502,22 @@ export class DatabaseStorage {
     }
 
     const { licenseIds, ...data } = file;
-    
+
     // Normalize breakTimes array - filter empty strings and trim
     const normalizedBreakTimes = (data.breakTimes || [])
       .filter(t => t && typeof t === 'string' && t.trim())
       .map(t => t.trim());
-    
+
     // Compute breakTime from normalized breakTimes, or use provided breakTime
-    const normalizedBreakTime = normalizedBreakTimes.length > 0 
-      ? normalizedBreakTimes[0] 
+    const normalizedBreakTime = normalizedBreakTimes.length > 0
+      ? normalizedBreakTimes[0]
       : (data.breakTime && data.breakTime.trim() ? data.breakTime.trim() : null);
-    
+
     // Ensure breakTimes is populated from breakTime if empty
-    const finalBreakTimes = normalizedBreakTimes.length > 0 
-      ? normalizedBreakTimes 
+    const finalBreakTimes = normalizedBreakTimes.length > 0
+      ? normalizedBreakTimes
       : (normalizedBreakTime ? [normalizedBreakTime] : []);
-    
+
     // Ensure seriesId is set if seriesTitle or title is available
     let seriesId = data.seriesId;
     const seriesTitle = data.seriesTitle || data.title;
@@ -544,7 +544,7 @@ export class DatabaseStorage {
     if (licenseIds !== undefined) {
       // Clear existing
       await db.delete(metadataToLicenses).where(eq(metadataToLicenses.metadataFileId, id));
-      
+
       // Add new
       if (licenseIds.length > 0) {
         const links = licenseIds.map(lId => ({
@@ -560,7 +560,7 @@ export class DatabaseStorage {
       .select()
       .from(metadataToLicenses)
       .where(eq(metadataToLicenses.metadataFileId, id));
-    
+
     const finalLicenseIds = finalLinks.map(l => l.licenseId);
 
     return normalizeMetadataFile(updated, finalLicenseIds);
@@ -575,7 +575,7 @@ export class DatabaseStorage {
       // For upsert match, we check visibility
       const visibility = getFileVisibilityConditions(permissions);
       const whereConditions = [eq(metadataFiles.id, originalId)];
-      
+
       if (visibility.type === "own") {
         whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
       } else if (visibility.type === "group") {
@@ -601,7 +601,7 @@ export class DatabaseStorage {
         eq(metadataFiles.season, data.season),
         eq(metadataFiles.episode, data.episode)
       ];
-      
+
       if (visibility.type === "own") {
         whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
       } else if (visibility.type === "group") {
@@ -646,12 +646,12 @@ export class DatabaseStorage {
 
   async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {
     const visibility = getFileVisibilityConditions(permissions);
-    
+
     return await db.transaction(async (tx) => {
       let count = 0;
       for (const update of updates) {
         const whereConditions = [eq(metadataFiles.id, update.id)];
-        
+
         if (visibility.type === "own") {
           whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
         } else if (visibility.type === "group") {
@@ -662,7 +662,7 @@ export class DatabaseStorage {
             whereConditions.push(sql`1 = 0`);
           }
         }
-        
+
         const result = await tx
           .update(metadataFiles)
           .set({
@@ -671,9 +671,9 @@ export class DatabaseStorage {
           })
           .where(and(...whereConditions))
           .returning();
-        
+
         console.log(`[bulkUpdateMetadata] ID: ${update.id}, Data:`, update.data, `Result length: ${result.length}`);
-        
+
         if (result.length > 0) {
           count++;
         }
@@ -685,7 +685,7 @@ export class DatabaseStorage {
   async deleteMetadataFile(id: string, permissions: UserPermissions): Promise<boolean> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.id, id)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -696,7 +696,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const result = await db
       .delete(metadataFiles)
       .where(and(...whereConditions))
@@ -712,7 +712,7 @@ export class DatabaseStorage {
         eq(metadataFiles.title, seriesTitle)
       )
     ];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -723,7 +723,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const result = await db
       .delete(metadataFiles)
       .where(and(...whereConditions))
@@ -740,7 +740,7 @@ export class DatabaseStorage {
       ),
       eq(metadataFiles.season, season)
     ];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -751,7 +751,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const result = await db
       .delete(metadataFiles)
       .where(and(...whereConditions))
@@ -765,7 +765,7 @@ export class DatabaseStorage {
         .select()
         .from(settings)
         .where(eq(settings.key, "next_id"));
-      
+
       let currentId = 77362;
       if (setting) {
         currentId = parseInt(setting.value);
@@ -780,15 +780,15 @@ export class DatabaseStorage {
       const normalizedBreakTimes = (batch.breakTimes || [])
         .filter(t => t && typeof t === 'string' && t.trim())
         .map(t => t.trim());
-      
+
       // Compute breakTime from normalized breakTimes, or use provided breakTime
-      const normalizedBreakTime = normalizedBreakTimes.length > 0 
-        ? normalizedBreakTimes[0] 
+      const normalizedBreakTime = normalizedBreakTimes.length > 0
+        ? normalizedBreakTimes[0]
         : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
-      
+
       // Ensure breakTimes is populated from breakTime if empty
-      const finalBreakTimes = normalizedBreakTimes.length > 0 
-        ? normalizedBreakTimes 
+      const finalBreakTimes = normalizedBreakTimes.length > 0
+        ? normalizedBreakTimes
         : (normalizedBreakTime ? [normalizedBreakTime] : []);
 
       const files: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
@@ -827,7 +827,7 @@ export class DatabaseStorage {
         if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
           fileData.groupId = permissions.groupIds[0];
         }
-        
+
         files.push(fileData);
         currentId++;
       }
@@ -841,7 +841,7 @@ export class DatabaseStorage {
         .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(files).returning();
-      
+
       // Create tasks if description provided
       if (batch.taskDescription && created.length > 0) {
         const taskValues = created.map(file => ({
@@ -863,7 +863,7 @@ export class DatabaseStorage {
         .select()
         .from(settings)
         .where(eq(settings.key, "next_id"));
-      
+
       let currentId = 77362;
       if (setting) {
         currentId = parseInt(setting.value);
@@ -881,13 +881,13 @@ export class DatabaseStorage {
         const normalizedBreakTimes = (batch.breakTimes || [])
           .filter(t => t && typeof t === 'string' && t.trim())
           .map(t => t.trim());
-        
-        const normalizedBreakTime = normalizedBreakTimes.length > 0 
-          ? normalizedBreakTimes[0] 
+
+        const normalizedBreakTime = normalizedBreakTimes.length > 0
+          ? normalizedBreakTimes[0]
           : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
-        
-        const finalBreakTimes = normalizedBreakTimes.length > 0 
-          ? normalizedBreakTimes 
+
+        const finalBreakTimes = normalizedBreakTimes.length > 0
+          ? normalizedBreakTimes
           : (normalizedBreakTime ? [normalizedBreakTime] : []);
 
         for (const seasonConfig of batch.seasons) {
@@ -928,7 +928,7 @@ export class DatabaseStorage {
             if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
               fileData.groupId = permissions.groupIds[0];
             }
-            
+
             allFiles.push(fileData);
             currentId++;
           }
@@ -963,7 +963,7 @@ export class DatabaseStorage {
   async getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -974,7 +974,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
     const totalFiles = await db
@@ -1026,7 +1026,7 @@ export class DatabaseStorage {
   async getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFile[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.title, seriesTitle)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -1037,7 +1037,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const files = await db
       .select()
       .from(metadataFiles)
@@ -1052,7 +1052,7 @@ export class DatabaseStorage {
       eq(metadataFiles.title, seriesTitle),
       eq(metadataFiles.season, season)
     ];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -1063,7 +1063,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const files = await db
       .select()
       .from(metadataFiles)
@@ -1083,7 +1083,7 @@ export class DatabaseStorage {
       eq(metadataFiles.title, currentFile.title),
       eq(metadataFiles.season, currentFile.season),
     ];
-    
+
     if (visibility.type === "own") {
       baseConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -1133,7 +1133,7 @@ export class DatabaseStorage {
         sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`
       )
     ];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -1144,7 +1144,7 @@ export class DatabaseStorage {
         whereConditions.push(sql`1 = 0`);
       }
     }
-    
+
     const files = await db
       .select()
       .from(metadataFiles)
@@ -1249,7 +1249,7 @@ export class DatabaseStorage {
   }
 
   async updateUserPermissions(userId: string, permissions: {
-    canReadMetadata: number, 
+    canReadMetadata: number,
     canWriteMetadata: number,
     canReadLicenses: number,
     canWriteLicenses: number,
@@ -1389,7 +1389,7 @@ export class DatabaseStorage {
         .select()
         .from(settings)
         .where(eq(settings.key, "next_id"));
-  
+
       let currentId = 77362;
       if (setting) {
         currentId = parseInt(setting.value);
@@ -1399,10 +1399,10 @@ export class DatabaseStorage {
           value: currentId.toString(),
         });
       }
-  
+
       const files: any[] = [];
       const { licenseId, seriesTitle, seasonStart, seasonEnd, episodesPerSeason } = data;
-  
+
       for (let season = seasonStart; season <= seasonEnd; season++) {
         for (let episode = 1; episode <= episodesPerSeason; episode++) {
           files.push({
@@ -1421,7 +1421,7 @@ export class DatabaseStorage {
           currentId++;
         }
       }
-  
+
       await tx
         .update(settings)
         .set({
@@ -1429,7 +1429,7 @@ export class DatabaseStorage {
           updatedAt: new Date(),
         })
         .where(eq(settings.key, "next_id"));
-  
+
       const created = await tx.insert(metadataFiles).values(files).returning();
       return created;
     });
@@ -1458,7 +1458,7 @@ export class DatabaseStorage {
   async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {
@@ -1473,7 +1473,7 @@ export class DatabaseStorage {
     if (status) {
       whereConditions.push(eq(tasks.status, status));
     }
-    
+
     const results = await db
       .select({
         task: tasks,
@@ -1599,7 +1599,7 @@ export class DatabaseStorage {
   async getSeriesTasks(seriesId: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [eq(metadataFiles.seriesId, seriesId)];
-    
+
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
     } else if (visibility.type === "group") {

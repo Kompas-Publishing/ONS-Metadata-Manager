@@ -1,9 +1,9 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, type AuthenticatedRequest, authenticate } from "../_lib/apiHandler.js";
-import { insertLicenseSchema } from "../_shared/schema.js";
+import { insertLicenseSchema } from "../../shared/schema.js";
 import { z } from "zod";
-import { getUserPermissions } from "../_server/permissions.js";
+import { getUserPermissions } from "../../shared/permissions.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   await authenticate(req);
