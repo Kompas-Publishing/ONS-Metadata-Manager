@@ -6,7 +6,7 @@ export type UserPermissions = {
   userId: string;
   isAdmin: boolean;
   isActive: boolean;
-  permissions: {
+  features: {
     metadata: { read: boolean; write: boolean };
     licenses: { read: boolean; write: boolean };
     tasks: { read: boolean; write: boolean };
@@ -32,7 +32,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     userId,
     isAdmin,
     isActive,
-    permissions: {
+    features: {
       metadata: {
         read: isAdmin || (isActive && user.canReadMetadata === 1),
         write: isAdmin || (isActive && user.canWriteMetadata === 1),
@@ -77,11 +77,11 @@ export async function requirePermission(
 
   let allowed = false;
   if (feature === "ai") {
-    allowed = permissions.permissions.ai;
+    allowed = permissions.features.ai;
   } else if (feature === "aiChat") {
-    allowed = permissions.permissions.aiChat;
+    allowed = permissions.features.aiChat;
   } else {
-    allowed = permissions.permissions[feature][action];
+    allowed = permissions.features[feature][action];
   }
   
   return {
@@ -95,17 +95,19 @@ export async function requirePermission(
  * Validates that a URL belongs to Vercel Blob storage.
  * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
  */
+const BLOB_STORE_ID = process.env.BLOB_STORE_ID || "rwcuq3rxnmz4nbvx";
+
 export function isValidBlobUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') return false;
-    
+
     const hostname = parsed.hostname.toLowerCase();
     // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
     // This is the most robust way to prevent SSRF and token leakage.
     return (
-      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
-      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
+      hostname === `${BLOB_STORE_ID}.public.blob.vercel-storage.com` ||
+      hostname === `${BLOB_STORE_ID}.private.blob.vercel-storage.com`
     );
   } catch {
     return false;

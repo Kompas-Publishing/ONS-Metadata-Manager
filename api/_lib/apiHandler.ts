@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { storage } from "../_server/storage.js";
 import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPayload } from "../_server/jwt.js";
 import type { User } from "../_shared/schema.js";
-import { getUserPermissions, requirePermission as checkPermission, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
+import { getUserPermissions, requirePermission as checkPermission, isValidBlobUrl, type UserPermissions, type PermissionFeature, type PermissionAction } from "../_server/permissions.js";
 
 export interface AuthenticatedRequest extends VercelRequest {
   user?: User;
@@ -134,26 +134,7 @@ export function withCors(handler: ApiHandler): ApiHandler {
   };
 }
 
-/**
- * Validates that a URL belongs to Vercel Blob storage.
- * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
- */
-export function isValidBlobUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:') return false;
-    
-    const hostname = parsed.hostname.toLowerCase();
-    // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
-    // This is the most robust way to prevent SSRF and token leakage.
-    return (
-      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
-      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
-    );
-  } catch {
-    return false;
-  }
-}
+export { isValidBlobUrl };
 
 export function apiHandler(handler: ApiHandler): ApiHandler {
   return withCors(handler);
