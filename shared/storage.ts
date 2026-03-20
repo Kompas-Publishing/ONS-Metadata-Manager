@@ -1,3 +1,8 @@
+// Escape special LIKE pattern characters to prevent unintended wildcard matching
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 import {
   users,
   metadataFiles,
@@ -1126,11 +1131,12 @@ export class DatabaseStorage {
   }
 
   async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]> {
+    const pattern = `%${escapeLike(keyword.trim())}%`;
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       or(
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + keyword + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`
       )
     ];
 
@@ -1160,14 +1166,15 @@ export class DatabaseStorage {
       return [];
     }
 
+    const licensePattern = `%${escapeLike(trimmed)}%`;
     return await db
       .select()
       .from(licenses)
       .where(
         or(
-          sql`LOWER(${licenses.name}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.distributor}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+          sql`LOWER(${licenses.name}) LIKE LOWER(${licensePattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.distributor}) LIKE LOWER(${licensePattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${licensePattern}) ESCAPE '\\'`
         )
       )
       .orderBy(desc(licenses.createdAt))
@@ -1180,12 +1187,13 @@ export class DatabaseStorage {
       return [];
     }
 
+    const taskPattern = `%${escapeLike(trimmed)}%`;
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       or(
-        sql`LOWER(${tasks.description}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+        sql`LOWER(${tasks.description}) LIKE LOWER(${taskPattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${taskPattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${taskPattern}) ESCAPE '\\'`
       )
     ];
 
