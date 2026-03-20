@@ -35,7 +35,7 @@ export default function ViewFile() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
     }
   }, [isAuthenticated, authLoading, toast]);
@@ -105,13 +105,16 @@ export default function ViewFile() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${params?.id}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${params?.id}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        window.URL.revokeObjectURL(url);
+      }
       
       toast({
         title: "Success",
@@ -211,11 +214,11 @@ export default function ViewFile() {
             actors: file.actors || [],
             genre: file.genre || [],
             tags: file.tags || [],
-            seasonType: (file.seasonType as any) || undefined,
+            seasonType: (file.seasonType as "Winter" | "Summer" | "Autumn" | "Spring") || undefined,
             contentType: file.contentType || "",
-            category: (file.category as any) || undefined,
+            category: (file.category as "Series" | "Movie" | "Documentary") || undefined,
             channel: file.channel ?? "ONS",
-            programRating: (file.programRating as any) || undefined,
+            programRating: (file.programRating as "AL" | "6" | "9" | "12" | "16" | "18") || undefined,
             productionCountry: file.productionCountry ?? "",
             seriesTitle: file.seriesTitle ?? "",
             yearOfProduction: file.yearOfProduction || undefined,

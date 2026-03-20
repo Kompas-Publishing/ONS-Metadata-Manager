@@ -922,7 +922,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { allowed, permissions, reason } = await requirePermission(
         userId,
-        "delete",
+        "metadata",
+        "write",
       );
 
       if (!allowed) {

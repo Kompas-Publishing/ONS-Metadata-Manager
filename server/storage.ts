@@ -27,6 +27,11 @@ import { db } from "./db";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
 import { UserPermissions, getFileVisibilityConditions } from "./permissions";
 
+// Escape special LIKE pattern characters to prevent unintended wildcard matching
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 // Extend MetadataFile type to include licenseIds array
 export type MetadataFileWithLicenses = MetadataFile & { licenseIds?: string[] };
 
@@ -424,7 +429,7 @@ export class DatabaseStorage implements IStorage {
       breakTime: normalizedBreakTime,
       breakTimes: finalBreakTimes,
       id,
-      createdBy: permissions.userId,
+      createdBy: permissions.user.id,
     };
     
     if (permissions.fileVisibility === "group" && permissions.groupIds && permissions.groupIds.length > 0) {
@@ -988,11 +993,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchMetadata(keyword: string, permissions: UserPermissions): Promise<MetadataFile[]> {
+    const escaped = escapeLike(keyword.trim());
+    const pattern = `%${escaped}%`;
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       or(
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + keyword + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + keyword + '%'})`
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`
       )
     ];
     
@@ -1022,14 +1029,15 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
+    const pattern = `%${escapeLike(trimmed)}%`;
     return await db
       .select()
       .from(licenses)
       .where(
         or(
-          sql`LOWER(${licenses.name}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.distributor}) LIKE LOWER(${'%' + trimmed + '%'})`,
-          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+          sql`LOWER(${licenses.name}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.distributor}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`
         )
       )
       .orderBy(desc(licenses.createdAt))
@@ -1042,12 +1050,13 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
+    const pattern = `%${escapeLike(trimmed)}%`;
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       or(
-        sql`LOWER(${tasks.description}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${'%' + trimmed + '%'})`,
-        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${'%' + trimmed + '%'})`
+        sql`LOWER(${tasks.description}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.seriesTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`
       )
     ];
 
