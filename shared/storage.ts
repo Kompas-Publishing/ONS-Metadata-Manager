@@ -147,10 +147,11 @@ function parseMetadataId(id: string): number {
   // Parse format: xxx-xxx-xxx back to number
   const parts = id.split('-');
   if (parts.length !== 3) return 0;
-  const segment1 = parseInt(parts[0]) * 1000000;
-  const segment2 = parseInt(parts[1]) * 1000;
-  const segment3 = parseInt(parts[2]);
-  return segment1 + segment2 + segment3;
+  const s1 = parseInt(parts[0], 10);
+  const s2 = parseInt(parts[1], 10);
+  const s3 = parseInt(parts[2], 10);
+  if (isNaN(s1) || isNaN(s2) || isNaN(s3)) return 0;
+  return s1 * 1000000 + s2 * 1000 + s3;
 }
 
 function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = []): MetadataFileWithLicenses {
@@ -227,40 +228,42 @@ export class DatabaseStorage {
   }
 
   async consumeNextId(): Promise<string> {
-    const [setting] = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, "next_id"));
-
-    let nextId = 77362;
-    if (setting) {
-      nextId = parseInt(setting.value);
-    } else {
-      // Initialize from highest existing ID in database
-      const existingFiles = await db
-        .select({ id: metadataFiles.id })
-        .from(metadataFiles);
-
-      if (existingFiles.length > 0) {
-        const highestId = existingFiles
-          .map(f => parseMetadataId(f.id))
-          .reduce((max, current) => Math.max(max, current), 0);
-        nextId = Math.max(nextId, highestId + 1);
-      }
-
-      await db.insert(settings).values({
-        key: "next_id",
-        value: nextId.toString(),
-      });
-    }
-
-    await db
+    // Atomically increment and return the consumed ID in a single UPDATE … RETURNING,
+    // which is race-condition-free under any isolation level.
+    const result = await db
       .update(settings)
       .set({
-        value: (nextId + 1).toString(),
+        value: sql`(CAST(${settings.value} AS INTEGER) + 1)::TEXT`,
         updatedAt: new Date(),
       })
-      .where(eq(settings.key, "next_id"));
+      .where(eq(settings.key, "next_id"))
+      .returning({ consumed: sql<number>`CAST(${settings.value} AS INTEGER) - 1` });
+
+    if (result.length > 0) {
+      return formatMetadataId(result[0].consumed);
+    }
+
+    // Row doesn't exist yet — initialise from the highest existing file ID.
+    let nextId = 77362;
+    const existingFiles = await db
+      .select({ id: metadataFiles.id })
+      .from(metadataFiles);
+
+    if (existingFiles.length > 0) {
+      const highestId = existingFiles
+        .map(f => parseMetadataId(f.id))
+        .reduce((max, current) => Math.max(max, current), 0);
+      nextId = Math.max(nextId, highestId + 1);
+    }
+
+    // INSERT … ON CONFLICT DO UPDATE ensures only one concurrent caller wins.
+    await db
+      .insert(settings)
+      .values({ key: "next_id", value: (nextId + 1).toString() })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: (nextId + 1).toString(), updatedAt: new Date() },
+      });
 
     return formatMetadataId(nextId);
   }
@@ -650,6 +653,9 @@ export class DatabaseStorage {
   }
 
   async bulkUpdateMetadata(updates: Array<{id: string, data: Partial<InsertMetadataFile>}>, permissions: UserPermissions): Promise<number> {
+    if (updates.length > 500) {
+      throw new Error("Bulk update limit exceeded: maximum 500 records per request.");
+    }
     const visibility = getFileVisibilityConditions(permissions);
 
     return await db.transaction(async (tx) => {
@@ -677,7 +683,6 @@ export class DatabaseStorage {
           .where(and(...whereConditions))
           .returning();
 
-        console.log(`[bulkUpdateMetadata] ID: ${update.id}, Data:`, update.data, `Result length: ${result.length}`);
 
         if (result.length > 0) {
           count++;
@@ -1290,6 +1295,10 @@ export class DatabaseStorage {
   }
 
   async updateUserVisibility(userId: string, fileVisibility: string): Promise<User | undefined> {
+    const allowed = ["own", "all", "group"];
+    if (!allowed.includes(fileVisibility)) {
+      throw new Error(`Invalid fileVisibility value: "${fileVisibility}". Must be one of: ${allowed.join(", ")}.`);
+    }
     const [updated] = await db
       .update(users)
       .set({

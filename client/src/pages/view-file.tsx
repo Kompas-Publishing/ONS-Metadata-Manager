@@ -245,6 +245,91 @@ export default function ViewFile() {
           readOnly={true}
         />
       </Card>
+
+      {/* Task management */}
+      <Card className="p-6">
+        <CardHeader className="px-0 pt-0">
+          <CardTitle className="flex items-center gap-2">
+            <CheckSquare className="w-5 h-5" />
+            Tasks
+          </CardTitle>
+          <CardDescription>Track tasks associated with this file</CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-0 space-y-4">
+          {tasksLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(tasks ?? []).map((task) => {
+                const isDone = task.status === "completed";
+                return (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-3 rounded-md border px-3 py-2"
+                  >
+                    <Checkbox
+                      checked={isDone}
+                      onCheckedChange={(checked) =>
+                        toggleTaskMutation.mutate({
+                          id: task.id,
+                          status: checked ? "completed" : "pending",
+                        })
+                      }
+                    />
+                    <span className={cn("flex-1 text-sm", isDone && "line-through text-muted-foreground")}>
+                      {task.description}
+                    </span>
+                    <Badge variant={isDone ? "secondary" : "outline"} className="shrink-0">
+                      {isDone ? (
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                      ) : (
+                        <Clock className="w-3 h-3 mr-1" />
+                      )}
+                      {isDone ? "Done" : "Pending"}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      onClick={() => deleteTaskMutation.mutate(task.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {tasks?.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No tasks yet</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Input
+              placeholder="Add a task…"
+              value={newTaskDesc}
+              onChange={(e) => setNewTaskDesc(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTaskDesc.trim()) {
+                  addTaskMutation.mutate(newTaskDesc.trim());
+                }
+              }}
+            />
+            <Button
+              onClick={() => {
+                if (newTaskDesc.trim()) addTaskMutation.mutate(newTaskDesc.trim());
+              }}
+              disabled={!newTaskDesc.trim() || addTaskMutation.isPending}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

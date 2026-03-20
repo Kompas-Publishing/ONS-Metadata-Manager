@@ -10,6 +10,15 @@ import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 
+function parseAiJson(raw: string): any {
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw new Error(`AI returned invalid JSON: ${cleaned.slice(0, 200)}`);
+  }
+}
+
 export class AiService {
   genAI: GoogleGenerativeAI | null = null;
   model: string = "gemini-3-pro-preview";
@@ -66,7 +75,7 @@ Example: { "name": "Ballykissangel", "distributor": "BBC" }`;
     if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const phase1Result = await model.generateContent(phase1Content);
-    const searchData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
+    const searchData = parseAiJson(phase1Result.response.text());
 
     // Search DB for candidate licenses
     const allLicenses = await storage.listLicenses();
@@ -128,7 +137,7 @@ Only return the JSON object.`;
     if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const finalResult = await model.generateContent(finalContent);
-    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(finalResult.response.text());
 
     // Enrich and normalize
     for (const p of resultJson.proposals || []) {
@@ -196,7 +205,7 @@ Only return the JSON object. Do not include markdown formatting.`;
     if (isPdf) content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const result = await model.generateContent(content);
-    const resultJson = JSON.parse(result.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(result.response.text());
 
     // Normalize results as in original methods
     for (const p of resultJson.proposals || []) {
@@ -242,7 +251,7 @@ Example: { "keywords": ["Holland Heritage", "Heritage"] }`;
     if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const phase1Result = await model.generateContent(phase1Content);
-    const keywordsData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
+    const keywordsData = parseAiJson(phase1Result.response.text());
 
     // Search DB for candidates
     let candidates: MetadataFile[] = [];
@@ -314,7 +323,7 @@ Only return the JSON object. Do not include markdown formatting.`;
     if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const finalResult = await model.generateContent(finalContent);
-    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(finalResult.response.text());
 
     // Enrich proposals with existingData for UI comparison and normalize season
     for (const proposal of resultJson.proposals || []) {

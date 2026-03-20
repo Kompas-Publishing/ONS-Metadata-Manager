@@ -180,7 +180,7 @@ export const metadataFiles = pgTable("metadata_files", {
   metadataTimesStatus: varchar("metadata_times_status", { length: 50 }).default("Incomplete"),
   seriesId: varchar("series_id").references(() => seriesTable.id, { onDelete: "set null" }),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
-  licenseId: varchar("license_id").references(() => licenses.id), // Legacy: Single link to license
+  licenseId: varchar("license_id").references(() => licenses.id, { onDelete: "set null" }), // Legacy: Single link to license
   createdBy: varchar("created_by").references(() => users.id),
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),

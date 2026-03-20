@@ -56,15 +56,16 @@ export default function AllFiles() {
       await apiRequest("DELETE", `/api/metadata/${id}`, undefined);
     },
     onSuccess: () => {
+      setDeleteId(null);
       toast({
         title: "Success",
         description: "File deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setDeleteId(null);
     },
     onError: (error: Error) => {
+      setDeleteId(null);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",

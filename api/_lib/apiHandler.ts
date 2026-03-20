@@ -15,10 +15,13 @@ export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Pro
 export function corsMiddleware(req: AuthenticatedRequest, res: VercelResponse) {
   const origin = req.headers.origin;
   const allowedOrigins = ['https://metadata.onstv.nl'];
-  
+  // In development, also allow the Vite dev server on port 5173 only
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:5173');
+  }
+
   let currentOrigin = allowedOrigins[0];
-  // Allow primary domain and any Vercel preview URLs
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.startsWith('http://localhost'))) {
+  if (origin && allowedOrigins.includes(origin)) {
     currentOrigin = origin;
   }
 

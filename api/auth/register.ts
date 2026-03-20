@@ -19,7 +19,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
 
     const existingUser = await storage.getUserByEmail(email);
     if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({ message: "Registration failed. Please check your details and try again." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -38,6 +38,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
       canReadTasks: 1,
       canWriteTasks: 0,
       canUseAI: 0,
+      canUseAIChat: 0,
       fileVisibility: "own",
       isAdmin: 0,
     });

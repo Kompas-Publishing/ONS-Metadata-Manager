@@ -26,7 +26,8 @@ export default function EditFile() {
   }, [params?.id]);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (authLoading) return;
+    if (!isAuthenticated) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
@@ -35,11 +36,7 @@ export default function EditFile() {
       setTimeout(() => {
         window.location.href = "/login";
       }, 500);
-    }
-  }, [isAuthenticated, authLoading, toast]);
-
-  useEffect(() => {
-    if (!authLoading && !canWriteMetadata) {
+    } else if (!canWriteMetadata) {
       toast({
         title: "Permission Denied",
         description: "You don't have permission to edit files.",
@@ -47,7 +44,7 @@ export default function EditFile() {
       });
       setLocation(`/view/${params?.id}`);
     }
-  }, [authLoading, canWriteMetadata, params?.id, toast, setLocation]);
+  }, [authLoading, isAuthenticated, canWriteMetadata, params?.id, toast, setLocation]);
 
   const { data: file, isLoading } = useQuery<MetadataFileWithLicenses>({
     queryKey: ["/api/metadata", params?.id],

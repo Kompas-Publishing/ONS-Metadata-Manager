@@ -1,7 +1,14 @@
 import jwt from "jsonwebtoken";
 import type { User } from "./schema.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET!;
+const _jwtSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+if (!_jwtSecret) {
+  throw new Error("Missing JWT secret: set JWT_SECRET or SESSION_SECRET environment variable.");
+}
+if (_jwtSecret.length < 32) {
+  throw new Error("JWT secret must be at least 32 characters long.");
+}
+const JWT_SECRET: string = _jwtSecret;
 const JWT_EXPIRES_IN = "7d"; // 7 days to match old session TTL
 
 export interface JWTPayload {
