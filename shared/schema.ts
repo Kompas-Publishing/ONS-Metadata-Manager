@@ -185,7 +185,14 @@ export const metadataFiles = pgTable("metadata_files", {
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_metadata_created_by").on(table.createdBy),
+  index("idx_metadata_group_id").on(table.groupId),
+  index("idx_metadata_title").on(table.title),
+  index("idx_metadata_series_id").on(table.seriesId),
+  index("idx_metadata_created_at").on(table.createdAt),
+  index("idx_metadata_license_id").on(table.licenseId),
+]);
 
 // Join table for many-to-many Metadata-License relationship
 export const metadataToLicenses = pgTable("metadata_to_licenses", {
@@ -375,7 +382,9 @@ export const tasks = pgTable("tasks", {
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_tasks_metadata_file_id").on(table.metadataFileId),
+]);
 
 export const insertTaskSchema = createInsertSchema(tasks, {
   metadataFileId: z.string().min(1),

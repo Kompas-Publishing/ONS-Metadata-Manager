@@ -236,11 +236,9 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Link href={`/view/${file.id}`}>
-                                  <a target="_blank" className="p-1 hover:text-primary">
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                </Link>
+                                <a href={`/view/${file.id}`} target="_blank" rel="noopener noreferrer" className="p-1 hover:text-primary">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
                                 <button
                                   onClick={() => unlinkMutation.mutate([file.id])}
                                   className="p-1 hover:text-destructive"
