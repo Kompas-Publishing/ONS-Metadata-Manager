@@ -1,6 +1,6 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../../../../../shared/storage.js";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../../_lib/apiHandler.js";
+import { storage } from "../../../../shared/storage.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   const { title: itemTitle, season: seasonValue } = req.query;

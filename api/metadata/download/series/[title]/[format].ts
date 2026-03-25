@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../../../../../shared/storage.js";
-import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../../../_lib/apiHandler.js";
-import { transformFileForDownload, buildSeriesXml, buildMetadataXlsx } from "../../../../../_lib/downloadUtils.js";
+import { storage } from "../../../../../shared/storage.js";
+import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../../../_lib/apiHandler.js";
+import { transformFileForDownload, buildSeriesXml, buildMetadataXlsx } from "../../../../_lib/downloadUtils.js";
 import * as XLSX from "xlsx";
 
 export default apiHandler(
