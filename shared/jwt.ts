@@ -41,10 +41,11 @@ export function verifyToken(token: string): JWTPayload | null {
   try {
     // @ts-ignore
     const verify = (jwt.verify || (jwt as any).default?.verify);
+    const opts = { algorithms: ["HS256" as const] };
     if (typeof verify === 'function') {
-      return verify(token, JWT_SECRET) as JWTPayload;
+      return verify(token, JWT_SECRET, opts) as JWTPayload;
     }
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, JWT_SECRET, opts) as JWTPayload;
   } catch (error) {
     console.error("JWT verification failed:", error);
     return null;
@@ -71,7 +72,10 @@ export function extractTokenFromCookie(cookieHeader: string | undefined): string
 
   // Parse cookie string to find auth_token
   const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split('=');
+    const eqIndex = cookie.indexOf('=');
+    if (eqIndex === -1) return acc;
+    const key = cookie.substring(0, eqIndex).trim();
+    const value = cookie.substring(eqIndex + 1).trim();
     acc[key] = value;
     return acc;
   }, {} as Record<string, string>);
