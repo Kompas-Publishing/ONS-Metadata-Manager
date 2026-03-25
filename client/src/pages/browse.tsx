@@ -11,7 +11,7 @@ import {
   ExternalLink, Globe, FolderOpen, CheckCircle2, ChevronDown, ChevronUp,
   Link2, Info, ShieldCheck, X
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile, SeriesItem, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -70,10 +70,11 @@ interface SeriesGroup {
 
 export default function Browse() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"newest" | "name" | "category" | "seasons" | "episodes">("newest");
   const [, setLocation] = useLocation();
+  const [, routeParams] = useRoute("/browse/:title");
+  const selectedSeries = routeParams?.title ? decodeURIComponent(routeParams.title) : null;
   const { canWriteMetadata, canReadMetadata } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -223,7 +224,7 @@ export default function Browse() {
         description: `Successfully deleted all files for ${title}`,
       });
       if (selectedSeries === title) {
-        setSelectedSeries(null);
+        setLocation("/browse");
       }
     },
     onError: (error: Error) => {
@@ -432,7 +433,7 @@ export default function Browse() {
                   <Card
                     key={series.title}
                     className="p-6 hover-elevate cursor-pointer group relative"
-                    onClick={() => setSelectedSeries(series.title)}
+                    onClick={() => setLocation(`/browse/${encodeURIComponent(series.title)}`)}
                     data-testid={`series-card-${series.title}`}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -522,7 +523,7 @@ export default function Browse() {
                       <TableRow 
                         key={series.title} 
                         className="cursor-pointer"
-                        onClick={() => setSelectedSeries(series.title)}
+                        onClick={() => setLocation(`/browse/${encodeURIComponent(series.title)}`)}
                       >
                         <TableCell className="font-medium">{series.title}</TableCell>
                         <TableCell>
@@ -535,7 +536,7 @@ export default function Browse() {
                         <TableCell className="text-muted-foreground">{format(series.lastAddedAt, "dd-MM-yyyy")}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedSeries(series.title); }}>
+                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setLocation(`/browse/${encodeURIComponent(series.title)}`); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
                           </div>
@@ -557,7 +558,7 @@ export default function Browse() {
         <div className="space-y-6">
           <Button
             variant="outline"
-            onClick={() => setSelectedSeries(null)}
+            onClick={() => setLocation("/browse")}
             data-testid="button-back-to-series"
           >
             Back to All Series

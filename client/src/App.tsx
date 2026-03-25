@@ -77,6 +77,16 @@ function Router() {
         </AuthenticatedRoute>
       </Route>
       
+      <Route path="/browse/:title">
+        <AuthenticatedRoute>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <Browse />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
+        </AuthenticatedRoute>
+      </Route>
+
       <Route path="/browse">
         <AuthenticatedRoute>
           {canReadMetadata || canWriteMetadata ? (
