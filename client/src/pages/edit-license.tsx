@@ -41,14 +41,10 @@ export default function EditLicense() {
     document.title = "Edit License | ONS Broadcast Portal";
   }, []);
 
-  console.log("EditLicense: id =", id);
-
   const { data: license, isLoading, isError, error: queryError } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
     enabled: !!id && (canReadLicenses || canWriteLicenses),
   });
-
-  if (queryError) console.error("EditLicense: Query error =", queryError);
 
   useEffect(() => {
     if (!isLoading && !canWriteLicenses) {
@@ -83,7 +79,6 @@ export default function EditLicense() {
 
   useEffect(() => {
     if (license) {
-      console.log("EditLicense: resetting form with license data", license);
       try {
         form.reset({
           name: license.name || "",
@@ -103,8 +98,8 @@ export default function EditLicense() {
           productionYear: license.productionYear || undefined,
           subsFromDistributor: license.subsFromDistributor || 0,
         });
-      } catch (err) {
-        console.error("EditLicense: error resetting form", err);
+      } catch {
+        // Form reset failed silently
       }
     }
   }, [license, form.reset]);

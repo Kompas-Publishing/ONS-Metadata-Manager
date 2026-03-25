@@ -269,22 +269,6 @@ export default function Tasks() {
     }
   };
 
-  const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    
-    return tasks.filter((t) => {
-      const matchesSearch = 
-        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.metadataFile.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.metadataFileId.includes(searchTerm);
-      
-      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
-      const matchesDesc = descFilter === "all" || t.description === descFilter;
-
-      return matchesSearch && matchesStatus && matchesDesc;
-    });
-  }, [tasks, searchTerm, statusFilter, descFilter]);
-
   const uniqueDescriptions = useMemo(() => {
     if (!tasks) return [];
     const descs = new Set(tasks.map(t => t.description));

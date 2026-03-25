@@ -276,39 +276,37 @@ export default function Browse() {
     },
   });
 
-  const seriesGroups: { [key: string]: SeriesGroup } = {};
-  
-  if (files) {
-    files.forEach((file) => {
-      if (!file.title) return;
-      
-      if (!seriesGroups[file.title]) {
-        seriesGroups[file.title] = {
-          title: file.title,
-          category: file.category || "Unknown",
-          seasonCount: 0,
-          episodeCount: 0,
-          seriesTitle: file.seriesTitle ?? undefined,
-          lastAddedAt: file.createdAt ? new Date(file.createdAt) : new Date(0),
-          seasons: {},
-        };
-      }
-      
-      const fileDate = file.createdAt ? new Date(file.createdAt) : new Date(0);
-      if (fileDate > seriesGroups[file.title].lastAddedAt) {
-        seriesGroups[file.title].lastAddedAt = fileDate;
-      }
-      
-      const seasonNum = file.season || 0;
-      if (!seriesGroups[file.title].seasons[seasonNum]) {
-        seriesGroups[file.title].seasons[seasonNum] = [];
-        seriesGroups[file.title].seasonCount++;
-      }
-      
-      seriesGroups[file.title].seasons[seasonNum].push(file);
-      seriesGroups[file.title].episodeCount++;
-    });
-  }
+  const seriesGroups = useMemo(() => {
+    const groups: { [key: string]: SeriesGroup } = {};
+    if (files) {
+      files.forEach((file) => {
+        if (!file.title) return;
+        if (!groups[file.title]) {
+          groups[file.title] = {
+            title: file.title,
+            category: file.category || "Unknown",
+            seasonCount: 0,
+            episodeCount: 0,
+            seriesTitle: file.seriesTitle ?? undefined,
+            lastAddedAt: file.createdAt ? new Date(file.createdAt) : new Date(0),
+            seasons: {},
+          };
+        }
+        const fileDate = file.createdAt ? new Date(file.createdAt) : new Date(0);
+        if (fileDate > groups[file.title].lastAddedAt) {
+          groups[file.title].lastAddedAt = fileDate;
+        }
+        const seasonNum = file.season || 0;
+        if (!groups[file.title].seasons[seasonNum]) {
+          groups[file.title].seasons[seasonNum] = [];
+          groups[file.title].seasonCount++;
+        }
+        groups[file.title].seasons[seasonNum].push(file);
+        groups[file.title].episodeCount++;
+      });
+    }
+    return groups;
+  }, [files]);
 
   const filteredSeries = useMemo(() => {
     return Object.values(seriesGroups)

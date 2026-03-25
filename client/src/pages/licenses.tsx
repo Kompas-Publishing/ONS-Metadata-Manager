@@ -192,7 +192,7 @@ export default function Licenses() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Licenses ({filteredAndSortedLicenses.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">

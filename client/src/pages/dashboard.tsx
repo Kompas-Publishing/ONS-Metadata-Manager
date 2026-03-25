@@ -179,7 +179,7 @@ export default function Dashboard() {
                           {file.seriesTitle || 'Stand-alone content'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <Link href={`/view/${file.id}`}>
                           <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
                             <Eye className="w-4 h-4" />

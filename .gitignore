@@ -11,3 +11,4 @@ vite.config.ts.*
 logs
 .claude
 claude.md
+Code_Audit.md

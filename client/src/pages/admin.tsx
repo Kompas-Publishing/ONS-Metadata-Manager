@@ -533,7 +533,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                 <p className="text-muted-foreground">No users found</p>
               </Card>
             ) : (
-              <Card className="p-6">
+              <Card className="p-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

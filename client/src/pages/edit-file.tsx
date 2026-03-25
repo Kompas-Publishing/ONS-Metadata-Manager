@@ -240,12 +240,3 @@ export default function EditFile() {
     </div>
   );
 }
-
-// Helper to determine the correct data type for the mutation
-function prepareMutationData(data: InsertMetadataFile & { licenseIds?: string[] }): InsertMetadataFile & { licenseIds?: string[] } {
-  const { licenseId, licenseIds, ...rest } = data;
-  return {
-    ...rest,
-    licenseIds: licenseIds || (licenseId ? [licenseId] : []),
-  };
-}

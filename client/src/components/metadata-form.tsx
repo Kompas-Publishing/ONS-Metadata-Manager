@@ -246,19 +246,6 @@ export function MetadataForm({
               )}
             </div>
 
-            {generatedId && false && ( // Hidden original ID display as we have the new header
-              <div className="p-6 border rounded-lg bg-card">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                  Generated ID
-                </p>
-                <p
-                  className="text-2xl font-mono font-semibold text-foreground"
-                  data-testid="generated-id"
-                >
-                  {generatedId}
-                </p>
-              </div>
-            )}
           </fieldset>
 
           <div className="border-t pt-8">
