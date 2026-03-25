@@ -69,6 +69,39 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
         }
 
         const updatedFile = await storage.updateMetadataFile(id, data, permissions!);
+
+        // Auto-create tasks when status flags are set to Incomplete
+        const userId = req.user!.id;
+        const existingTasks = await storage.getTasksByFileId(id, permissions);
+
+        if (data.subsStatus === "Incomplete") {
+          const hasSubsTask = existingTasks.some(
+            t => t.status === "pending" && /subtitle/i.test(t.description)
+          );
+          if (!hasSubsTask) {
+            await storage.createTask({
+              metadataFileId: id,
+              description: "Subtitles incomplete – create or obtain subtitles",
+              status: "pending",
+              createdBy: userId,
+            });
+          }
+        }
+
+        if (data.metadataTimesStatus === "Incomplete") {
+          const hasTimesTask = existingTasks.some(
+            t => t.status === "pending" && /metadata times/i.test(t.description)
+          );
+          if (!hasTimesTask) {
+            await storage.createTask({
+              metadataFileId: id,
+              description: "Metadata times incomplete – add timing data",
+              status: "pending",
+              createdBy: userId,
+            });
+          }
+        }
+
         res.json(updatedFile);
       } catch (error: any) {
         console.error("Error updating metadata file:", error);

@@ -10,3 +10,4 @@ vite.config.ts.*
 *.log
 logs
 .claude
+claude.md
