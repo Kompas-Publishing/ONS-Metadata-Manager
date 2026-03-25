@@ -7,7 +7,8 @@ export default apiHandler(
     if (req.method === "GET") {
       try {
         const users = await storage.listAllUsers();
-        res.json({ users });
+        const sanitized = users.map(({ password, ...u }) => u);
+        res.json({ users: sanitized });
       } catch (error) {
         console.error("Error listing users:", error);
         res.status(500).json({ message: "Failed to list users" });

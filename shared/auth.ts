@@ -1,6 +1,5 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import bcrypt from "bcryptjs";
 import { type User } from "./schema.js";
 import { type IStorage } from "./storage.js";
@@ -32,17 +31,17 @@ export function setupPassport(storage: IStorage) {
       async (email, password, done) => {
         try {
           const user = await storage.getUserByEmail(email);
-          
+
           if (!user) {
             return done(null, false, { message: "Invalid email or password" });
           }
 
           if (!user.password) {
-            return done(null, false, { message: "Please use social login" });
+            return done(null, false, { message: "No password set for this account" });
           }
 
           const isValid = await bcrypt.compare(password, user.password as string);
-          
+
           if (!isValid) {
             return done(null, false, { message: "Invalid email or password" });
           }
@@ -58,58 +57,6 @@ export function setupPassport(storage: IStorage) {
       }
     )
   );
-
-  const googleCallbackURL = process.env.GOOGLE_CALLBACK_URL || 
-    `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/api/auth/google/callback`;
-
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          callbackURL: googleCallbackURL,
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          try {
-            const email = profile.emails?.[0]?.value;
-            
-            if (!email) {
-              return done(new Error("No email found from Google profile"));
-            }
-
-            let user = await storage.getUserByEmail(email);
-
-            if (!user) {
-              user = await storage.createUser({
-                email,
-                firstName: profile.name?.givenName || null,
-                lastName: profile.name?.familyName || null,
-                profileImageUrl: profile.photos?.[0]?.value || null,
-                authProvider: "google",
-                status: "pending",
-                canReadMetadata: 1,
-                canWriteMetadata: 0,
-                canReadLicenses: 1,
-                canWriteLicenses: 0,
-                canReadTasks: 1,
-                canWriteTasks: 0,
-                canUseAI: 0,
-                fileVisibility: "own",
-                isAdmin: 0,
-              });
-            } else if (user.authProvider !== "google") {
-              return done(null, false, { message: "Email already registered with password login" });
-            }
-
-            return done(null, user);
-          } catch (error) {
-            return done(error as Error);
-          }
-        }
-      )
-    );
-  }
 
   return passport;
 }

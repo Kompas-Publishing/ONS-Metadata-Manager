@@ -2,6 +2,7 @@ import type { VercelResponse } from "@vercel/node";
 import { storage } from "../../../../shared/storage.js";
 import { apiHandler, requireAdmin, type AuthenticatedRequest } from "../../../_lib/apiHandler.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 export default apiHandler(
   requireAdmin(async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -16,11 +17,12 @@ export default apiHandler(
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
-      // Generate a random 12-character password
+      // Generate a cryptographically secure random 16-character password
       const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+      const randomBytes = crypto.randomBytes(16);
       let newPassword = "";
-      for (let i = 0; i < 12; i++) {
-        newPassword += charset.charAt(Math.floor(Math.random() * charset.length));
+      for (let i = 0; i < 16; i++) {
+        newPassword += charset.charAt(randomBytes[i] % charset.length);
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 12);

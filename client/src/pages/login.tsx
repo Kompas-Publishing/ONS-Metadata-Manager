@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Link, useLocation } from "wouter";
 import { z } from "zod";
-import { SiGoogle } from "react-icons/si";
 import { Eye, EyeOff } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -49,8 +48,6 @@ export default function Login() {
       });
     }
   };
-
-  const hasGoogleAuth = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   return (
     <AuthLayout
@@ -122,32 +119,6 @@ export default function Login() {
           >
             {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
           </Button>
-
-          {hasGoogleAuth && (
-            <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => window.location.href = "/api/auth/google"}
-                data-testid="button-google-login"
-              >
-                <SiGoogle className="mr-2 h-4 w-4" />
-                Sign in with Google
-              </Button>
-            </>
-          )}
 
           <div className="text-center text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>

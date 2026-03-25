@@ -1323,10 +1323,16 @@ export class DatabaseStorage {
   }
 
   async updateUserProfile(userId: string, data: Partial<User>): Promise<User | undefined> {
+    // Whitelist only safe profile fields to prevent privilege escalation
+    const safeData: Record<string, unknown> = {};
+    if (data.firstName !== undefined) safeData.firstName = data.firstName;
+    if (data.lastName !== undefined) safeData.lastName = data.lastName;
+    if (data.profileImageUrl !== undefined) safeData.profileImageUrl = data.profileImageUrl;
+
     const [updated] = await db
       .update(users)
       .set({
-        ...data,
+        ...safeData,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
