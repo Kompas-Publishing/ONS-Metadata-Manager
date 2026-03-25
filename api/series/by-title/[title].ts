@@ -17,13 +17,10 @@ export default apiHandler(
 
       const decodedTitle = title; // Vercel already decodes query params
       
-      let item = await storage.getSeriesByTitle(decodedTitle);
-      
+      const item = await storage.getSeriesByTitle(decodedTitle);
+
       if (!item) {
-        // Auto-create series if it doesn't exist yet (handles legacy data)
-        item = await storage.upsertSeries({
-          title: decodedTitle,
-        });
+        return res.status(404).json({ message: "Series not found" });
       }
 
       const [licenses, tasks] = await Promise.all([
