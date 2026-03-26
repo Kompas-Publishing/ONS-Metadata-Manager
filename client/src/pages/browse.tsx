@@ -37,6 +37,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -276,6 +282,19 @@ export default function Browse() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const bulkEditMutation = useMutation({
+    mutationFn: async ({ ids, data }: { ids: string[]; data: Record<string, any> }) => {
+      await apiRequest("POST", "/api/metadata/bulk-edit", { ids, data });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      toast({ title: "Bulk edit applied", description: "Episodes updated successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Bulk edit failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -977,17 +996,52 @@ export default function Browse() {
                     </div>
                     <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                       {canWriteMetadata && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                          className="gap-2 h-8"
-                        >
-                          <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`}>
-                            <Edit className="w-3.5 h-3.5" />
-                            Batch Editor
-                          </Link>
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="gap-2 h-8"
+                          >
+                            <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`}>
+                              <Edit className="w-3.5 h-3.5" />
+                              Batch Editor
+                            </Link>
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="gap-2 h-8">
+                                Quick Edit
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { draft: 0 } });
+                              }}>
+                                Mark all as Published
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { draft: 1 } });
+                              }}>
+                                Mark all as Draft
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { subsStatus: "Complete" } });
+                              }}>
+                                Subs: Complete
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { metadataTimesStatus: "Complete" } });
+                              }}>
+                                Metadata: Complete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </>
                       )}
                       <Button
                         variant="outline"
