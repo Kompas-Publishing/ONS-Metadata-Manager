@@ -29,6 +29,8 @@ export default apiHandler(
     }
 
     try {
+      const isPreview = req.query.preview === "true";
+
       // Run multer middleware
       await runMiddleware(req, res, upload.array("files"));
 
@@ -209,19 +211,38 @@ export default apiHandler(
               if (breakTimes.length > 0) metadata.breakTime = breakTimes[0];
 
               const originalId = row[idx.originalId]?.toString();
-              const result = await storage.upsertMetadataFile(
-                metadata,
-                req.userPermissions!,
-                originalId,
-              );
-              results.push(result);
+
+              if (isPreview) {
+                // Preview mode: just collect parsed rows
+                results.push({ ...metadata, originalId, _valid: true });
+              } else {
+                const result = await storage.upsertMetadataFile(
+                  metadata,
+                  req.userPermissions!,
+                  originalId,
+                );
+                results.push(result);
+              }
             } catch (rowErr: any) {
-              errors.push(`Row error in ${file.originalname}: ${rowErr.message}`);
+              if (isPreview) {
+                errors.push(`Row in ${file.originalname}: ${rowErr.message}`);
+              } else {
+                errors.push(`Row error in ${file.originalname}: ${rowErr.message}`);
+              }
             }
           }
         } catch (fileErr: any) {
           errors.push(`File error ${file.originalname}: ${fileErr.message}`);
         }
+      }
+
+      if (isPreview) {
+        return res.json({
+          preview: true,
+          rows: results,
+          rowCount: results.length,
+          errors,
+        });
       }
 
       res.json({

@@ -19,6 +19,14 @@ import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -88,15 +96,16 @@ export default function Browse() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[]; formData: FormData } | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+
   const importXlsxMutation = useMutation({
-    mutationFn: async (files: FileList) => {
-      const formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append("files", files[i]);
-      }
+    mutationFn: async (formData: FormData) => {
+      const token = localStorage.getItem("auth_token");
       const res = await fetch("/api/metadata/import-xlsx", {
         method: "POST",
         body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
         const error = await res.json();
@@ -106,26 +115,19 @@ export default function Browse() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      setImportPreview(null);
       toast({
         title: "Import successful",
         description: data.message,
       });
       if (data.errors && data.errors.length > 0) {
         data.errors.slice(0, 3).forEach((err: string) => {
-          toast({
-            title: "Import Warning",
-            description: err,
-            variant: "destructive",
-          });
+          toast({ title: "Import Warning", description: err, variant: "destructive" });
         });
       }
     },
     onError: (error: Error) => {
-      toast({
-        title: "Import failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -134,10 +136,36 @@ export default function Browse() {
     input.type = "file";
     input.multiple = true;
     input.accept = ".xlsx";
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (files && files.length > 0) {
-        importXlsxMutation.mutate(files);
+      if (!files || files.length === 0) return;
+
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+      }
+
+      // Preview first
+      setImportLoading(true);
+      try {
+        const token = localStorage.getItem("auth_token");
+        const res = await fetch("/api/metadata/import-xlsx?preview=true", {
+          method: "POST",
+          body: formData,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error("Preview failed");
+        const data = await res.json();
+        // Build a fresh FormData for the actual import (can't reuse consumed one)
+        const importFormData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+          importFormData.append("files", files[i]);
+        }
+        setImportPreview({ rows: data.rows || [], errors: data.errors || [], formData: importFormData });
+      } catch (err: any) {
+        toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+      } finally {
+        setImportLoading(false);
       }
     };
     input.click();
@@ -391,10 +419,10 @@ export default function Browse() {
                 variant="outline"
                 className="gap-2"
                 onClick={handleImportClick}
-                disabled={importXlsxMutation.isPending}
+                disabled={importXlsxMutation.isPending || importLoading}
                 data-testid="button-import-xlsx"
               >
-                {importXlsxMutation.isPending ? (
+                {(importXlsxMutation.isPending || importLoading) ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Upload className="w-4 h-4" />
@@ -921,9 +949,9 @@ export default function Browse() {
                       size="sm"
                       className="gap-2"
                       onClick={handleImportClick}
-                      disabled={importXlsxMutation.isPending}
+                      disabled={importXlsxMutation.isPending || importLoading}
                     >
-                      {importXlsxMutation.isPending ? (
+                      {(importXlsxMutation.isPending || importLoading) ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Upload className="w-4 h-4" />
@@ -1275,6 +1303,72 @@ export default function Browse() {
             ))}
         </div>
       )}
+
+      {/* XLSX Import Preview Dialog */}
+      <Dialog open={!!importPreview} onOpenChange={(open) => { if (!open) setImportPreview(null); }}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Import Preview</DialogTitle>
+            <DialogDescription>
+              {importPreview?.rows.length || 0} rows parsed. Review before importing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {importPreview?.errors && importPreview.errors.length > 0 && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm font-medium text-destructive mb-1">Errors ({importPreview.errors.length})</p>
+                {importPreview.errors.slice(0, 5).map((err, i) => (
+                  <p key={i} className="text-xs text-destructive/80">{err}</p>
+                ))}
+                {importPreview.errors.length > 5 && (
+                  <p className="text-xs text-muted-foreground mt-1">...and {importPreview.errors.length - 5} more</p>
+                )}
+              </div>
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40px]">#</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Season</TableHead>
+                  <TableHead>Episode</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {importPreview?.rows.slice(0, 50).map((row: any, i: number) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                    <TableCell className="font-medium text-sm">{row.title}</TableCell>
+                    <TableCell>{row.season || "-"}</TableCell>
+                    <TableCell>{row.episode || "-"}</TableCell>
+                    <TableCell>{row.category || "-"}</TableCell>
+                    <TableCell className="font-mono text-xs">{row.duration || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {importPreview && importPreview.rows.length > 50 && (
+              <p className="text-xs text-muted-foreground text-center py-2">Showing first 50 of {importPreview.rows.length} rows</p>
+            )}
+          </div>
+          <DialogFooter className="pt-4 border-t">
+            <Button variant="outline" onClick={() => setImportPreview(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (importPreview?.formData) {
+                  importXlsxMutation.mutate(importPreview.formData);
+                }
+              }}
+              disabled={importXlsxMutation.isPending}
+            >
+              {importXlsxMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Import {importPreview?.rows.length || 0} Records
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
