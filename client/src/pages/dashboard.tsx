@@ -70,7 +70,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header & Greeting */}
       <div className="relative overflow-hidden rounded-3xl bg-primary/5 border border-primary/10 p-8 md:p-12">
         <div className="relative z-10">
@@ -80,7 +80,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
             Welcome back, here's what's going on across your metadata and licenses today.
           </p>
-          <div className="flex gap-3 mt-6">
+          <div className="flex flex-wrap gap-3 mt-6">
             {canWriteMetadata && (
               <Link href="/create">
                 <Button className="rounded-full px-6 shadow-lg shadow-primary/20">

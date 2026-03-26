@@ -69,7 +69,7 @@ export default function CreateFile() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-foreground">Create Metadata File</h1>
         <p className="text-muted-foreground mt-2">

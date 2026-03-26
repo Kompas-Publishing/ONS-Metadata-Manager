@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Pencil, Trash2, Download, FileText, Calendar, Tv, X, Eye } from "lucide-react";
+import { Search, Pencil, Trash2, Download, FileText, Calendar, Tv, X, Eye, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
@@ -189,7 +189,7 @@ export default function AllFiles() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-foreground">All Files</h1>
         <p className="text-muted-foreground mt-2">
@@ -290,7 +290,7 @@ export default function AllFiles() {
                         {file.id}
                       </span>
                       {file.season && file.episode && (
-                        <Badge variant="outline" data-testid={`file-season-episode-${file.id}`}>
+                        <Badge variant="secondary" data-testid={`file-season-episode-${file.id}`}>
                           S{file.season}E{file.episode}
                         </Badge>
                       )}
@@ -319,7 +319,7 @@ export default function AllFiles() {
 
                     <div className="flex items-center gap-2 flex-wrap">
                       {file.draft === 1 && (
-                        <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`file-draft-${file.id}`}>
+                        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5" data-testid={`file-draft-${file.id}`}>
                           Draft
                         </Badge>
                       )}
@@ -403,6 +403,14 @@ export default function AllFiles() {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No files found</p>
+            {canWriteMetadata && (
+              <Link href="/create">
+                <Button className="mt-4">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Metadata
+                </Button>
+              </Link>
+            )}
           </div>
         )}
       </Card>

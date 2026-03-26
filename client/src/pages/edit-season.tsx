@@ -140,7 +140,7 @@ export default function EditSeason() {
   const seasonNum = params?.season ? parseInt(params.season) : 0;
 
   useEffect(() => {
-    document.title = `Edit ${title} S${seasonNum} | ONS Portal`;
+    document.title = `Edit ${title} S${seasonNum} | ONS Broadcast Portal`;
   }, [title, seasonNum]);
 
   const [rows, setRows] = useState<Record<string, any>[]>([]);
