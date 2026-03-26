@@ -48,7 +48,7 @@ import {
   Film,
 } from "lucide-react";
 import {
-  CommandDialog,
+  Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -368,10 +368,12 @@ export function AppSidebar() {
           </Button>
         </div>
 
-        <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <DialogContent className="overflow-hidden p-0 shadow-lg">
+            <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
           <CommandInput placeholder="Search metadata, licenses, series..." value={searchQuery} onValueChange={handleSearchChange} />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+          <CommandList className="max-h-[300px]">
+            <CommandEmpty>{searchQuery.length < 2 ? "Type at least 2 characters..." : "No results found."}</CommandEmpty>
             {searchResults.metadata.length > 0 && (
               <CommandGroup heading="Metadata">
                 {searchResults.metadata.map((f: any) => (
@@ -408,7 +410,9 @@ export function AppSidebar() {
               </CommandGroup>
             )}
           </CommandList>
-        </CommandDialog>
+            </Command>
+          </DialogContent>
+        </Dialog>
         
         {filteredGroups.map((group) => (
           <SidebarGroup key={group.label}>

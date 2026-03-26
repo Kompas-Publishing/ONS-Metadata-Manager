@@ -13,57 +13,122 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { MetadataFile } from "@shared/schema";
 
-// All editable fields for the spreadsheet
-interface EpisodeEdit {
-  id: string;
-  episode: number | null;
-  episodeTitle: string;
-  description: string;
-  duration: string;
-  channel: string;
-  contentType: string;
-  programRating: string;
-  productionCountry: string;
-  yearOfProduction: number | undefined;
-  seasonType: string;
-  genre: string[];
-  actors: string[];
-  catchUp: number;
-  subtitles: number;
-  segmented: number;
-  draft: number;
-  subsStatus: string;
-  metadataTimesStatus: string;
-  breakTimes: string[];
-  endCredits: string;
-  tags: string[];
-}
+// Matches the export XLSX column structure
+const COLUMNS = [
+  { key: "channel", label: "Channel", width: "w-20", type: "text" },
+  { key: "id", label: "ID", width: "w-36", type: "readonly" },
+  { key: "title", label: "Title", width: "w-40", type: "readonly" },
+  { key: "description", label: "Description", width: "w-64", type: "text" },
+  { key: "genre", label: "Genre", width: "w-40", type: "tags" },
+  { key: "programRating", label: "Rating", width: "w-20", type: "select", options: ["AL", "6", "9", "12", "16", "18"] },
+  { key: "productionCountry", label: "Country", width: "w-20", type: "text" },
+  { key: "yearOfProduction", label: "Year", width: "w-20", type: "number" },
+  { key: "catchUp", label: "CatchUp", width: "w-16", type: "bool" },
+  { key: "season", label: "S", width: "w-12", type: "readonly" },
+  { key: "episodeCount", label: "Eps", width: "w-12", type: "readonly" },
+  { key: "episodeTitle", label: "Episode Title", width: "w-48", type: "text" },
+  { key: "episode", label: "Ep#", width: "w-14", type: "readonly" },
+  { key: "duration", label: "Duration", width: "w-24", type: "text" },
+  { key: "segmented", label: "Seg", width: "w-14", type: "bool" },
+  { key: "breakTimes", label: "Break Times", width: "w-36", type: "tags" },
+  { key: "subtitles", label: "Subs", width: "w-14", type: "bool" },
+  { key: "endCredits", label: "End Credits", width: "w-24", type: "text" },
+  { key: "contentType", label: "Type", width: "w-28", type: "select", options: ["Long Form", "Short Form", "program", "commercial", "Promo", "Filler"] },
+  { key: "seasonType", label: "Season Type", width: "w-24", type: "select", options: ["Winter", "Summer", "Autumn", "Spring"] },
+  { key: "draft", label: "Draft", width: "w-14", type: "bool" },
+  { key: "subsStatus", label: "Subs Status", width: "w-28", type: "select", options: ["Incomplete", "Complete"] },
+  { key: "metadataTimesStatus", label: "Meta Status", width: "w-28", type: "select", options: ["Incomplete", "Complete"] },
+  { key: "actors", label: "Actors", width: "w-48", type: "tags" },
+  { key: "tags", label: "Tags", width: "w-36", type: "tags" },
+] as const;
 
-function initFromFile(ep: MetadataFile): EpisodeEdit {
+type ColDef = (typeof COLUMNS)[number];
+
+function initFromFile(ep: MetadataFile): Record<string, any> {
   return {
     id: ep.id,
-    episode: ep.episode,
-    episodeTitle: ep.episodeTitle || "",
-    description: ep.description || "",
-    duration: ep.duration || "",
     channel: ep.channel || "ONS",
-    contentType: ep.contentType || "",
+    title: ep.title || "",
+    description: ep.description || "",
+    genre: ep.genre || [],
     programRating: ep.programRating || "",
     productionCountry: ep.productionCountry || "",
-    yearOfProduction: ep.yearOfProduction || undefined,
-    seasonType: ep.seasonType || "",
-    genre: ep.genre || [],
-    actors: ep.actors || [],
+    yearOfProduction: ep.yearOfProduction || "",
     catchUp: ep.catchUp ?? 0,
-    subtitles: ep.subtitles ?? 0,
+    season: ep.season || 0,
+    episodeCount: ep.episodeCount || 0,
+    episodeTitle: ep.episodeTitle || "",
+    episode: ep.episode || 0,
+    duration: ep.duration || "",
     segmented: ep.segmented ?? 0,
+    breakTimes: ep.breakTimes || [],
+    subtitles: ep.subtitles ?? 0,
+    endCredits: ep.endCredits || "",
+    contentType: ep.contentType || "",
+    seasonType: ep.seasonType || "",
     draft: ep.draft ?? 0,
     subsStatus: ep.subsStatus || "Incomplete",
     metadataTimesStatus: ep.metadataTimesStatus || "Incomplete",
-    breakTimes: ep.breakTimes || [],
-    endCredits: ep.endCredits || "",
+    actors: ep.actors || [],
     tags: ep.tags || [],
   };
+}
+
+function CellInput({ col, value, onChange }: { col: ColDef; value: any; onChange: (v: any) => void }) {
+  const base = "h-7 text-xs rounded-none border-0 border-b border-transparent focus:border-primary focus:ring-0 bg-transparent px-2";
+
+  if (col.type === "readonly") {
+    return <span className="text-xs text-muted-foreground px-2 py-1 truncate block">{value}</span>;
+  }
+  if (col.type === "bool") {
+    return (
+      <div className="flex items-center justify-center h-7">
+        <Checkbox checked={value === 1} onCheckedChange={(c) => onChange(c ? 1 : 0)} className="h-3.5 w-3.5" />
+      </div>
+    );
+  }
+  if (col.type === "select") {
+    return (
+      <Select value={value || ""} onValueChange={onChange}>
+        <SelectTrigger className={`${base} h-7 text-xs`}>
+          <SelectValue placeholder="-" />
+        </SelectTrigger>
+        <SelectContent>
+          {(col as any).options.map((opt: string) => (
+            <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (col.type === "number") {
+    return (
+      <Input
+        type="number"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : "")}
+        className={base}
+      />
+    );
+  }
+  if (col.type === "tags") {
+    const arr = Array.isArray(value) ? value : [];
+    return (
+      <Input
+        value={arr.join(", ")}
+        onChange={(e) => onChange(e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+        className={base}
+        placeholder="comma, separated"
+      />
+    );
+  }
+  return (
+    <Input
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      className={base}
+    />
+  );
 }
 
 export default function EditSeason() {
@@ -75,10 +140,10 @@ export default function EditSeason() {
   const seasonNum = params?.season ? parseInt(params.season) : 0;
 
   useEffect(() => {
-    document.title = `Edit ${title} Season ${seasonNum} | ONS Broadcast Portal`;
+    document.title = `Edit ${title} S${seasonNum} | ONS Portal`;
   }, [title, seasonNum]);
 
-  const [episodes, setEpisodes] = useState<EpisodeEdit[]>([]);
+  const [rows, setRows] = useState<Record<string, any>[]>([]);
 
   const { data: seasonData, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ['/api/metadata/season', title, seasonNum],
@@ -87,7 +152,7 @@ export default function EditSeason() {
 
   useEffect(() => {
     if (seasonData) {
-      setEpisodes(seasonData.map(initFromFile));
+      setRows(seasonData.map(initFromFile));
     }
   }, [seasonData]);
 
@@ -107,43 +172,30 @@ export default function EditSeason() {
   });
 
   const handleSave = () => {
-    const updates = episodes.map((ep) => ({
-      id: ep.id,
-      data: {
-        episodeTitle: ep.episodeTitle || null,
-        description: ep.description || null,
-        duration: ep.duration || null,
-        channel: ep.channel,
-        contentType: ep.contentType,
-        programRating: ep.programRating || null,
-        productionCountry: ep.productionCountry || null,
-        yearOfProduction: ep.yearOfProduction || null,
-        seasonType: ep.seasonType || null,
-        genre: ep.genre,
-        actors: ep.actors,
-        catchUp: ep.catchUp ? 1 : 0,
-        subtitles: ep.subtitles ? 1 : 0,
-        segmented: ep.segmented ? 1 : 0,
-        draft: ep.draft ? 1 : 0,
-        subsStatus: ep.subsStatus,
-        metadataTimesStatus: ep.metadataTimesStatus,
-        breakTimes: ep.breakTimes,
-        endCredits: ep.endCredits || null,
-        tags: ep.tags,
-      },
-    }));
+    const editableKeys = COLUMNS.filter(c => c.type !== "readonly").map(c => c.key);
+    const updates = rows.map((row) => {
+      const data: Record<string, any> = {};
+      editableKeys.forEach((key) => {
+        const val = row[key];
+        if (key === "catchUp" || key === "subtitles" || key === "segmented" || key === "draft") {
+          data[key] = val ? 1 : 0;
+        } else if (key === "yearOfProduction") {
+          data[key] = val || null;
+        } else {
+          data[key] = val === "" ? null : val;
+        }
+      });
+      return { id: row.id, data };
+    });
     updateMutation.mutate(updates);
   };
 
-  const updateEp = useCallback((id: string, field: keyof EpisodeEdit, value: any) => {
-    setEpisodes((prev) =>
-      prev.map((ep) => (ep.id === id ? { ...ep, [field]: value } : ep))
-    );
-  }, []);
-
-  // Apply a value to ALL episodes for a given field
-  const applyToAll = useCallback((field: keyof EpisodeEdit, value: any) => {
-    setEpisodes((prev) => prev.map((ep) => ({ ...ep, [field]: value })));
+  const updateCell = useCallback((rowIdx: number, key: string, value: any) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], [key]: value };
+      return next;
+    });
   }, []);
 
   if (isLoading) {
@@ -167,222 +219,71 @@ export default function EditSeason() {
   }
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-3 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">{title}</h1>
-              <p className="text-sm text-muted-foreground">Season {seasonNum} — {episodes.length} episodes</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">{title}</h1>
+            <p className="text-xs text-muted-foreground">Season {seasonNum} — {rows.length} episodes</p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
+        <Button onClick={handleSave} disabled={updateMutation.isPending} size="sm" className="gap-2">
           {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save All Changes
+          Save All
         </Button>
       </div>
 
-      {/* Spreadsheet */}
-      <Card className="overflow-hidden border">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-muted/60 border-b">
-                <th className="sticky left-0 z-20 bg-muted/60 px-3 py-2 text-left font-semibold text-xs uppercase tracking-wider w-16 border-r">Ep</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider min-w-[200px]">Episode Title</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider min-w-[250px]">Description</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-24">Duration</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-24">Channel</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-28">Content Type</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-20">Rating</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-28">Country</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-20">Year</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-28">Season Type</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-24">End Credits</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-28">Subs Status</th>
-                <th className="px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider w-28">Meta Status</th>
-                <th className="px-2 py-2 text-center font-semibold text-xs uppercase tracking-wider w-14">Draft</th>
-                <th className="px-2 py-2 text-center font-semibold text-xs uppercase tracking-wider w-14">CU</th>
-                <th className="px-2 py-2 text-center font-semibold text-xs uppercase tracking-wider w-14">Subs</th>
-                <th className="px-2 py-2 text-center font-semibold text-xs uppercase tracking-wider w-14">Seg</th>
+      {/* Spreadsheet grid */}
+      <div className="border rounded-lg overflow-hidden bg-background">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
+          <table className="text-xs border-collapse" style={{ minWidth: "2400px" }}>
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-muted">
+                <th className="sticky left-0 z-30 bg-muted px-2 py-2 text-left font-semibold text-[10px] uppercase tracking-wider border-b border-r w-10">#</th>
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`px-1 py-2 text-left font-semibold text-[10px] uppercase tracking-wider border-b border-r ${col.width}`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {episodes.map((ep) => (
-                <tr key={ep.id} className="border-b hover:bg-muted/20 transition-colors">
-                  {/* Sticky episode number */}
-                  <td className="sticky left-0 z-10 bg-background px-3 py-1 border-r">
-                    <Badge variant="outline" className="font-mono text-xs">{ep.episode}</Badge>
+              {rows.map((row, rowIdx) => (
+                <tr key={row.id} className="border-b hover:bg-muted/30 transition-colors group">
+                  <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/30 px-2 py-0 text-center border-r">
+                    <Badge variant="outline" className="font-mono text-[10px] h-5">{row.episode}</Badge>
                   </td>
-                  {/* Episode title */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.episodeTitle}
-                      onChange={(e) => updateEp(ep.id, "episodeTitle", e.target.value)}
-                      className="h-8 text-xs border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="Episode title..."
-                    />
-                  </td>
-                  {/* Description */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.description}
-                      onChange={(e) => updateEp(ep.id, "description", e.target.value)}
-                      className="h-8 text-xs border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="Description..."
-                    />
-                  </td>
-                  {/* Duration */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.duration}
-                      onChange={(e) => updateEp(ep.id, "duration", e.target.value)}
-                      className="h-8 text-xs font-mono border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="00:00:00"
-                    />
-                  </td>
-                  {/* Channel */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.channel}
-                      onChange={(e) => updateEp(ep.id, "channel", e.target.value)}
-                      className="h-8 text-xs border-transparent hover:border-input focus:border-input bg-transparent"
-                    />
-                  </td>
-                  {/* Content Type */}
-                  <td className="px-1 py-1">
-                    <Select value={ep.contentType} onValueChange={(v) => updateEp(ep.id, "contentType", v)}>
-                      <SelectTrigger className="h-8 text-xs border-transparent hover:border-input bg-transparent">
-                        <SelectValue placeholder="-" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Long Form">Long Form</SelectItem>
-                        <SelectItem value="Short Form">Short Form</SelectItem>
-                        <SelectItem value="program">Program</SelectItem>
-                        <SelectItem value="commercial">Commercial</SelectItem>
-                        <SelectItem value="Promo">Promo</SelectItem>
-                        <SelectItem value="Filler">Filler</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  {/* Rating */}
-                  <td className="px-1 py-1">
-                    <Select value={ep.programRating} onValueChange={(v) => updateEp(ep.id, "programRating", v)}>
-                      <SelectTrigger className="h-8 text-xs border-transparent hover:border-input bg-transparent">
-                        <SelectValue placeholder="-" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AL">AL</SelectItem>
-                        <SelectItem value="6">6</SelectItem>
-                        <SelectItem value="9">9</SelectItem>
-                        <SelectItem value="12">12</SelectItem>
-                        <SelectItem value="16">16</SelectItem>
-                        <SelectItem value="18">18</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  {/* Country */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.productionCountry}
-                      onChange={(e) => updateEp(ep.id, "productionCountry", e.target.value)}
-                      className="h-8 text-xs border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="NL"
-                    />
-                  </td>
-                  {/* Year */}
-                  <td className="px-1 py-1">
-                    <Input
-                      type="number"
-                      value={ep.yearOfProduction || ""}
-                      onChange={(e) => updateEp(ep.id, "yearOfProduction", e.target.value ? parseInt(e.target.value) : undefined)}
-                      className="h-8 text-xs border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="2024"
-                    />
-                  </td>
-                  {/* Season Type */}
-                  <td className="px-1 py-1">
-                    <Select value={ep.seasonType} onValueChange={(v) => updateEp(ep.id, "seasonType", v)}>
-                      <SelectTrigger className="h-8 text-xs border-transparent hover:border-input bg-transparent">
-                        <SelectValue placeholder="-" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Winter">Winter</SelectItem>
-                        <SelectItem value="Summer">Summer</SelectItem>
-                        <SelectItem value="Autumn">Autumn</SelectItem>
-                        <SelectItem value="Spring">Spring</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  {/* End Credits */}
-                  <td className="px-1 py-1">
-                    <Input
-                      value={ep.endCredits}
-                      onChange={(e) => updateEp(ep.id, "endCredits", e.target.value)}
-                      className="h-8 text-xs font-mono border-transparent hover:border-input focus:border-input bg-transparent"
-                      placeholder="00:00:00"
-                    />
-                  </td>
-                  {/* Subs Status */}
-                  <td className="px-1 py-1">
-                    <Select value={ep.subsStatus} onValueChange={(v) => updateEp(ep.id, "subsStatus", v)}>
-                      <SelectTrigger className="h-8 text-xs border-transparent hover:border-input bg-transparent">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Incomplete">Incomplete</SelectItem>
-                        <SelectItem value="Complete">Complete</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  {/* Meta Status */}
-                  <td className="px-1 py-1">
-                    <Select value={ep.metadataTimesStatus} onValueChange={(v) => updateEp(ep.id, "metadataTimesStatus", v)}>
-                      <SelectTrigger className="h-8 text-xs border-transparent hover:border-input bg-transparent">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Incomplete">Incomplete</SelectItem>
-                        <SelectItem value="Complete">Complete</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  {/* Draft */}
-                  <td className="px-1 py-1 text-center">
-                    <Checkbox checked={ep.draft === 1} onCheckedChange={(c) => updateEp(ep.id, "draft", c ? 1 : 0)} className="h-4 w-4" />
-                  </td>
-                  {/* Catch Up */}
-                  <td className="px-1 py-1 text-center">
-                    <Checkbox checked={ep.catchUp === 1} onCheckedChange={(c) => updateEp(ep.id, "catchUp", c ? 1 : 0)} className="h-4 w-4" />
-                  </td>
-                  {/* Subtitles */}
-                  <td className="px-1 py-1 text-center">
-                    <Checkbox checked={ep.subtitles === 1} onCheckedChange={(c) => updateEp(ep.id, "subtitles", c ? 1 : 0)} className="h-4 w-4" />
-                  </td>
-                  {/* Segmented */}
-                  <td className="px-1 py-1 text-center">
-                    <Checkbox checked={ep.segmented === 1} onCheckedChange={(c) => updateEp(ep.id, "segmented", c ? 1 : 0)} className="h-4 w-4" />
-                  </td>
+                  {COLUMNS.map((col) => (
+                    <td key={col.key} className={`px-0 py-0 border-r ${col.width}`}>
+                      <CellInput
+                        col={col}
+                        value={row[col.key]}
+                        onChange={(v) => updateCell(rowIdx, col.key, v)}
+                      />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {/* Sticky save bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 flex items-center justify-between z-50">
-        <p className="text-sm text-muted-foreground">
-          Editing <strong>{episodes.length}</strong> episodes in <strong>{title}</strong> Season {seasonNum}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t px-6 py-3 flex items-center justify-between z-50">
+        <p className="text-xs text-muted-foreground">
+          <strong>{rows.length}</strong> episodes — <strong>{title}</strong> Season {seasonNum}
         </p>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>Cancel</Button>
+          <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
             {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save All
           </Button>
