@@ -4,8 +4,10 @@ import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_li
 import { z } from "zod";
 
 const updateTaskSchema = z.object({
-  status: z["enum"](["pending", "completed"]).optional(),
+  status: z["enum"](["pending", "in_progress", "completed"]).optional(),
   description: z.string().optional(),
+  assignedTo: z.string().optional().nullable(),
+  priority: z["enum"](["low", "medium", "high"]).optional(),
 });
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {

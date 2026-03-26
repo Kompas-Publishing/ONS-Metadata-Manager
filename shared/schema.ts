@@ -377,8 +377,10 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
   description: text("description").notNull(), // e.g., "heeft meta nodig"
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, completed
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, in_progress, completed
   deadline: timestamp("deadline"), // Optional deadline for the task
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  priority: varchar("priority", { length: 10 }).default("medium").notNull(), // low, medium, high
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -389,8 +391,10 @@ export const tasks = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasks, {
   metadataFileId: z.string().min(1),
   description: z.string().min(1, "Description is required"),
-  status: z.enum(["pending", "completed"]).optional(),
+  status: z.enum(["pending", "in_progress", "completed"]).optional(),
   deadline: z.coerce.date().optional(),
+  assignedTo: z.string().optional().nullable(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
 }).omit({
   id: true,
   createdBy: true,

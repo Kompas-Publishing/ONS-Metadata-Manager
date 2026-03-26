@@ -6,9 +6,13 @@ export default apiHandler(
   requirePermission("tasks", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method === "GET") {
       try {
-        const { status } = req.query;
+        const { status, assignedTo } = req.query;
         // requirePermission sets req.userPermissions
-        const tasks = await storage.listTasks(req.userPermissions!, typeof status === "string" ? status : undefined);
+        const tasks = await storage.listTasks(
+          req.userPermissions!,
+          typeof status === "string" ? status : undefined,
+          typeof assignedTo === "string" ? assignedTo : undefined
+        );
         return res.json(tasks);
       } catch (error) {
         console.error("Error fetching tasks:", error);

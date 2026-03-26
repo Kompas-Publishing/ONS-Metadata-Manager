@@ -17,6 +17,8 @@ export default apiHandler(
         metadataFileIds: z.array(z.string()).min(1),
         description: z.string().min(1),
         deadline: z.coerce.date().optional(),
+        assignedTo: z.string().optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
       });
 
       const validation = bulkSchema.safeParse(req.body);

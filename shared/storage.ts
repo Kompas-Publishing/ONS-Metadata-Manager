@@ -132,8 +132,8 @@ export type IStorage = {
 
   // Task Management
   createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
-  bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, createdBy: string }): Promise<Task[]>;
-  listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
+  bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, deadline?: Date | null, assignedTo?: string, priority?: string, createdBy: string }): Promise<Task[]>;
+  listTasks(permissions: UserPermissions, status?: string, assignedTo?: string): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]>;
   getTasksByFileId(fileId: string, permissions: UserPermissions): Promise<Task[]>;
   updateTask(id: number, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: number): Promise<boolean>;
@@ -1476,8 +1476,8 @@ export class DatabaseStorage {
     return task;
   }
 
-  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, deadline?: Date | null, createdBy: string }): Promise<Task[]> {
-    const { metadataFileIds, description, deadline, createdBy } = taskData;
+  async bulkCreateTasks(taskData: { metadataFileIds: string[], description: string, deadline?: Date | null, assignedTo?: string, priority?: string, createdBy: string }): Promise<Task[]> {
+    const { metadataFileIds, description, deadline, assignedTo, priority, createdBy } = taskData;
     if (metadataFileIds.length === 0) return [];
 
     const values = metadataFileIds.map(fileId => ({
@@ -1485,13 +1485,15 @@ export class DatabaseStorage {
       description,
       status: "pending" as const,
       deadline,
+      assignedTo: assignedTo || null,
+      priority: priority || "medium",
       createdBy,
     }));
 
     return await db.insert(tasks).values(values).returning();
   }
 
-  async listTasks(permissions: UserPermissions, status?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
+  async listTasks(permissions: UserPermissions, status?: string, assignedTo?: string): Promise<(Task & { metadataFile: MetadataFile })[]> {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [];
 
@@ -1508,6 +1510,10 @@ export class DatabaseStorage {
 
     if (status) {
       whereConditions.push(eq(tasks.status, status));
+    }
+
+    if (assignedTo) {
+      whereConditions.push(eq(tasks.assignedTo, assignedTo));
     }
 
     const results = await db

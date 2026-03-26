@@ -470,6 +470,7 @@ export default function Tasks() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
@@ -494,7 +495,7 @@ export default function Tasks() {
           Object.entries(groupedTasks)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([title, seasons]) => {
-              const totalPending = Object.values(seasons).flat().filter(t => t.status === 'pending').length;
+              const totalPending = Object.values(seasons).flat().filter(t => t.status !== 'completed').length;
               const isGroupOpen = openGroups[title] ?? true;
 
               return (
@@ -600,13 +601,11 @@ export default function Tasks() {
                                 )}>
                                   <CardContent className="p-4 flex items-center justify-between gap-4">
                                     <div className="flex items-center gap-4 min-w-0">
-                                      <Checkbox 
-                                        checked={task.status === "completed"}
-                                        onCheckedChange={(checked) => {
-                                          toggleMutation.mutate({ 
-                                            id: task.id, 
-                                            status: checked ? "completed" : "pending" 
-                                          });
+                                      <Checkbox
+                                        checked={task.status === "completed" ? true : task.status === "in_progress" ? "indeterminate" : false}
+                                        onCheckedChange={() => {
+                                          const next = task.status === "pending" ? "in_progress" : task.status === "in_progress" ? "completed" : "pending";
+                                          toggleMutation.mutate({ id: task.id, status: next });
                                         }}
                                         className="h-5 w-5"
                                         disabled={!canWriteTasks}
@@ -619,6 +618,19 @@ export default function Tasks() {
                                           )}>
                                             {task.description}
                                           </span>
+                                          {task.status === "in_progress" && (
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-200">
+                                              In Progress
+                                            </Badge>
+                                          )}
+                                          {(task as any).priority && (task as any).priority !== "medium" && (
+                                            <Badge variant="outline" className={cn(
+                                              "text-[10px]",
+                                              (task as any).priority === "high" ? "border-orange-400 text-orange-600 bg-orange-50" : "text-muted-foreground"
+                                            )}>
+                                              {(task as any).priority}
+                                            </Badge>
+                                          )}
                                           {task.deadline && (
                                             <Badge variant="outline" className={cn(
                                               "text-[10px] font-mono",
