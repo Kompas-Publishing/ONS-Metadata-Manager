@@ -3,21 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  FileText, 
-  Layers, 
-  Film, 
-  Plus, 
-  Tv, 
-  Calendar, 
-  Eye, 
-  Pencil, 
-  CheckSquare, 
-  FileKey, 
-  Sparkles,
+import {
+  FileText,
+  Film,
+  Plus,
+  Eye,
+  Pencil,
+  CheckSquare,
+  FileKey,
   ArrowRight,
   Clock,
-  LayoutDashboard
+  LayoutDashboard,
+  AlertTriangle,
+  FileWarning,
+  FilePen
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -30,6 +29,10 @@ interface Stats {
   totalFiles: number;
   recentFiles: number;
   totalSeries: number;
+  overdueTasks: number;
+  expiringLicenses: number;
+  incompleteMeta: number;
+  drafts: number;
 }
 
 export default function Dashboard() {
@@ -97,28 +100,94 @@ export default function Dashboard() {
         <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-48 h-48 bg-primary/5 rounded-full blur-2xl" />
       </div>
 
+      {/* Attention Needed */}
+      {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0 || stats.drafts > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.overdueTasks > 0 && (
+            <Link href="/tasks">
+              <Card className="border-destructive/30 bg-destructive/5 hover:border-destructive/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-destructive">{stats.overdueTasks}</p>
+                    <p className="text-xs text-muted-foreground">Overdue tasks</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {stats.expiringLicenses > 0 && (
+            <Link href="/licenses">
+              <Card className="border-orange-300/50 bg-orange-50/50 hover:border-orange-400/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                    <FileKey className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-orange-700">{stats.expiringLicenses}</p>
+                    <p className="text-xs text-muted-foreground">Licenses expiring soon</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {stats.incompleteMeta > 0 && (
+            <Link href="/all-files">
+              <Card className="border-amber-300/50 bg-amber-50/50 hover:border-amber-400/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                    <FileWarning className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-700">{stats.incompleteMeta}</p>
+                    <p className="text-xs text-muted-foreground">Files need completion</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {stats.drafts > 0 && (
+            <Link href="/all-files">
+              <Card className="border-blue-300/50 bg-blue-50/50 hover:border-blue-400/50 transition-colors cursor-pointer">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <FilePen className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-700">{stats.drafts}</p>
+                    <p className="text-xs text-muted-foreground">Drafts</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard 
-          title="Total Metadata" 
-          value={stats?.totalFiles} 
-          loading={statsLoading} 
-          icon={FileText} 
+        <StatsCard
+          title="Total Metadata"
+          value={stats?.totalFiles}
+          loading={statsLoading}
+          icon={FileText}
           description="Files in database"
         />
-        <StatsCard 
-          title="Recent Activity" 
-          value={stats?.recentFiles} 
-          loading={statsLoading} 
-          icon={Clock} 
+        <StatsCard
+          title="Recent Activity"
+          value={stats?.recentFiles}
+          loading={statsLoading}
+          icon={Clock}
           description="Added in last 24h"
           highlight
         />
-        <StatsCard 
-          title="Active Series" 
-          value={stats?.totalSeries} 
-          loading={statsLoading} 
-          icon={Film} 
+        <StatsCard
+          title="Active Series"
+          value={stats?.totalSeries}
+          loading={statsLoading}
+          icon={Film}
           description="Unique series titles"
         />
       </div>

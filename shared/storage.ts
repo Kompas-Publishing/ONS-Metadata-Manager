@@ -80,7 +80,7 @@ export type IStorage = {
   deleteMetadataBySeries(seriesTitle: string, permissions: UserPermissions): Promise<number>;
   deleteMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<number>;
   createBatchMetadataFiles(batch: BatchCreate & { licenseIds?: string[] }, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
-  getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }>;
+  getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number; overdueTasks: number; expiringLicenses: number; incompleteMeta: number; drafts: number }>;
   getMetadataBySeriesTitle(seriesTitle: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   getMetadataBySeason(seriesTitle: string, season: number, permissions: UserPermissions): Promise<MetadataFileWithLicenses[]>;
   getAdjacentEpisodes(id: string, permissions: UserPermissions): Promise<{ prev: MetadataFileWithLicenses | null; next: MetadataFileWithLicenses | null }>;
@@ -983,9 +983,12 @@ export class DatabaseStorage {
     });
   }
 
-  async getStats(permissions: UserPermissions): Promise<{ totalFiles: number; recentFiles: number; totalSeries: number }> {
+  async getStats(permissions: UserPermissions): Promise<{
+    totalFiles: number; recentFiles: number; totalSeries: number;
+    overdueTasks: number; expiringLicenses: number; incompleteMeta: number; drafts: number;
+  }> {
     const visibility = getFileVisibilityConditions(permissions);
-    const whereConditions = [];
+    const whereConditions: any[] = [];
 
     if (visibility.type === "own") {
       whereConditions.push(eq(metadataFiles.createdBy, visibility.userId));
@@ -1017,10 +1020,55 @@ export class DatabaseStorage {
       .from(metadataFiles)
       .where(whereClause);
 
+    // Overdue tasks: pending or in_progress with deadline in the past
+    const overdueTasks = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(and(
+        sql`${tasks.status} != 'completed'`,
+        sql`${tasks.deadline} IS NOT NULL`,
+        sql`${tasks.deadline} < NOW()`
+      ));
+
+    // Licenses expiring within 30 days
+    const expiringLicenses = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(licenses)
+      .where(and(
+        sql`${licenses.licenseEnd} IS NOT NULL`,
+        sql`${licenses.licenseEnd} > NOW()`,
+        sql`${licenses.licenseEnd} < NOW() + INTERVAL '30 days'`
+      ));
+
+    // Files with incomplete metadata or subs status
+    const incompleteMeta = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(metadataFiles)
+      .where(and(
+        ...(whereConditions.length > 0 ? whereConditions : []),
+        or(
+          eq(metadataFiles.metadataTimesStatus, "Incomplete"),
+          eq(metadataFiles.subsStatus, "Incomplete")
+        )
+      ));
+
+    // Draft files
+    const drafts = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(metadataFiles)
+      .where(and(
+        ...(whereConditions.length > 0 ? whereConditions : []),
+        eq(metadataFiles.draft, 1)
+      ));
+
     return {
       totalFiles: totalFiles[0]?.count || 0,
       recentFiles: recentFiles[0]?.count || 0,
       totalSeries: uniqueSeries[0]?.count || 0,
+      overdueTasks: overdueTasks[0]?.count || 0,
+      expiringLicenses: expiringLicenses[0]?.count || 0,
+      incompleteMeta: incompleteMeta[0]?.count || 0,
+      drafts: drafts[0]?.count || 0,
     };
   }
 
