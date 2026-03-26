@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,21 +30,31 @@ import {
   LayoutDashboard,
   FilePlus,
   Layers,
-    List,
-    FileText,
-    LogOut,
-    Shield,
-    FileKey,
-    CheckSquare,
-    Sparkles,
-    Settings,
-    User,
-    Camera,
-    Key,
-    Save,
-    Loader2,
-    Upload,
-  } from "lucide-react";
+  List,
+  FileText,
+  LogOut,
+  Shield,
+  FileKey,
+  CheckSquare,
+  Sparkles,
+  Settings,
+  User,
+  Camera,
+  Key,
+  Save,
+  Loader2,
+  Upload,
+  Search,
+  Film,
+} from "lucide-react";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { upload } from "@vercel/blob/client";
   
   const menuGroups = [
@@ -217,6 +227,41 @@ export function AppSidebar() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Global search
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ metadata: any[]; licenses: any[]; series: any[] }>({ metadata: [], licenses: [], series: [] });
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen(open => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (value.trim().length < 2) {
+      setSearchResults({ metadata: [], licenses: [], series: [] });
+      return;
+    }
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) setSearchResults(await res.json());
+      } catch { /* ignore */ }
+    }, 300);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
   };
@@ -310,6 +355,60 @@ export function AppSidebar() {
           <h2 className="text-xl font-bold tracking-tight text-primary">ONS Portal</h2>
           <p className="text-xs text-muted-foreground mt-1 font-medium">Broadcast Management System</p>
         </div>
+
+        <div className="px-3 mb-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start text-muted-foreground text-sm h-9 gap-2"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="w-4 h-4" />
+            Search...
+            <kbd className="ml-auto pointer-events-none text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K</kbd>
+          </Button>
+        </div>
+
+        <CommandDialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <CommandInput placeholder="Search metadata, licenses, series..." value={searchQuery} onValueChange={handleSearchChange} />
+          <CommandList>
+            <CommandEmpty>No results found.</CommandEmpty>
+            {searchResults.metadata.length > 0 && (
+              <CommandGroup heading="Metadata">
+                {searchResults.metadata.map((f: any) => (
+                  <CommandItem key={f.id} onSelect={() => { setSearchOpen(false); setLocation(`/view/${f.id}`); }}>
+                    <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium">{f.title}</span>
+                      {f.season && <span className="text-muted-foreground text-xs ml-2">S{f.season}E{f.episode}</span>}
+                    </div>
+                    <span className="text-[10px] font-mono text-muted-foreground">{f.id}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {searchResults.licenses.length > 0 && (
+              <CommandGroup heading="Licenses">
+                {searchResults.licenses.map((l: any) => (
+                  <CommandItem key={l.id} onSelect={() => { setSearchOpen(false); setLocation(`/licenses/${l.id}`); }}>
+                    <FileKey className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <span className="font-medium">{l.name}</span>
+                    {l.distributor && <span className="text-muted-foreground text-xs ml-2">{l.distributor}</span>}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {searchResults.series.length > 0 && (
+              <CommandGroup heading="Series">
+                {searchResults.series.map((s: any) => (
+                  <CommandItem key={s.id} onSelect={() => { setSearchOpen(false); setLocation(`/browse/${encodeURIComponent(s.title)}`); }}>
+                    <Film className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <span className="font-medium">{s.title}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </CommandDialog>
         
         {filteredGroups.map((group) => (
           <SidebarGroup key={group.label}>

@@ -1291,6 +1291,59 @@ export class DatabaseStorage {
     }));
   }
 
+  async globalSearch(query: string, permissions: UserPermissions): Promise<{
+    metadata: MetadataFileWithLicenses[];
+    licenses: License[];
+    series: Series[];
+  }> {
+    const trimmed = query.trim();
+    if (!trimmed) return { metadata: [], licenses: [], series: [] };
+
+    const pattern = `%${escapeLike(trimmed)}%`;
+    const visibility = getFileVisibilityConditions(permissions);
+    const metaWhere: any[] = [
+      or(
+        sql`LOWER(${metadataFiles.title}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`LOWER(${metadataFiles.episodeTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+        sql`${metadataFiles.id} LIKE ${pattern} ESCAPE '\\'`
+      )
+    ];
+    if (visibility.type === "own") {
+      metaWhere.push(eq(metadataFiles.createdBy, visibility.userId));
+    } else if (visibility.type === "group") {
+      if (visibility.groupIds && visibility.groupIds.length > 0) {
+        metaWhere.push(inArray(metadataFiles.groupId, visibility.groupIds));
+      } else {
+        metaWhere.push(sql`1 = 0`);
+      }
+    }
+
+    const [metadataResults, licenseResults, seriesResults] = await Promise.all([
+      db.select().from(metadataFiles)
+        .where(and(...metaWhere))
+        .orderBy(desc(metadataFiles.createdAt))
+        .limit(5),
+      db.select().from(licenses)
+        .where(or(
+          sql`LOWER(${licenses.name}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.distributor}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+          sql`LOWER(${licenses.contentTitle}) LIKE LOWER(${pattern}) ESCAPE '\\'`
+        ))
+        .orderBy(desc(licenses.createdAt))
+        .limit(5),
+      db.select().from(seriesTable)
+        .where(sql`LOWER(${seriesTable.title}) LIKE LOWER(${pattern}) ESCAPE '\\'`)
+        .orderBy(desc(seriesTable.createdAt))
+        .limit(5),
+    ]);
+
+    return {
+      metadata: metadataResults.map(f => normalizeMetadataFile(f)),
+      licenses: licenseResults,
+      series: seriesResults,
+    };
+  }
+
   async listAllUsers(): Promise<User[]> {
     return await db
       .select()
