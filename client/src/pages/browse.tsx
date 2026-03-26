@@ -72,6 +72,9 @@ export default function Browse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"newest" | "name" | "category" | "seasons" | "episodes">("newest");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [completionFilter, setCompletionFilter] = useState<string>("all");
   const [, setLocation] = useLocation();
   const [, routeParams] = useRoute("/browse/:title");
   const selectedSeries = routeParams?.title ? decodeURIComponent(routeParams.title) : null;
@@ -308,30 +311,32 @@ export default function Browse() {
     return groups;
   }, [files]);
 
+  const availableCategories = useMemo(() => {
+    const cats = new Set(Object.values(seriesGroups).map(s => s.category).filter(c => c && c !== "Unknown"));
+    return Array.from(cats).sort();
+  }, [seriesGroups]);
+
   const filteredSeries = useMemo(() => {
     return Object.values(seriesGroups)
-      .filter((series) =>
-        series.title.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      .filter((series) => {
+        if (!series.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        if (categoryFilter !== "all" && series.category !== categoryFilter) return false;
+        const allEpisodes = Object.values(series.seasons).flat();
+        if (statusFilter === "draft" && !allEpisodes.some(f => f.draft === 1)) return false;
+        if (statusFilter === "published" && allEpisodes.every(f => f.draft === 1)) return false;
+        if (completionFilter === "incomplete" && !allEpisodes.some(f => f.subsStatus === "Incomplete" || f.metadataTimesStatus === "Incomplete")) return false;
+        if (completionFilter === "complete" && allEpisodes.some(f => f.subsStatus === "Incomplete" || f.metadataTimesStatus === "Incomplete")) return false;
+        return true;
+      })
       .sort((a, b) => {
-        if (sortBy === "newest") {
-          return b.lastAddedAt.getTime() - a.lastAddedAt.getTime();
-        }
-        if (sortBy === "name") {
-          return a.title.localeCompare(b.title);
-        }
-        if (sortBy === "category") {
-          return a.category.localeCompare(b.category);
-        }
-        if (sortBy === "seasons") {
-          return b.seasonCount - a.seasonCount;
-        }
-        if (sortBy === "episodes") {
-          return b.episodeCount - a.episodeCount;
-        }
+        if (sortBy === "newest") return b.lastAddedAt.getTime() - a.lastAddedAt.getTime();
+        if (sortBy === "name") return a.title.localeCompare(b.title);
+        if (sortBy === "category") return a.category.localeCompare(b.category);
+        if (sortBy === "seasons") return b.seasonCount - a.seasonCount;
+        if (sortBy === "episodes") return b.episodeCount - a.episodeCount;
         return 0;
       });
-  }, [seriesGroups, searchQuery, sortBy]);
+  }, [seriesGroups, searchQuery, sortBy, categoryFilter, statusFilter, completionFilter]);
 
   const selectedSeriesData = selectedSeries ? seriesGroups[selectedSeries] : null;
 
@@ -411,6 +416,47 @@ export default function Browse() {
           </div>
         )}
       </div>
+
+      {!selectedSeries && (
+        <div className="flex flex-wrap gap-2">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {availableCategories.map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Has Drafts</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={completionFilter} onValueChange={setCompletionFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Completion" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="complete">Complete</SelectItem>
+              <SelectItem value="incomplete">Incomplete</SelectItem>
+            </SelectContent>
+          </Select>
+          {(categoryFilter !== "all" || statusFilter !== "all" || completionFilter !== "all") && (
+            <Button variant="ghost" size="sm" onClick={() => { setCategoryFilter("all"); setStatusFilter("all"); setCompletionFilter("all"); }}>
+              <X className="w-3 h-3 mr-1" /> Clear filters
+            </Button>
+          )}
+        </div>
+      )}
 
       {!selectedSeries ? (
         <div>
