@@ -24,7 +24,7 @@ export default apiHandler(
       }
 
       const [licenses, tasks] = await Promise.all([
-        storage.getSeriesLicenses(item.id),
+        storage.getSeriesLicensesFromEpisodes(item.id),
         storage.getSeriesTasks(item.id, req.userPermissions!)
       ]);
 

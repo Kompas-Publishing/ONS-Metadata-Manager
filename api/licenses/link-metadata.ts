@@ -11,17 +11,23 @@ export default apiHandler(
     try {
       const { licenseId, metadataIds } = req.body;
 
-      if (licenseId === undefined || !metadataIds || !Array.isArray(metadataIds)) {
-        return res.status(400).json({ message: "licenseId and metadataIds array are required" });
+      if (!metadataIds || !Array.isArray(metadataIds) || metadataIds.length === 0) {
+        return res.status(400).json({ message: "metadataIds array is required" });
       }
 
-      // Update all selected metadata files to point to this license
-      const count = await storage.bulkUpdateMetadata(
-        metadataIds.map((id: string) => ({ id, data: { licenseId } })),
-        req.userPermissions!
-      );
-
-      res.json({ message: "Metadata linked to license successfully", count });
+      if (licenseId) {
+        // Link: insert into metadataToLicenses join table
+        const count = await storage.linkMetadataToLicense(licenseId, metadataIds);
+        res.json({ message: "Metadata linked to license successfully", count });
+      } else {
+        // Unlink requires knowing which license to remove — use licenseIdToRemove
+        const { licenseIdToRemove } = req.body;
+        if (!licenseIdToRemove) {
+          return res.status(400).json({ message: "licenseIdToRemove is required when unlinking" });
+        }
+        const count = await storage.unlinkMetadataFromLicense(licenseIdToRemove, metadataIds);
+        res.json({ message: "Metadata unlinked from license successfully", count });
+      }
     } catch (error) {
       console.error("Error linking metadata to license:", error);
       res.status(500).json({ message: "Failed to link metadata" });

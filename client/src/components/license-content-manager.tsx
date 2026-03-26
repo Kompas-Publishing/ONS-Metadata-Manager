@@ -107,8 +107,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
 
   const unlinkMutation = useMutation({
     mutationFn: async (metadataIds: string[]) => {
-      // We use the same link endpoint but with null licenseId
-      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseId: null, metadataIds });
+      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseIdToRemove: licenseId, metadataIds });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Content unlinked from license." });

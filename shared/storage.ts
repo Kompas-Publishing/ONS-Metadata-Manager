@@ -3,6 +3,23 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+// Compact sorted season numbers into range string: [1,2,3,5,7,8] => "1-3, 5, 7-8"
+function compactSeasonRange(seasons: number[]): string {
+  if (seasons.length === 0) return "";
+  const ranges: string[] = [];
+  let start = seasons[0], end = seasons[0];
+  for (let i = 1; i < seasons.length; i++) {
+    if (seasons[i] === end + 1) {
+      end = seasons[i];
+    } else {
+      ranges.push(start === end ? `${start}` : `${start}-${end}`);
+      start = end = seasons[i];
+    }
+  }
+  ranges.push(start === end ? `${start}` : `${start}-${end}`);
+  return ranges.join(", ");
+}
+
 import {
   users,
   metadataFiles,
@@ -109,6 +126,9 @@ export type IStorage = {
   updateLicense(id: string, license: Partial<InsertLicense>): Promise<License | undefined>;
   deleteLicense(id: string): Promise<boolean>;
   generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFileWithLicenses[]>;
+  linkMetadataToLicense(licenseId: string, metadataIds: string[]): Promise<number>;
+  unlinkMetadataFromLicense(licenseId: string, metadataIds: string[]): Promise<number>;
+  getSeriesLicensesFromEpisodes(seriesId: string): Promise<(License & { seasonRange: string | null })[]>;
 
   // Task Management
   createTask(task: InsertTask & { createdBy: string }): Promise<Task>;
@@ -159,17 +179,11 @@ function normalizeMetadataFile(file: MetadataFile, linkedLicenseIds: string[] = 
   const breakTimes = file.breakTimes || (file.breakTime ? [file.breakTime] : []);
   const breakTime = breakTimes.length > 0 ? breakTimes[0] : file.breakTime;
 
-  // Combine legacy licenseId with many-to-many licenseIds
-  const licenseIds = [...linkedLicenseIds];
-  if (file.licenseId && !licenseIds.includes(file.licenseId)) {
-    licenseIds.push(file.licenseId);
-  }
-
   return {
     ...file,
     breakTime,
     breakTimes,
-    licenseIds,
+    licenseIds: [...linkedLicenseIds],
   };
 }
 
@@ -360,11 +374,10 @@ export class DatabaseStorage {
     }
 
     if (licenseId) {
-      // Find files linked to this license either via legacy or join table
-      whereConditions.push(or(
-        eq(metadataFiles.licenseId, licenseId),
+      // Find files linked to this license via the join table
+      whereConditions.push(
         sql`${metadataFiles.id} IN (SELECT metadata_file_id FROM metadata_to_licenses WHERE license_id = ${licenseId})`
-      ));
+      );
     }
 
     const results = await db
@@ -1617,6 +1630,72 @@ export class DatabaseStorage {
       ...r.license,
       seasonRange: r.seasonRange,
     }));
+  }
+
+  async getSeriesLicensesFromEpisodes(seriesId: string): Promise<(License & { seasonRange: string | null })[]> {
+    // Derive licenses from episode-level links (metadataToLicenses join table)
+    const results = await db
+      .select({
+        license: licenses,
+        season: metadataFiles.season,
+      })
+      .from(metadataToLicenses)
+      .innerJoin(metadataFiles, eq(metadataToLicenses.metadataFileId, metadataFiles.id))
+      .innerJoin(licenses, eq(metadataToLicenses.licenseId, licenses.id))
+      .where(eq(metadataFiles.seriesId, seriesId));
+
+    // Group by license and compute season ranges
+    const licenseMap = new Map<string, { license: License; seasons: Set<number> }>();
+    for (const r of results) {
+      if (!licenseMap.has(r.license.id)) {
+        licenseMap.set(r.license.id, { license: r.license, seasons: new Set() });
+      }
+      if (r.season != null) {
+        licenseMap.get(r.license.id)!.seasons.add(r.season);
+      }
+    }
+
+    // Also include any manually linked series-level licenses (seriesToLicenses)
+    const manualLinks = await this.getSeriesLicenses(seriesId);
+    for (const ml of manualLinks) {
+      if (!licenseMap.has(ml.id)) {
+        licenseMap.set(ml.id, { license: ml, seasons: new Set() });
+      }
+    }
+
+    return Array.from(licenseMap.values()).map(({ license, seasons }) => {
+      const sortedSeasons = Array.from(seasons).sort((a, b) => a - b);
+      const seasonRange = sortedSeasons.length > 0 ? compactSeasonRange(sortedSeasons) : null;
+      return { ...license, seasonRange };
+    });
+  }
+
+  async linkMetadataToLicense(licenseId: string, metadataIds: string[]): Promise<number> {
+    if (metadataIds.length === 0) return 0;
+    const values = metadataIds.map(id => ({ metadataFileId: id, licenseId }));
+    await db.insert(metadataToLicenses).values(values).onConflictDoNothing();
+
+    // Auto-sync: update seriesToLicenses for any series these files belong to
+    const files = await db.select({ seriesId: metadataFiles.seriesId })
+      .from(metadataFiles)
+      .where(inArray(metadataFiles.id, metadataIds));
+    const seriesIds = Array.from(new Set(files.map(f => f.seriesId).filter(Boolean))) as string[];
+    for (const sid of seriesIds) {
+      await this.linkSeriesToLicense(sid, licenseId);
+    }
+
+    return metadataIds.length;
+  }
+
+  async unlinkMetadataFromLicense(licenseId: string, metadataIds: string[]): Promise<number> {
+    if (metadataIds.length === 0) return 0;
+    await db.delete(metadataToLicenses).where(
+      and(
+        eq(metadataToLicenses.licenseId, licenseId),
+        inArray(metadataToLicenses.metadataFileId, metadataIds)
+      )
+    );
+    return metadataIds.length;
   }
 
   async getSeriesTasks(seriesId: string, permissions: UserPermissions): Promise<(Task & { metadataFile: MetadataFileWithLicenses })[]> {
