@@ -1063,9 +1063,21 @@ export default function Browse() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { subsStatus: "Incomplete" } });
+                              }}>
+                                Subs: Incomplete
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
                                 bulkEditMutation.mutate({ ids, data: { metadataTimesStatus: "Complete" } });
                               }}>
                                 Metadata: Complete
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const ids = episodes.map(e => e.id);
+                                bulkEditMutation.mutate({ ids, data: { metadataTimesStatus: "Incomplete" } });
+                              }}>
+                                Metadata: Incomplete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

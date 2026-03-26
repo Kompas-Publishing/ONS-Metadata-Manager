@@ -79,6 +79,10 @@ export function requireAuth(handler: ApiHandler): ApiHandler {
       return res.status(423).json({ message: "Account is not active. Please contact an administrator." });
     }
 
+    // Populate permissions so downstream handlers can use them
+    const permissions = await getUserPermissions(user.id);
+    req.userPermissions = permissions || undefined;
+
     return handler(req, res);
   };
 }

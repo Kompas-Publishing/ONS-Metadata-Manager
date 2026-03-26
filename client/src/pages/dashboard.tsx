@@ -78,7 +78,7 @@ export default function Dashboard() {
             {getGreeting()}, {user?.firstName || 'User'}!
           </h1>
           <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
-            Welcome back here's what's going on across your metadata and licenses today.
+            Welcome back, here's what's going on across your metadata and licenses today.
           </p>
           <div className="flex gap-3 mt-6">
             {canWriteMetadata && (
@@ -289,18 +289,36 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {tasks && tasks.length > 0 ? (
-                <div className="space-y-4">
-                  {tasks.slice(0, 4).map((task) => (
-                    <div key={task.id} className="flex gap-3">
-                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground line-clamp-2">{task.description}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase font-semibold">
-                          File: {task.metadataFile?.title}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {tasks.slice(0, 5).map((task) => {
+                    const isOverdue = task.deadline && new Date(task.deadline) < new Date();
+                    return (
+                      <Link key={task.id} href={`/view/${task.metadataFileId}`}>
+                        <div className={cn(
+                          "p-3 rounded-lg border transition-colors hover:border-primary/30 cursor-pointer",
+                          isOverdue ? "border-destructive/20 bg-destructive/5" : "border-transparent bg-muted/30"
+                        )}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium">{task.description}</span>
+                            {(task as any).priority === "high" && (
+                              <Badge variant="outline" className="text-[9px] h-4 border-orange-400 text-orange-600">high</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                            <span className="font-semibold uppercase">{task.metadataFile?.title}</span>
+                            {task.metadataFile?.season && (
+                              <span>S{task.metadataFile.season}E{task.metadataFile.episode}</span>
+                            )}
+                            {task.deadline && (
+                              <span className={cn("ml-auto", isOverdue && "text-destructive font-bold")}>
+                                {isOverdue ? "Overdue" : `Due ${format(new Date(task.deadline), "dd MMM")}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                   <Link href="/tasks">
                     <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
                       View all {tasks.length} tasks
@@ -329,21 +347,40 @@ export default function Dashboard() {
             <CardContent>
               {licenses && licenses.length > 0 ? (
                 <div className="space-y-3">
-                  {licenses.slice(0, 3).map((license) => (
-                    <div key={license.id} className="p-3 bg-muted/30 rounded-lg border border-transparent hover:border-blue-200 transition-colors">
-                      <p className="text-sm font-semibold truncate">{license.name}</p>
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                          {license.distributor}
-                        </span>
-                        {license.licenseEnd && (
-                          <span className="text-[10px] text-muted-foreground italic">
-                            Ends {format(new Date(license.licenseEnd), "MMM yyyy")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  {licenses.slice(0, 4).map((license) => {
+                    const endDate = license.licenseEnd ? new Date(license.licenseEnd) : null;
+                    const now = new Date();
+                    const thirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                    const isExpiring = endDate && endDate > now && endDate < thirtyDays;
+                    const isExpired = endDate && endDate < now;
+                    return (
+                      <Link key={license.id} href={`/licenses/${license.id}`}>
+                        <div className={cn(
+                          "p-3 rounded-lg border transition-colors cursor-pointer hover:border-primary/30",
+                          isExpired ? "border-destructive/20 bg-destructive/5" :
+                          isExpiring ? "border-orange-200 bg-orange-50/50" :
+                          "border-transparent bg-muted/30"
+                        )}>
+                          <p className="text-sm font-semibold truncate">{license.name}</p>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                              {license.distributor}
+                            </span>
+                            {endDate && (
+                              <span className={cn(
+                                "text-[10px]",
+                                isExpired ? "text-destructive font-bold" :
+                                isExpiring ? "text-orange-600 font-semibold" :
+                                "text-muted-foreground"
+                              )}>
+                                {isExpired ? "Expired" : `Ends ${format(endDate, "dd MMM yyyy")}`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                   <Link href="/licenses">
                     <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
                       Open License Manager

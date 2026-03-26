@@ -94,17 +94,25 @@ export default function Tasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [descFilter, setDescFilter] = useState<string>("all");
-  
+
   // Dialog state
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeAddTab, setActiveAddTab] = useState<"existing" | "new">("existing");
   const [selectedExistingIds, setSelectedExistingIds] = useState<string[]>([]);
   const [taskDescription, setTaskDescription] = useState("");
   const [taskDeadline, setTaskDeadline] = useState<Date | undefined>(undefined);
+  const [taskPriority, setTaskPriority] = useState<string>("medium");
+  const [taskAssignee, setTaskAssignee] = useState<string>("");
 
   const { data: tasks, isLoading } = useQuery<TaskWithFile[]>({
     queryKey: ["/api/tasks"],
     enabled: canReadTasks || canWriteTasks,
+  });
+
+  // Fetch users for assignee dropdown
+  const { data: usersData } = useQuery<{ users: { id: string; email: string; firstName: string | null; lastName: string | null }[] }>({
+    queryKey: ["/api/admin/users"],
+    enabled: canWriteTasks,
   });
 
   // Grouping logic
@@ -221,7 +229,7 @@ export default function Tasks() {
   });
 
   const bulkAddMutation = useMutation({
-    mutationFn: async (data: { metadataFileIds: string[], description: string, deadline?: Date }) => {
+    mutationFn: async (data: { metadataFileIds: string[]; description: string; deadline?: Date; priority?: string; assignedTo?: string }) => {
       await apiRequest("POST", "/api/tasks/bulk", data);
     },
     onSuccess: () => {
@@ -230,6 +238,8 @@ export default function Tasks() {
       setSelectedExistingIds([]);
       setTaskDescription("");
       setTaskDeadline(undefined);
+      setTaskPriority("medium");
+      setTaskAssignee("");
       toast({ title: "Success", description: "Tasks assigned successfully." });
     },
   });
@@ -260,7 +270,9 @@ export default function Tasks() {
       bulkAddMutation.mutate({
         metadataFileIds: selectedExistingIds,
         description: taskDescription,
-        deadline: taskDeadline
+        deadline: taskDeadline,
+        priority: taskPriority,
+        assignedTo: taskAssignee && taskAssignee !== "unassigned" ? taskAssignee : undefined,
       });
     } else {
       batchForm.handleSubmit((data) => {
@@ -359,6 +371,37 @@ export default function Tasks() {
                           />
                         </PopoverContent>
                       </Popover>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Priority</Label>
+                      <Select value={taskPriority} onValueChange={setTaskPriority}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Assign To (Optional)</Label>
+                      <Select value={taskAssignee} onValueChange={setTaskAssignee}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {usersData?.users?.filter(u => u.firstName || u.lastName || u.email).map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="flex-1 overflow-hidden">
@@ -650,6 +693,14 @@ export default function Tasks() {
                                           {task.metadataFile.episodeTitle && (
                                             <span className="italic">"{task.metadataFile.episodeTitle}"</span>
                                           )}
+                                          {(task as any).assignedTo && usersData?.users && (() => {
+                                            const assignee = usersData.users.find(u => u.id === (task as any).assignedTo);
+                                            return assignee ? (
+                                              <span className="text-primary font-medium">
+                                                {assignee.firstName || assignee.email}
+                                              </span>
+                                            ) : null;
+                                          })()}
                                         </div>
                                       </div>
                                     </div>
