@@ -6,9 +6,14 @@ import { z } from "zod";
 const bulkEditSchema = z.object({
   ids: z.array(z.string()).min(1).max(500),
   data: z.object({
+    title: z.string().optional(),
     draft: z.number().min(0).max(1).optional(),
     subsStatus: z.string().optional(),
     metadataTimesStatus: z.string().optional(),
+    category: z.string().optional(),
+    seasonType: z.string().optional(),
+    contentType: z.string().optional(),
+    channel: z.string().optional(),
     licenseIds: z.array(z.string()).optional(),
   }),
 });

@@ -27,17 +27,6 @@ import { TimeInput } from "@/components/time-input";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 
-function parseFormattedId(formattedId: string): number {
-  return parseInt(formattedId.replace(/-/g, ''), 10);
-}
-
-function formatMetadataId(num: number): string {
-  const segment3 = String(num % 1000).padStart(3, '0');
-  const segment2 = String(Math.floor(num / 1000) % 1000).padStart(3, '0');
-  const segment1 = String(Math.floor(num / 1000000) % 1000).padStart(3, '0');
-  return `${segment1}-${segment2}-${segment3}`;
-}
-
 export default function BatchCreate() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -49,11 +38,6 @@ export default function BatchCreate() {
   useEffect(() => {
     document.title = "Batch Create | ONS Broadcast Portal";
   }, []);
-
-  const { data: nextId } = useQuery<string>({
-    queryKey: ["/api/metadata/next-id"],
-    enabled: canWriteMetadata,
-  });
 
   const form = useForm<EnhancedBatchCreate>({
     resolver: zodResolver(enhancedBatchCreateSchema),
@@ -744,7 +728,7 @@ export default function BatchCreate() {
               </div>
             </div>
 
-            {nextId && totalEpisodes > 0 && (
+            {totalEpisodes > 0 && (
               <Card className="p-6 bg-muted/50">
                 <h3 className="text-sm font-medium mb-4">Batch Preview</h3>
                 <div className="space-y-3 text-sm">
@@ -753,8 +737,8 @@ export default function BatchCreate() {
                     <span className="font-medium">{totalEpisodes} files</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">ID range: </span>
-                    <span className="font-mono font-medium">{nextId} - {formatMetadataId(parseFormattedId(nextId) + totalEpisodes - 1)}</span>
+                    <span className="text-muted-foreground">IDs: </span>
+                    <span className="font-mono font-medium text-muted-foreground">Auto-generated</span>
                   </div>
                   
                   {form.watch("title") && (

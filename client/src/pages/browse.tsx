@@ -15,6 +15,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile, SeriesItem, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { computeMetadataStatus, STATUS_CONFIG } from "@/lib/metadata-status";
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -44,12 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -89,6 +84,11 @@ export default function Browse() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [completionFilter, setCompletionFilter] = useState<string>("all");
+
+  // Quick Edit Dialog state
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+  const [quickEditIds, setQuickEditIds] = useState<string[]>([]);
+  const [quickEditValues, setQuickEditValues] = useState({ title: "", subsStatus: "", category: "", seasonType: "", contentType: "" });
   const [, setLocation] = useLocation();
   const [, routeParams] = useRoute("/browse/:title");
   const selectedSeries = routeParams?.title ? decodeURIComponent(routeParams.title) : null;
@@ -371,8 +371,8 @@ export default function Browse() {
         const allEpisodes = Object.values(series.seasons).flat();
         if (statusFilter === "draft" && !allEpisodes.some(f => f.draft === 1)) return false;
         if (statusFilter === "published" && allEpisodes.every(f => f.draft === 1)) return false;
-        if (completionFilter === "incomplete" && !allEpisodes.some(f => f.subsStatus === "Incomplete" || f.metadataTimesStatus === "Incomplete")) return false;
-        if (completionFilter === "complete" && allEpisodes.some(f => f.subsStatus === "Incomplete" || f.metadataTimesStatus === "Incomplete")) return false;
+        if (completionFilter === "incomplete" && !allEpisodes.some(f => computeMetadataStatus(f) !== "green")) return false;
+        if (completionFilter === "complete" && allEpisodes.some(f => computeMetadataStatus(f) !== "green")) return false;
         return true;
       })
       .sort((a, b) => {
@@ -1036,51 +1036,25 @@ export default function Browse() {
                               Batch Editor
                             </Link>
                           </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm" className="gap-2 h-8">
-                                Quick Edit
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { draft: 0 } });
-                              }}>
-                                Mark all as Published
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { draft: 1 } });
-                              }}>
-                                Mark all as Draft
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { subsStatus: "Complete" } });
-                              }}>
-                                Subs: Complete
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { subsStatus: "Incomplete" } });
-                              }}>
-                                Subs: Incomplete
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { metadataTimesStatus: "Complete" } });
-                              }}>
-                                Metadata: Complete
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                const ids = episodes.map(e => e.id);
-                                bulkEditMutation.mutate({ ids, data: { metadataTimesStatus: "Incomplete" } });
-                              }}>
-                                Metadata: Incomplete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 h-8"
+                            onClick={() => {
+                              const first = episodes[0];
+                              setQuickEditIds(episodes.map(e => e.id));
+                              setQuickEditValues({
+                                title: first?.title || "",
+                                subsStatus: first?.subsStatus || "Incomplete",
+                                category: first?.category || "",
+                                seasonType: first?.seasonType || "",
+                                contentType: first?.contentType || "",
+                              });
+                              setQuickEditOpen(true);
+                            }}
+                          >
+                            Quick Edit
+                          </Button>
                         </>
                       )}
                       <Button
@@ -1315,6 +1289,97 @@ export default function Browse() {
             ))}
         </div>
       )}
+
+      {/* Quick Edit Dialog */}
+      <Dialog open={quickEditOpen} onOpenChange={setQuickEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick Edit — {quickEditIds.length} Episodes</DialogTitle>
+            <DialogDescription>
+              Changes apply to all episodes in this season.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Series Title</label>
+              <Input
+                value={quickEditValues.title}
+                onChange={(e) => setQuickEditValues(v => ({ ...v, title: e.target.value }))}
+                placeholder="Series title..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Subs Status</label>
+                <Select value={quickEditValues.subsStatus} onValueChange={(v) => setQuickEditValues(prev => ({ ...prev, subsStatus: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Incomplete">Incomplete</SelectItem>
+                    <SelectItem value="Complete">Complete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Select value={quickEditValues.category} onValueChange={(v) => setQuickEditValues(prev => ({ ...prev, category: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Series">Series</SelectItem>
+                    <SelectItem value="Movie">Movie</SelectItem>
+                    <SelectItem value="Documentary">Documentary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Season Type</label>
+                <Select value={quickEditValues.seasonType} onValueChange={(v) => setQuickEditValues(prev => ({ ...prev, seasonType: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Winter">Winter</SelectItem>
+                    <SelectItem value="Summer">Summer</SelectItem>
+                    <SelectItem value="Autumn">Autumn</SelectItem>
+                    <SelectItem value="Spring">Spring</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Content Type</label>
+                <Select value={quickEditValues.contentType} onValueChange={(v) => setQuickEditValues(prev => ({ ...prev, contentType: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Long Form">Long Form</SelectItem>
+                    <SelectItem value="Short Form">Short Form</SelectItem>
+                    <SelectItem value="program">Program</SelectItem>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                    <SelectItem value="Promo">Promo</SelectItem>
+                    <SelectItem value="Filler">Filler</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickEditOpen(false)}>Cancel</Button>
+            <Button
+              disabled={bulkEditMutation.isPending}
+              onClick={() => {
+                const data: Record<string, string | number> = {};
+                if (quickEditValues.title) data.title = quickEditValues.title;
+                if (quickEditValues.subsStatus) data.subsStatus = quickEditValues.subsStatus;
+                if (quickEditValues.category) data.category = quickEditValues.category;
+                if (quickEditValues.seasonType) data.seasonType = quickEditValues.seasonType;
+                if (quickEditValues.contentType) data.contentType = quickEditValues.contentType;
+                bulkEditMutation.mutate({ ids: quickEditIds, data }, {
+                  onSuccess: () => setQuickEditOpen(false),
+                });
+              }}
+            >
+              {bulkEditMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Apply to {quickEditIds.length} Episodes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* XLSX Import Preview Dialog */}
       <Dialog open={!!importPreview} onOpenChange={(open) => { if (!open) setImportPreview(null); }}>

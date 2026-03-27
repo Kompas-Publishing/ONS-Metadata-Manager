@@ -19,11 +19,6 @@ export default function CreateFile() {
     document.title = "Create Metadata | ONS Broadcast Portal";
   }, []);
 
-  const { data: nextId } = useQuery<string>({
-    queryKey: ["/api/metadata/next-id"],
-    enabled: canWriteMetadata,
-  });
-
   const createMutation = useMutation({
     mutationFn: async (data: InsertMetadataFile) => {
       return await apiRequest("POST", "/api/metadata", data);
@@ -83,7 +78,7 @@ export default function CreateFile() {
           onSaveDraft={handleSaveDraft}
           isPending={createMutation.isPending}
           submitLabel="Create File"
-          generatedId={nextId}
+          generatedId="Auto-generated"
         />
       </Card>
     </div>

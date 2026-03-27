@@ -223,63 +223,28 @@ export class DatabaseStorage {
   }
 
   async peekNextId(): Promise<string> {
-    const [setting] = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, "next_id"));
-
-    let nextId = 77362;
-    if (setting) {
-      nextId = parseInt(setting.value);
-    } else {
-      await db.insert(settings).values({
-        key: "next_id",
-        value: nextId.toString(),
-      });
-    }
-
-    return formatMetadataId(nextId);
+    // IDs are randomly generated — return a preview candidate
+    return this.consumeNextId();
   }
 
   async consumeNextId(): Promise<string> {
-    // Atomically increment and return the consumed ID in a single UPDATE … RETURNING,
-    // which is race-condition-free under any isolation level.
-    const result = await db
-      .update(settings)
-      .set({
-        value: sql`(CAST(${settings.value} AS INTEGER) + 1)::TEXT`,
-        updatedAt: new Date(),
-      })
-      .where(eq(settings.key, "next_id"))
-      .returning({ consumed: sql<number>`CAST(${settings.value} AS INTEGER) - 1` });
+    // Generate a random numeric ID and check for collisions
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const randomNum = Math.floor(Math.random() * 900000000) + 100000; // 100000 to 999999999
+      const candidateId = formatMetadataId(randomNum);
 
-    if (result.length > 0) {
-      return formatMetadataId(result[0].consumed);
+      const [existing] = await db
+        .select({ id: metadataFiles.id })
+        .from(metadataFiles)
+        .where(eq(metadataFiles.id, candidateId))
+        .limit(1);
+
+      if (!existing) {
+        return candidateId;
+      }
     }
-
-    // Row doesn't exist yet — initialise from the highest existing file ID.
-    let nextId = 77362;
-    const existingFiles = await db
-      .select({ id: metadataFiles.id })
-      .from(metadataFiles);
-
-    if (existingFiles.length > 0) {
-      const highestId = existingFiles
-        .map(f => parseMetadataId(f.id))
-        .reduce((max, current) => Math.max(max, current), 0);
-      nextId = Math.max(nextId, highestId + 1);
-    }
-
-    // INSERT … ON CONFLICT DO UPDATE ensures only one concurrent caller wins.
-    await db
-      .insert(settings)
-      .values({ key: "next_id", value: (nextId + 1).toString() })
-      .onConflictDoUpdate({
-        target: settings.key,
-        set: { value: (nextId + 1).toString(), updatedAt: new Date() },
-      });
-
-    return formatMetadataId(nextId);
+    throw new Error("Failed to generate unique ID after maximum attempts");
   }
 
   async getMetadataFile(id: string, permissions: UserPermissions): Promise<MetadataFileWithLicenses | undefined> {
@@ -784,32 +749,30 @@ export class DatabaseStorage {
 
   async createBatchMetadataFiles(batch: BatchCreate, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
+      // Collect existing IDs for collision avoidance within the batch
+      const existingRows = await tx.select({ id: metadataFiles.id }).from(metadataFiles);
+      const usedIds = new Set(existingRows.map(f => f.id));
 
-      let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
+      const generateUniqueId = (): string => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const candidate = formatMetadataId(Math.floor(Math.random() * 900000000) + 100000);
+          if (!usedIds.has(candidate)) {
+            usedIds.add(candidate);
+            return candidate;
+          }
+        }
+        throw new Error("Failed to generate unique ID");
+      };
 
-      // Normalize breakTimes array once for the batch - filter empty strings and trim
+      // Normalize breakTimes array once for the batch
       const normalizedBreakTimes = (batch.breakTimes || [])
         .filter(t => t && typeof t === 'string' && t.trim())
         .map(t => t.trim());
 
-      // Compute breakTime from normalized breakTimes, or use provided breakTime
       const normalizedBreakTime = normalizedBreakTimes.length > 0
         ? normalizedBreakTimes[0]
         : (batch.breakTime && batch.breakTime.trim() ? batch.breakTime.trim() : null);
 
-      // Ensure breakTimes is populated from breakTime if empty
       const finalBreakTimes = normalizedBreakTimes.length > 0
         ? normalizedBreakTimes
         : (normalizedBreakTime ? [normalizedBreakTime] : []);
@@ -817,7 +780,7 @@ export class DatabaseStorage {
       const files: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
       for (let i = 0; i < batch.episodeCount; i++) {
         const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
-          id: formatMetadataId(currentId),
+          id: generateUniqueId(),
           title: batch.title,
           season: batch.season,
           episode: batch.startEpisode + i,
@@ -852,16 +815,7 @@ export class DatabaseStorage {
         }
 
         files.push(fileData);
-        currentId++;
       }
-
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(files).returning();
 
@@ -882,20 +836,20 @@ export class DatabaseStorage {
 
   async createMultiBatchMetadataFiles(data: { batches: EnhancedBatchCreate[], taskDescription?: string }, permissions: UserPermissions): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
+      // Collect existing IDs for collision avoidance
+      const existingRows = await tx.select({ id: metadataFiles.id }).from(metadataFiles);
+      const usedIds = new Set(existingRows.map(f => f.id));
 
-      let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
+      const generateUniqueId = (): string => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const candidate = formatMetadataId(Math.floor(Math.random() * 900000000) + 100000);
+          if (!usedIds.has(candidate)) {
+            usedIds.add(candidate);
+            return candidate;
+          }
+        }
+        throw new Error("Failed to generate unique ID");
+      };
 
       const allFiles: (InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null })[] = [];
 
@@ -916,7 +870,7 @@ export class DatabaseStorage {
         for (const seasonConfig of batch.seasons) {
           for (let i = 0; i < seasonConfig.episodeCount; i++) {
             const fileData: InsertMetadataFile & { id: string; createdBy: string; groupId?: string | null } = {
-              id: formatMetadataId(currentId),
+              id: generateUniqueId(),
               title: batch.title,
               season: seasonConfig.season,
               episode: seasonConfig.startEpisode + i,
@@ -953,18 +907,9 @@ export class DatabaseStorage {
             }
 
             allFiles.push(fileData);
-            currentId++;
           }
         }
       }
-
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(allFiles).returning();
 
@@ -1522,20 +1467,19 @@ export class DatabaseStorage {
 
   async generateLicenseDrafts(data: LicenseBatchGenerate, userId: string): Promise<MetadataFile[]> {
     return await db.transaction(async (tx) => {
-      const [setting] = await tx
-        .select()
-        .from(settings)
-        .where(eq(settings.key, "next_id"));
+      const existingRows = await tx.select({ id: metadataFiles.id }).from(metadataFiles);
+      const usedIds = new Set(existingRows.map(f => f.id));
 
-      let currentId = 77362;
-      if (setting) {
-        currentId = parseInt(setting.value);
-      } else {
-        await tx.insert(settings).values({
-          key: "next_id",
-          value: currentId.toString(),
-        });
-      }
+      const generateUniqueId = (): string => {
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const candidate = formatMetadataId(Math.floor(Math.random() * 900000000) + 100000);
+          if (!usedIds.has(candidate)) {
+            usedIds.add(candidate);
+            return candidate;
+          }
+        }
+        throw new Error("Failed to generate unique ID");
+      };
 
       const files: any[] = [];
       const { licenseId, seriesTitle, seasonStart, seasonEnd, episodesPerSeason } = data;
@@ -1543,29 +1487,20 @@ export class DatabaseStorage {
       for (let season = seasonStart; season <= seasonEnd; season++) {
         for (let episode = 1; episode <= episodesPerSeason; episode++) {
           files.push({
-            id: formatMetadataId(currentId),
+            id: generateUniqueId(),
             title: seriesTitle,
             season: season,
             episode: episode,
             licenseId: licenseId,
             draft: 1,
             createdBy: userId,
-            duration: "00:00:00", // Default required field
-            contentType: "Long Form", // Default required
+            duration: "00:00:00",
+            contentType: "Long Form",
             breakTimes: [],
             tags: [],
           });
-          currentId++;
         }
       }
-
-      await tx
-        .update(settings)
-        .set({
-          value: currentId.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.key, "next_id"));
 
       const created = await tx.insert(metadataFiles).values(files).returning();
       return created;
