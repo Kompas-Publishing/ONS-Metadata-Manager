@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,10 +13,11 @@ import {
   FileKey,
   ArrowRight,
   Clock,
-  LayoutDashboard,
   AlertTriangle,
   FileWarning,
-  FilePen
+  FilePen,
+  CheckCircle2,
+  TrendingUp,
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -36,7 +37,7 @@ interface Stats {
 }
 
 export default function Dashboard() {
-  const { user, isAdmin, canWriteMetadata, canReadMetadata, canReadLicenses, canReadTasks } = useAuth();
+  const { user, canWriteMetadata, canReadMetadata, canReadLicenses, canReadTasks } = useAuth();
 
   useEffect(() => {
     document.title = "Dashboard | ONS Broadcast Portal";
@@ -69,284 +70,217 @@ export default function Dashboard() {
     return "Good evening";
   };
 
+  const hasAlerts = stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0 || stats.drafts > 0);
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Header & Greeting */}
-      <div className="relative overflow-hidden rounded-3xl bg-primary/5 border border-primary/10 p-8 md:p-12">
-        <div className="relative z-10">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-            {getGreeting()}, {user?.firstName || 'User'}!
+      {/* Compact header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {getGreeting()}, {user?.firstName || "User"}
           </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
-            Welcome back, here's what's going on across your metadata and licenses today.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Here's your broadcast operations overview.
           </p>
-          <div className="flex flex-wrap gap-3 mt-6">
-            {canWriteMetadata && (
-              <Link href="/create">
-                <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Metadata
-                </Button>
-              </Link>
-            )}
-            <Link href="/tasks">
-              <Button variant="outline" className="rounded-full px-6 bg-background">
-                View Tasks
+        </div>
+        <div className="flex gap-2">
+          {canWriteMetadata && (
+            <Link href="/create">
+              <Button size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Metadata
               </Button>
             </Link>
-          </div>
+          )}
         </div>
-        <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-48 h-48 bg-primary/5 rounded-full blur-2xl" />
       </div>
 
-      {/* Attention Needed */}
-      {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0 || stats.drafts > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.overdueTasks > 0 && (
-            <Link href="/tasks">
-              <Card className="border-destructive/30 bg-destructive/5 hover:border-destructive/50 transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-destructive" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-destructive">{stats.overdueTasks}</p>
-                    <p className="text-xs text-muted-foreground">Overdue tasks</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {stats.expiringLicenses > 0 && (
-            <Link href="/licenses">
-              <Card className="border-orange-300/50 bg-orange-50/50 hover:border-orange-400/50 transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                    <FileKey className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-orange-700">{stats.expiringLicenses}</p>
-                    <p className="text-xs text-muted-foreground">Licenses expiring soon</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {stats.incompleteMeta > 0 && (
-            <Link href="/all-files">
-              <Card className="border-amber-300/50 bg-amber-50/50 hover:border-amber-400/50 transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                    <FileWarning className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-amber-700">{stats.incompleteMeta}</p>
-                    <p className="text-xs text-muted-foreground">Files need completion</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {stats.drafts > 0 && (
-            <Link href="/all-files">
-              <Card className="border-blue-300/50 bg-blue-50/50 hover:border-blue-400/50 transition-colors cursor-pointer">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                    <FilePen className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-blue-700">{stats.drafts}</p>
-                    <p className="text-xs text-muted-foreground">Drafts</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-        </div>
-      )}
-
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard
-          title="Total Metadata"
-          value={stats?.totalFiles}
+      {/* Attention row — always visible */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <AlertCard
+          label="Overdue"
+          count={stats?.overdueTasks ?? 0}
           loading={statsLoading}
-          icon={FileText}
-          description="Files in database"
+          icon={AlertTriangle}
+          href="/tasks"
+          variant="red"
         />
-        <StatsCard
-          title="Recent Activity"
-          value={stats?.recentFiles}
+        <AlertCard
+          label="Expiring licenses"
+          count={stats?.expiringLicenses ?? 0}
           loading={statsLoading}
-          icon={Clock}
-          description="Added in last 24h"
-          highlight
+          icon={FileKey}
+          href="/licenses"
+          variant="orange"
         />
-        <StatsCard
-          title="Active Series"
-          value={stats?.totalSeries}
+        <AlertCard
+          label="Incomplete"
+          count={stats?.incompleteMeta ?? 0}
           loading={statsLoading}
-          icon={Film}
-          description="Unique series titles"
+          icon={FileWarning}
+          href="/all-files"
+          variant="amber"
+        />
+        <AlertCard
+          label="Drafts"
+          count={stats?.drafts ?? 0}
+          loading={statsLoading}
+          icon={FilePen}
+          href="/all-files"
+          variant="blue"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Recent Metadata */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-sm border-muted">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <LayoutDashboard className="w-5 h-5 text-primary" />
-                  Recent Metadata
-                </CardTitle>
-                <CardDescription>The latest additions to the portal</CardDescription>
+      {/* Stats strip */}
+      <div className="grid grid-cols-3 gap-3">
+        <MiniStat label="Total files" value={stats?.totalFiles} loading={statsLoading} icon={FileText} />
+        <MiniStat label="Added today" value={stats?.recentFiles} loading={statsLoading} icon={TrendingUp} highlight />
+        <MiniStat label="Series" value={stats?.totalSeries} loading={statsLoading} icon={Film} />
+      </div>
+
+      {/* Main content — two columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent metadata */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold">Recent Metadata</CardTitle>
+            <Link href="/all-files">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+                View all <ArrowRight className="w-3 h-3" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {filesLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
               </div>
-              <Link href="/all-files">
-                <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/5">
-                  View All <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {filesLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
-                </div>
-              ) : recentFiles && recentFiles.length > 0 ? (
-                <div className="space-y-3">
-                  {recentFiles.slice(0, 5).map((file) => (
-                    <div
-                      key={file.id}
-                      className={cn(
-                        "group flex items-center justify-between p-4 border rounded-xl transition-all hover:border-primary/30 hover:shadow-md",
-                        file.draft === 1 && "bg-orange-50/50 border-orange-200"
-                      )}
-                    >
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-xs text-muted-foreground uppercase tracking-tighter">
-                            {file.id}
-                          </span>
+            ) : recentFiles && recentFiles.length > 0 ? (
+              <div className="space-y-1">
+                {recentFiles.slice(0, 6).map((file) => (
+                  <Link key={file.id} href={`/view/${file.id}`}>
+                    <div className={cn(
+                      "group flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/50 cursor-pointer",
+                      file.draft === 1 && "border-l-2 border-l-orange-400"
+                    )}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate">{file.title}</span>
                           {file.season && (
-                            <Badge variant="secondary" className="text-xs h-5 px-1.5 font-medium">
+                            <Badge variant="secondary" className="text-xs h-5 px-1.5 shrink-0">
                               S{file.season}E{file.episode}
                             </Badge>
                           )}
                           {file.draft === 1 && (
-                            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-xs h-5 px-1.5">
+                            <Badge className="bg-orange-100 text-orange-700 border-none text-xs h-5 px-1.5 shrink-0">
                               Draft
                             </Badge>
                           )}
                         </div>
-                        <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                          {file.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {file.seriesTitle || 'Stand-alone content'}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground font-mono">{file.id}</span>
+                          <span className="text-xs text-muted-foreground truncate">{file.seriesTitle || "Stand-alone"}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <Link href={`/view/${file.id}`}>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/edit/${file.id}`}>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => e.stopPropagation()} asChild>
+                          <Link href={`/edit/${file.id}`}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Link>
+                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 border-2 border-dashed rounded-xl">
-                  <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground font-medium">No metadata files yet</p>
-                  <Link href="/create">
-                    <Button variant="ghost" className="text-primary">Create your first record</Button>
                   </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <FileText className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No metadata files yet</p>
+                {canWriteMetadata && (
+                  <Link href="/create">
+                    <Button variant="ghost" size="sm" className="mt-1 text-primary">Create your first record</Button>
+                  </Link>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Right Column: Tasks & Quick Actions */}
+        {/* Tasks + Licenses stacked */}
         <div className="space-y-6">
-          {/* Tasks Overview */}
-          <Card className="shadow-sm border-muted h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-orange-500" />
+          {/* Tasks */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-orange-500" />
                 Pending Tasks
               </CardTitle>
-              <CardDescription>Action items requiring attention</CardDescription>
+              <Link href="/tasks">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+                  All tasks <ArrowRight className="w-3 h-3" />
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {tasks && tasks.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-1">
                   {tasks.slice(0, 5).map((task) => {
                     const isOverdue = task.deadline && new Date(task.deadline) < new Date();
                     return (
                       <Link key={task.id} href={`/view/${task.metadataFileId}`}>
                         <div className={cn(
-                          "p-3 rounded-lg border transition-colors hover:border-primary/30 cursor-pointer",
-                          isOverdue ? "border-destructive/20 bg-destructive/5" : "border-transparent bg-muted/30"
+                          "flex items-center justify-between p-2.5 rounded-lg transition-colors hover:bg-muted/50 cursor-pointer",
+                          isOverdue && "bg-destructive/5"
                         )}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium">{task.description}</span>
-                            {(task as any).priority === "high" && (
-                              <Badge variant="outline" className="text-[9px] h-4 border-orange-400 text-orange-600">high</Badge>
-                            )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{task.description}</span>
+                              {(task as any).priority === "high" && (
+                                <Badge variant="outline" className="text-xs h-4 px-1 border-orange-400 text-orange-600 shrink-0">!</Badge>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">{task.metadataFile?.title}</span>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="font-semibold uppercase">{task.metadataFile?.title}</span>
-                            {task.metadataFile?.season && (
-                              <span>S{task.metadataFile.season}E{task.metadataFile.episode}</span>
-                            )}
-                            {task.deadline && (
-                              <span className={cn("ml-auto", isOverdue && "text-destructive font-bold")}>
-                                {isOverdue ? "Overdue" : `Due ${format(new Date(task.deadline), "dd MMM")}`}
-                              </span>
-                            )}
-                          </div>
+                          {task.deadline && (
+                            <span className={cn(
+                              "text-xs shrink-0 ml-2",
+                              isOverdue ? "text-destructive font-semibold" : "text-muted-foreground"
+                            )}>
+                              {isOverdue ? "Overdue" : format(new Date(task.deadline), "dd MMM")}
+                            </span>
+                          )}
                         </div>
                       </Link>
                     );
                   })}
-                  <Link href="/tasks">
-                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
-                      View all {tasks.length} tasks
-                    </Button>
-                  </Link>
                 </div>
               ) : (
-                <div className="py-6 text-center">
-                  <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CheckSquare className="w-5 h-5 text-green-600" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">All caught up!</p>
+                <div className="flex items-center gap-3 py-6 justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-sm text-muted-foreground">All caught up</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Licenses Preview */}
-          <Card className="shadow-sm border-muted h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <FileKey className="w-5 h-5 text-blue-500" />
-                Latest Licenses
+          {/* Licenses */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileKey className="w-4 h-4 text-blue-500" />
+                Licenses
               </CardTitle>
+              <Link href="/licenses">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+                  All licenses <ArrowRight className="w-3 h-3" />
+                </Button>
+              </Link>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {licenses && licenses.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-1">
                   {licenses.slice(0, 4).map((license) => {
                     const endDate = license.licenseEnd ? new Date(license.licenseEnd) : null;
                     const now = new Date();
@@ -355,40 +289,28 @@ export default function Dashboard() {
                     const isExpired = endDate && endDate < now;
                     return (
                       <Link key={license.id} href={`/licenses/${license.id}`}>
-                        <div className={cn(
-                          "p-3 rounded-lg border transition-colors cursor-pointer hover:border-primary/30",
-                          isExpired ? "border-destructive/20 bg-destructive/5" :
-                          isExpiring ? "border-orange-200 bg-orange-50/50" :
-                          "border-transparent bg-muted/30"
-                        )}>
-                          <p className="text-sm font-semibold truncate">{license.name}</p>
-                          <div className="flex justify-between items-center mt-1">
-                            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                              {license.distributor}
-                            </span>
-                            {endDate && (
-                              <span className={cn(
-                                "text-xs",
-                                isExpired ? "text-destructive font-bold" :
-                                isExpiring ? "text-orange-600 font-semibold" :
-                                "text-muted-foreground"
-                              )}>
-                                {isExpired ? "Expired" : `Ends ${format(endDate, "dd MMM yyyy")}`}
-                              </span>
-                            )}
+                        <div className="flex items-center justify-between p-2.5 rounded-lg transition-colors hover:bg-muted/50 cursor-pointer">
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium truncate block">{license.name}</span>
+                            <span className="text-xs text-muted-foreground">{license.distributor}</span>
                           </div>
+                          {endDate && (
+                            <span className={cn(
+                              "text-xs shrink-0 ml-2",
+                              isExpired ? "text-destructive font-semibold" :
+                              isExpiring ? "text-orange-600 font-medium" :
+                              "text-muted-foreground"
+                            )}>
+                              {isExpired ? "Expired" : format(endDate, "dd MMM yyyy")}
+                            </span>
+                          )}
                         </div>
                       </Link>
                     );
                   })}
-                  <Link href="/licenses">
-                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
-                      Open License Manager
-                    </Button>
-                  </Link>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No licenses found.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">No licenses yet</p>
               )}
             </CardContent>
           </Card>
@@ -398,35 +320,72 @@ export default function Dashboard() {
   );
 }
 
-function StatsCard({ title, value, loading, icon: Icon, description, highlight }: any) {
+// Alert card — always visible, shows count or checkmark when 0
+function AlertCard({ label, count, loading, icon: Icon, href, variant }: {
+  label: string;
+  count: number;
+  loading: boolean;
+  icon: React.ElementType;
+  href: string;
+  variant: "red" | "orange" | "amber" | "blue";
+}) {
+  const colors = {
+    red: { active: "border-red-200 bg-red-50/80 text-red-700", icon: "bg-red-100 text-red-600", idle: "text-green-600" },
+    orange: { active: "border-orange-200 bg-orange-50/80 text-orange-700", icon: "bg-orange-100 text-orange-600", idle: "text-green-600" },
+    amber: { active: "border-amber-200 bg-amber-50/80 text-amber-700", icon: "bg-amber-100 text-amber-600", idle: "text-green-600" },
+    blue: { active: "border-blue-200 bg-blue-50/80 text-blue-700", icon: "bg-blue-100 text-blue-600", idle: "text-muted-foreground" },
+  }[variant];
+
+  const isActive = count > 0;
+
   return (
-    <Card className={cn(
-      "border-muted shadow-sm transition-all hover:shadow-md",
-      highlight && "border-primary/20 bg-primary/5 shadow-primary/5"
-    )}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-              {title}
-            </p>
+    <Link href={href}>
+      <Card className={cn(
+        "transition-all cursor-pointer hover:shadow-sm",
+        isActive ? colors.active : "border-muted"
+      )}>
+        <CardContent className="p-3 flex items-center gap-3">
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", isActive ? colors.icon : "bg-muted")}>
+            {isActive ? <Icon className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4 text-green-500" />}
+          </div>
+          <div className="min-w-0">
             {loading ? (
-              <Skeleton className="h-9 w-16" />
+              <Skeleton className="h-6 w-8" />
             ) : (
-              <p className="text-3xl font-black tracking-tight text-foreground">
-                {value || 0}
-              </p>
+              <p className="text-xl font-bold leading-none">{count}</p>
             )}
-            <p className="text-xs text-muted-foreground font-medium">
-              {description}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{label}</p>
           </div>
-          <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
-            highlight ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-          )}>
-            <Icon className="w-6 h-6" />
-          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+// Compact stat — single row
+function MiniStat({ label, value, loading, icon: Icon, highlight }: {
+  label: string;
+  value: number | undefined;
+  loading: boolean;
+  icon: React.ElementType;
+  highlight?: boolean;
+}) {
+  return (
+    <Card className={cn("border-muted", highlight && "border-primary/20 bg-primary/5")}>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={cn(
+          "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+          highlight ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+        )}>
+          <Icon className="w-4.5 h-4.5" />
+        </div>
+        <div>
+          {loading ? (
+            <Skeleton className="h-7 w-10" />
+          ) : (
+            <p className="text-2xl font-bold leading-none tracking-tight">{value ?? 0}</p>
+          )}
+          <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
         </div>
       </CardContent>
     </Card>
