@@ -191,7 +191,7 @@ export default function AllFiles() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">All Files</h1>
+        <h1 className="text-3xl font-bold tracking-tight">All Files</h1>
         <p className="text-muted-foreground mt-2">
           View, search, and manage all metadata files
         </p>
@@ -319,7 +319,7 @@ export default function AllFiles() {
 
                     <div className="flex items-center gap-2 flex-wrap">
                       {file.draft === 1 && (
-                        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5" data-testid={`file-draft-${file.id}`}>
+                        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-xs h-5 px-1.5" data-testid={`file-draft-${file.id}`}>
                           Draft
                         </Badge>
                       )}
@@ -352,6 +352,7 @@ export default function AllFiles() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hidden md:inline-flex"
                       onClick={() => handleDownload(file.id, "xml")}
                       data-testid={`button-download-xml-${file.id}`}
                       title="Download XML"
@@ -362,6 +363,7 @@ export default function AllFiles() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hidden md:inline-flex"
                       onClick={() => handleDownload(file.id, "xlsx")}
                       data-testid={`button-download-xlsx-${file.id}`}
                       title="Download XLSX"

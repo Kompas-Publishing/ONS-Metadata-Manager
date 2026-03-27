@@ -229,7 +229,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
                           {episodes.map(file => (
                             <div key={file.id} className="group flex items-center justify-between p-2 rounded bg-muted/50 text-xs border border-transparent hover:border-primary/20">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-mono text-[10px] text-muted-foreground w-12 flex-shrink-0">{file.id}</span>
+                                <span className="font-mono text-xs text-muted-foreground w-12 flex-shrink-0">{file.id}</span>
                                 <span className="truncate" title={file.episodeTitle || file.title}>
                                   Ep {file.episode}: {file.episodeTitle || file.title}
                                 </span>

@@ -236,7 +236,7 @@ export function MetadataForm({
               </div>
               {generatedId && (
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
                     Internal ID
                   </p>
                   <p className="text-lg font-mono font-bold text-foreground">

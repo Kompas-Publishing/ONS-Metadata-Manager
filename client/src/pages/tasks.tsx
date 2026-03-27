@@ -75,10 +75,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const PREDEFINED_DESCRIPTIONS = [
-  "heeft meta nodig",
-  "heeft subs nodig",
-  "heeft QC nodig",
-  "verzenden naar OD",
+  "Needs metadata",
+  "Needs subtitles",
+  "Needs QC",
+  "Send to OD",
 ] as const;
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
@@ -611,7 +611,7 @@ export default function Tasks() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      className="opacity-0 group-hover/season:opacity-100 text-destructive hover:bg-destructive/10 h-7 text-[10px] gap-1.5"
+                                      className="opacity-0 group-hover/season:opacity-100 text-destructive hover:bg-destructive/10 h-7 text-xs gap-1.5"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                       Delete Season Tasks
@@ -663,13 +663,13 @@ export default function Tasks() {
                                             {task.description}
                                           </span>
                                           {task.status === "in_progress" && (
-                                            <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-200">
+                                            <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
                                               In Progress
                                             </Badge>
                                           )}
                                           {(task as any).priority && (task as any).priority !== "medium" && (
                                             <Badge variant="outline" className={cn(
-                                              "text-[10px]",
+                                              "text-xs",
                                               (task as any).priority === "high" ? "border-orange-400 text-orange-600 bg-orange-50" : "text-muted-foreground"
                                             )}>
                                               {(task as any).priority}
@@ -677,7 +677,7 @@ export default function Tasks() {
                                           )}
                                           {task.deadline && (
                                             <Badge variant="outline" className={cn(
-                                              "text-[10px] font-mono",
+                                              "text-xs font-mono",
                                               new Date(task.deadline) < new Date() && task.status !== 'completed' ? "border-destructive text-destructive bg-destructive/5" : ""
                                             )}>
                                               Due: {format(new Date(task.deadline), "dd-MM-yyyy")}
@@ -686,7 +686,7 @@ export default function Tasks() {
                                         </div>
                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                           <span className="flex items-center gap-1">
-                                            ID: <span className="font-mono text-[10px]">{task.metadataFileId}</span>
+                                            ID: <span className="font-mono text-xs">{task.metadataFileId}</span>
                                           </span>
                                           {task.metadataFile.episode && (
                                             <span className="font-medium text-foreground">Episode {task.metadataFile.episode}</span>

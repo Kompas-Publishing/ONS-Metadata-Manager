@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, Loader2, CalendarIcon, X, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Loader2, CalendarIcon, X, Plus, Trash2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -131,11 +131,16 @@ export default function BatchCreate() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">Batch Create Files</h1>
-        <p className="text-muted-foreground mt-2">
-          Create multiple metadata files with flexible season and episode definitions
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" type="button" onClick={() => setLocation("/browse")}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Batch Create Files</h1>
+          <p className="text-muted-foreground mt-2">
+            Create multiple metadata files with flexible season and episode definitions
+          </p>
+        </div>
       </div>
 
       <Card className="p-6">

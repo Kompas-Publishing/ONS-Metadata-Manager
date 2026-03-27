@@ -395,7 +395,7 @@ export default function Browse() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Browse Series</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Browse Series</h1>
         <p className="text-muted-foreground mt-2">
           Browse and filter your metadata files by series and season
         </p>
@@ -548,7 +548,7 @@ export default function Browse() {
                         {series.category && series.category !== "Unknown" && (
                           <Badge variant="secondary">{series.category}</Badge>
                         )}
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wider">
                           Added {format(series.lastAddedAt, "dd MMM yyyy")}
                         </span>
                       </div>
@@ -776,7 +776,7 @@ export default function Browse() {
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {seriesDetails.tasks.slice(0, 5).map((task) => (
-                        <Badge key={task.id} variant="outline" className="bg-orange-50 border-orange-200 text-orange-800 text-[10px] py-0.5">
+                        <Badge key={task.id} variant="outline" className="bg-orange-50 border-orange-200 text-orange-800 text-xs py-0.5">
                           {task.metadataFile?.episode ? `E${task.metadataFile.episode}: ` : ""}{task.description}
                           {task.deadline && (
                             <span className="ml-1.5 opacity-70 font-mono">
@@ -786,7 +786,7 @@ export default function Browse() {
                         </Badge>
                       ))}
                       {seriesDetails.tasks.length > 5 && (
-                        <Badge variant="outline" className="text-[10px] py-0.5">
+                        <Badge variant="outline" className="text-xs py-0.5">
                           +{seriesDetails.tasks.length - 5} more
                         </Badge>
                       )}
@@ -1145,7 +1145,7 @@ export default function Browse() {
                                   <div className="flex flex-col">
                                     <span className="font-medium text-sm line-clamp-1">{episode.episodeTitle || episode.title}</span>
                                     {episode.draft === 1 && (
-                                      <span className="text-[10px] text-orange-600 font-semibold uppercase">Draft</span>
+                                      <span className="text-xs text-orange-600 font-semibold uppercase">Draft</span>
                                     )}
                                   </div>
                                 </TableCell>
@@ -1155,7 +1155,7 @@ export default function Browse() {
                                 <TableCell>
                                   <Badge 
                                     variant="outline" 
-                                    className={`text-[10px] font-normal px-1.5 py-0 ${
+                                    className={`text-xs font-normal px-1.5 py-0 ${
                                       episode.subsStatus === 'Complete' 
                                         ? 'bg-green-50 text-green-700 border-green-200' 
                                         : episode.subsStatus === 'Not needed'
@@ -1169,7 +1169,7 @@ export default function Browse() {
                                 <TableCell>
                                   <Badge 
                                     variant="outline" 
-                                    className={`text-[10px] font-normal px-1.5 py-0 ${
+                                    className={`text-xs font-normal px-1.5 py-0 ${
                                       episode.metadataTimesStatus === 'Complete' 
                                         ? 'bg-green-50 text-green-700 border-green-200' 
                                         : 'bg-orange-50 text-orange-700 border-orange-200'
@@ -1206,7 +1206,7 @@ export default function Browse() {
                                           ) : (
                                             <AlertCircle className={`w-4 h-4 ${statusColor}`} />
                                           )}
-                                          <span className="text-[10px] font-bold">{episodeTasks.length}</span>
+                                          <span className="text-xs font-bold">{episodeTasks.length}</span>
                                         </div>
                                         {/* Simple Tooltip on hover */}
                                         <div className="absolute bottom-full mb-2 hidden group-hover:block z-50 min-w-[150px] bg-popover text-popover-foreground p-2 rounded shadow-lg border border-border text-xs">
@@ -1217,7 +1217,7 @@ export default function Browse() {
                                                   • {t.description}
                                                 </span>
                                                 {t.deadline && (
-                                                  <span className="text-[10px] text-muted-foreground ml-2 italic">
+                                                  <span className="text-xs text-muted-foreground ml-2 italic">
                                                     Due: {format(new Date(t.deadline), "dd-MM-yyyy")}
                                                   </span>
                                                 )}

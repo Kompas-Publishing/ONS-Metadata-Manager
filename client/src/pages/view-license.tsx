@@ -331,7 +331,7 @@ export default function ViewLicense() {
             </CardContent>
           </Card>
           
-          <div className="px-4 text-[10px] text-muted-foreground uppercase font-mono">
+          <div className="px-4 text-xs text-muted-foreground uppercase font-mono">
             System ID: {license.id}
           </div>
         </div>

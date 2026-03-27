@@ -85,7 +85,7 @@ export default function Dashboard() {
               <Link href="/create">
                 <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
                   <Plus className="w-4 h-4 mr-2" />
-                  New Metadata
+                  Create Metadata
                 </Button>
               </Link>
             )}
@@ -227,16 +227,16 @@ export default function Dashboard() {
                     >
                       <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-tighter">
+                          <span className="font-mono text-xs text-muted-foreground uppercase tracking-tighter">
                             {file.id}
                           </span>
                           {file.season && (
-                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-medium">
+                            <Badge variant="secondary" className="text-xs h-5 px-1.5 font-medium">
                               S{file.season}E{file.episode}
                             </Badge>
                           )}
                           {file.draft === 1 && (
-                            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5">
+                            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-xs h-5 px-1.5">
                               Draft
                             </Badge>
                           )}
@@ -304,7 +304,7 @@ export default function Dashboard() {
                               <Badge variant="outline" className="text-[9px] h-4 border-orange-400 text-orange-600">high</Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="font-semibold uppercase">{task.metadataFile?.title}</span>
                             {task.metadataFile?.season && (
                               <span>S{task.metadataFile.season}E{task.metadataFile.episode}</span>
@@ -363,12 +363,12 @@ export default function Dashboard() {
                         )}>
                           <p className="text-sm font-semibold truncate">{license.name}</p>
                           <div className="flex justify-between items-center mt-1">
-                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                               {license.distributor}
                             </span>
                             {endDate && (
                               <span className={cn(
-                                "text-[10px]",
+                                "text-xs",
                                 isExpired ? "text-destructive font-bold" :
                                 isExpiring ? "text-orange-600 font-semibold" :
                                 "text-muted-foreground"
@@ -417,7 +417,7 @@ function StatsCard({ title, value, loading, icon: Icon, description, highlight }
                 {value || 0}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground font-medium">
+            <p className="text-xs text-muted-foreground font-medium">
               {description}
             </p>
           </div>

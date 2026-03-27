@@ -83,7 +83,7 @@ import { upload } from "@vercel/blob/client";
           permissionKey: "canReadMetadata",
         },
         {
-          title: "Create File",
+          title: "Create Metadata",
           url: "/create",
           icon: FilePlus,
           testId: "nav-create",
@@ -364,7 +364,7 @@ export function AppSidebar() {
           >
             <Search className="w-4 h-4" />
             Search...
-            <kbd className="ml-auto pointer-events-none text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K</kbd>
+            <kbd className="ml-auto pointer-events-none text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K</kbd>
           </Button>
         </div>
 
@@ -383,7 +383,7 @@ export function AppSidebar() {
                       <span className="font-medium">{f.title}</span>
                       {f.season && <span className="text-muted-foreground text-xs ml-2">S{f.season}E{f.episode}</span>}
                     </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">{f.id}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{f.id}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -437,7 +437,7 @@ export function AppSidebar() {
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                         {(item as any).disabled && (
-                          <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                          <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                             Soon
                           </span>
                         )}
@@ -566,7 +566,7 @@ export function AppSidebar() {
                           </>
                         )}
                       </Button>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Supports JPG, PNG, GIF. Max 4.5MB for serverless.
                       </p>
                     </div>

@@ -596,28 +596,28 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                               <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-[200px]">
                                   {user.canReadMetadata === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Meta:R</Badge>
                                   )}
                                   {user.canWriteMetadata === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Meta:W</Badge>
                                   )}
                                   {user.canReadLicenses === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Lic:R</Badge>
                                   )}
                                   {user.canWriteLicenses === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Lic:W</Badge>
                                   )}
                                   {user.canReadTasks === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Task:R</Badge>
                                   )}
                                   {user.canWriteTasks === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Task:W</Badge>
                                   )}
                                   {user.canUseAI === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">AI</Badge>
                                   )}
                                   {user.canUseAIChat === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI Chat</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">AI Chat</Badge>
                                   )}
                                 </div>
                               </TableCell>
@@ -952,7 +952,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                   })}
                                                 />
                                               </div>
-                                              <p className="text-[10px] text-muted-foreground leading-tight pt-1">
+                                              <p className="text-xs text-muted-foreground leading-tight pt-1">
                                                 AI Chat is read/write scoped by the user's existing permissions.
                                               </p>
                                             </div>

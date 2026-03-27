@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2, Database, Layers, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Database, Layers, Plus, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
@@ -131,11 +131,16 @@ export default function CreateLicense() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
-        <p className="text-muted-foreground mt-2">
-          Add a new content license with detailed contract information
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" type="button" onClick={() => setLocation("/licenses")}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
+          <p className="text-muted-foreground mt-2">
+            Add a new content license with detailed contract information
+          </p>
+        </div>
       </div>
 
       <Form {...form}>

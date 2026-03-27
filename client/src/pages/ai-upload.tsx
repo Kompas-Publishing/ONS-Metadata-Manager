@@ -418,7 +418,7 @@ export default function AiUpload() {
                             </CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-[10px] font-medium text-primary">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
                           <Bot className="w-3 h-3" />
                           <span>Gemini 3</span>
                         </div>
@@ -473,7 +473,7 @@ export default function AiUpload() {
                       
                       <div className="flex items-center gap-2 px-1 text-muted-foreground/60">
                         <Lightbulb className="w-3 h-3" />
-                        <span className="text-[10px] font-medium italic">
+                        <span className="text-xs font-medium italic">
                           Tip: Ask to recalculate fees, fix name casing, or merge duplicates.
                         </span>
                       </div>

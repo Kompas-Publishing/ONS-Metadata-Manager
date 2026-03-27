@@ -243,11 +243,11 @@ export default function EditSeason() {
           <table className="text-xs border-collapse" style={{ minWidth: "2400px" }}>
             <thead className="sticky top-0 z-20">
               <tr className="bg-muted">
-                <th className="sticky left-0 z-30 bg-muted px-2 py-2 text-left font-semibold text-[10px] uppercase tracking-wider border-b border-r w-10">#</th>
+                <th className="sticky left-0 z-30 bg-muted px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r w-10">#</th>
                 {COLUMNS.map((col) => (
                   <th
                     key={col.key}
-                    className={`px-1 py-2 text-left font-semibold text-[10px] uppercase tracking-wider border-b border-r ${col.width}`}
+                    className={`px-1 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r ${col.width}`}
                   >
                     {col.label}
                   </th>
@@ -258,7 +258,7 @@ export default function EditSeason() {
               {rows.map((row, rowIdx) => (
                 <tr key={row.id} className="border-b hover:bg-muted/30 transition-colors group">
                   <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/30 px-2 py-0 text-center border-r">
-                    <Badge variant="outline" className="font-mono text-[10px] h-5">{row.episode}</Badge>
+                    <Badge variant="outline" className="font-mono text-xs h-5">{row.episode}</Badge>
                   </td>
                   {COLUMNS.map((col) => (
                     <td key={col.key} className={`px-0 py-0 border-r ${col.width}`}>
