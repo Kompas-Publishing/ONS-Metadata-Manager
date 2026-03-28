@@ -58,16 +58,18 @@ export default function Dashboard() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight">
             {getGreeting()}, {user?.firstName || "User"}
           </h1>
-          {!statsLoading && stats && (
+          {!statsLoading && stats ? (
             <p className="text-sm text-muted-foreground mt-1">
               {stats.totalFiles} files across {stats.totalSeries} series
               {stats.recentFiles > 0 && <> · <span className="text-foreground font-medium">{stats.recentFiles} added today</span></>}
             </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">Loading your workspace...</p>
           )}
         </div>
         {canWriteMetadata && (
@@ -79,6 +81,8 @@ export default function Dashboard() {
           </Link>
         )}
       </div>
+
+      <div className="border-b" />
 
       {/* Alerts — text-based, not cards */}
       {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0) && (

@@ -1066,7 +1066,7 @@ export class DatabaseStorage {
     const visibility = getFileVisibilityConditions(permissions);
     const whereConditions = [
       eq(metadataFiles.title, seriesTitle),
-      eq(metadataFiles.season, season)
+      season === 0 ? sql`${metadataFiles.season} IS NULL OR ${metadataFiles.season} = 0` : eq(metadataFiles.season, season)
     ];
 
     if (visibility.type === "own") {

@@ -17,10 +17,15 @@ export default apiHandler(
 
       const decodedTitle = title; // Vercel already decodes query params
       
-      const item = await storage.getSeriesByTitle(decodedTitle);
+      let item = await storage.getSeriesByTitle(decodedTitle);
 
       if (!item) {
-        return res.status(404).json({ message: "Series not found" });
+        // Auto-create series record if metadata files exist with this title
+        const files = await storage.getMetadataBySeriesTitle(decodedTitle, req.userPermissions!);
+        if (files.length === 0) {
+          return res.status(404).json({ message: "Series not found" });
+        }
+        item = await storage.upsertSeries({ title: decodedTitle });
       }
 
       const [licenses, tasks] = await Promise.all([
