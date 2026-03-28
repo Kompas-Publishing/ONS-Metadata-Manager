@@ -359,7 +359,7 @@ export default function Contracts() {
                 </div>
               ) : (
                 <>
-                  <input type="file" accept=".pdf,.doc,.docx" onChange={handleFileUpload} className="hidden" id="contract-upload" />
+                  <input type="file" accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv" onChange={handleFileUpload} className="hidden" id="contract-upload" />
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => document.getElementById("contract-upload")?.click()} disabled={uploading}>
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     {uploading ? "Uploading..." : "Upload File"}
