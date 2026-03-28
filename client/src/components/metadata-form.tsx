@@ -216,7 +216,15 @@ export function MetadataForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleSubmit, () => {
+        // Scroll to first error field
+        setTimeout(() => {
+          const firstError = document.querySelector('[aria-invalid="true"]');
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 100);
+      })} className="space-y-8">
         <div className="space-y-8">
           <fieldset disabled={readOnly} className="contents">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 p-6 border-b bg-muted/20 -mx-6 -mt-8 mb-8">
@@ -420,8 +428,12 @@ export function MetadataForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="Long Form">Long Form</SelectItem>
+                          <SelectItem value="Short Form">Short Form</SelectItem>
                           <SelectItem value="program">Program</SelectItem>
                           <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="Promo">Promo</SelectItem>
+                          <SelectItem value="Filler">Filler</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
