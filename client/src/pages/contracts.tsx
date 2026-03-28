@@ -145,7 +145,7 @@ export default function Contracts() {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "pdf";
-      const randomName = `contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const randomName = `contracts/contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const blob = await upload(randomName, file, {
         access: "private",
         handleUploadUrl: "/api/blob/upload",

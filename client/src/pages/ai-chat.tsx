@@ -180,7 +180,7 @@ export default function AiChat() {
     try {
       let blobUrl = "";
       if (currentAttachment) {
-        const newBlob = await upload(currentAttachment.name, currentAttachment, {
+        const newBlob = await upload(`ai-chat/${currentAttachment.name}`, currentAttachment, {
           access: "private",
           handleUploadUrl: "/api/blob/upload",
           clientPayload: JSON.stringify({ type: "ai-chat" }),

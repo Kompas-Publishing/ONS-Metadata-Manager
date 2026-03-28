@@ -46,7 +46,7 @@ export default function AiUpload() {
       let blobUrl = "";
       if (file.size > MAX_BODY_SIZE) {
         // Upload to Vercel Blob first if it's too big for a standard POST body
-        const newBlob = await upload(file.name, file, {
+        const newBlob = await upload(`ai-uploader/${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),
@@ -92,7 +92,7 @@ export default function AiUpload() {
       if (file.size > MAX_BODY_SIZE) {
         // Reuse upload if needed, though usually refine happens after parse
         // For simplicity, we'll just upload again if needed or we could cache the blobUrl
-        const newBlob = await upload(file.name, file, {
+        const newBlob = await upload(`ai-uploader/${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),

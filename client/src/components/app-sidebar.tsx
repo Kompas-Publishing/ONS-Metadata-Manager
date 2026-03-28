@@ -280,7 +280,7 @@ export function AppSidebar() {
 
     try {
       setIsUploading(true);
-      const newBlob = await upload(file.name, file, {
+      const newBlob = await upload(`avatars/${file.name}`, file, {
         access: 'private',
         handleUploadUrl: '/api/blob/upload',
         clientPayload: JSON.stringify({ type: 'avatar' }),
