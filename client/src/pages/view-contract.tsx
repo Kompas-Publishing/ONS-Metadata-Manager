@@ -31,13 +31,26 @@ interface ContractDetail {
   id: string;
   name: string;
   distributor: string;
+  contractMode: string | null;
+  status: string;
   description: string | null;
   notes: string | null;
-  fileUrl: string | null;
-  fileName: string | null;
+  totalFeeAmount: string | null;
+  totalFeeCurrency: string | null;
   sharedTerms: any;
   createdAt: string | null;
-  licenses: License[];
+  files: { id: string; fileUrl: string; fileName: string; fileRole: string | null; notes: string | null }[];
+  licenseLinks: {
+    id: string;
+    licenseId: string;
+    sourceTitle: string | null;
+    sourceTitles: any;
+    packageLabel: string | null;
+    sourceReference: string | null;
+    notes: string | null;
+    mappingStatus: string | null;
+    license: License;
+  }[];
 }
 
 export default function ViewContract() {
@@ -148,13 +161,13 @@ export default function ViewContract() {
     );
   }
 
-  const totalCost = contract.licenses.reduce((sum, l) => {
-    const amt = l.licenseFeeAmount ? parseFloat(l.licenseFeeAmount) : 0;
+  const totalCost = contract.totalFeeAmount ? parseFloat(contract.totalFeeAmount) : contract.licenseLinks.reduce((sum, link) => {
+    const amt = link.license.licenseFeeAmount ? parseFloat(link.license.licenseFeeAmount) : 0;
     return sum + (isNaN(amt) ? 0 : amt);
   }, 0);
 
-  const totalLinkedContent = contract.licenses.length;
-  const existingLicenseIds = contract.licenses.map(l => l.id);
+  const totalLinkedContent = contract.licenseLinks.length;
+  const existingLicenseIds = contract.licenseLinks.map(l => l.licenseId);
   const availableLicenses = (allLicenses || []).filter(l => !existingLicenseIds.includes(l.id));
 
   return (
@@ -174,20 +187,18 @@ export default function ViewContract() {
             ) : (
               <>
                 <h1 className="text-2xl font-bold tracking-tight">{contract.name}</h1>
-                <p className="text-sm text-muted-foreground">{contract.distributor}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-sm text-muted-foreground">{contract.distributor}</span>
+                  {contract.contractMode && <Badge variant="outline" className="text-xs">{contract.contractMode}</Badge>}
+                  <Badge variant={contract.status === "verified" ? "secondary" : contract.status === "issue" ? "destructive" : "outline"} className="text-xs">
+                    {contract.status}
+                  </Badge>
+                </div>
               </>
             )}
           </div>
         </div>
         <div className="flex gap-2">
-          {contract.fileUrl && (
-            <a href={`/api/blob/view?url=${encodeURIComponent(contract.fileUrl)}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="w-4 h-4" />
-                Download
-              </Button>
-            </a>
-          )}
           {editing ? (
             <>
               <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
@@ -227,7 +238,7 @@ export default function ViewContract() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4"><p className="text-2xl font-bold">{totalLinkedContent}</p><p className="text-xs text-muted-foreground">Licenses</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-2xl font-bold font-mono">{formatCurrency(totalCost)}</p><p className="text-xs text-muted-foreground">Total Cost</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-2xl font-bold">{contract.fileUrl ? "Yes" : "No"}</p><p className="text-xs text-muted-foreground">File Attached</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-2xl font-bold">{contract.files.length > 0 ? contract.files.length : "No"}</p><p className="text-xs text-muted-foreground">{contract.files.length === 1 ? "File" : "Files"}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-2xl font-bold">{contract.createdAt ? format(new Date(contract.createdAt), "dd MMM yyyy") : "—"}</p><p className="text-xs text-muted-foreground">Created</p></CardContent></Card>
       </div>
 
@@ -273,10 +284,37 @@ export default function ViewContract() {
         </Card>
       )}
 
+      {/* Contract files */}
+      {contract.files.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase">Contract Files ({contract.files.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-1">
+              {contract.files.map(file => (
+                <div key={file.id} className="flex items-center justify-between py-2 px-1 rounded hover:bg-muted/30">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <a href={`/api/blob/view?url=${encodeURIComponent(file.fileUrl)}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate">
+                      {file.fileName}
+                    </a>
+                    {file.fileRole && file.fileRole !== "main" && (
+                      <Badge variant="outline" className="text-xs shrink-0">{file.fileRole}</Badge>
+                    )}
+                  </div>
+                  {file.notes && <span className="text-xs text-muted-foreground ml-2 shrink-0">{file.notes}</span>}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Linked licenses table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-lg">Linked Licenses ({contract.licenses.length})</CardTitle>
+          <CardTitle className="text-lg">Linked Licenses ({contract.licenseLinks.length})</CardTitle>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setLinkOpen(true)}>
             <Plus className="w-3.5 h-3.5" /> Link License
           </Button>
@@ -285,39 +323,47 @@ export default function ViewContract() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>License Name</TableHead>
+                <TableHead>License</TableHead>
+                <TableHead>Source Title</TableHead>
                 <TableHead>Season</TableHead>
-                <TableHead>Distributor</TableHead>
                 <TableHead>Fee</TableHead>
                 <TableHead>Period</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contract.licenses.length === 0 ? (
+              {contract.licenseLinks.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No licenses linked yet.</TableCell>
+                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">No licenses linked yet.</TableCell>
                 </TableRow>
               ) : (
-                contract.licenses.map(license => {
+                contract.licenseLinks.map(link => {
+                  const license = link.license;
                   const fee = license.licenseFeeAmount ? parseFloat(license.licenseFeeAmount) : 0;
                   return (
-                    <TableRow key={license.id}>
+                    <TableRow key={link.id}>
                       <TableCell>
                         <Link href={`/licenses/${license.id}`} className="text-primary hover:underline font-medium">
                           {license.name}
                         </Link>
-                        {license.contentTitle && license.contentTitle !== license.name && (
-                          <span className="text-xs text-muted-foreground ml-2">{license.contentTitle}</span>
-                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                        {link.sourceTitle || (link.sourceTitles ? (Array.isArray(link.sourceTitles) ? link.sourceTitles.join(", ") : String(link.sourceTitles)) : "—")}
                       </TableCell>
                       <TableCell>{license.season || "—"}</TableCell>
-                      <TableCell><Badge variant="outline" className="font-normal">{license.distributor || "—"}</Badge></TableCell>
-                      <TableCell className="font-mono">{!isNaN(fee) && fee > 0 ? formatCurrency(fee) : "—"}</TableCell>
+                      <TableCell className="font-mono text-sm">{!isNaN(fee) && fee > 0 ? formatCurrency(fee) : "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {license.licenseStart && license.licenseEnd
                           ? `${format(new Date(license.licenseStart), "dd-MM-yyyy")} – ${format(new Date(license.licenseEnd), "dd-MM-yyyy")}`
                           : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {link.mappingStatus && link.mappingStatus !== "mapped" && (
+                          <Badge variant={link.mappingStatus === "issue" ? "destructive" : "outline"} className="text-xs">
+                            {link.mappingStatus}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="text-destructive h-7 text-xs" onClick={() => unlinkMutation.mutate(license.id)}>

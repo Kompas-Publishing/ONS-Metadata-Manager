@@ -27,9 +27,11 @@ export default apiHandler(
           name: z.string().optional(),
           distributor: z.string().optional(),
           description: z.string().optional().nullable(),
+          contractMode: z.string().optional().nullable(),
+          status: z.string().optional(),
           notes: z.string().optional().nullable(),
-          fileUrl: z.string().optional().nullable(),
-          fileName: z.string().optional().nullable(),
+          totalFeeAmount: z.string().optional().nullable(),
+          totalFeeCurrency: z.string().optional(),
           sharedTerms: z.any().optional(),
         });
 

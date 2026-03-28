@@ -33,6 +33,7 @@ import {
   seriesToLicenses,
   contracts,
   contractsToLicenses,
+  contractFiles,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -55,6 +56,8 @@ import {
   type InsertSeriesToLicense,
   type Contract,
   type InsertContract,
+  type ContractFile,
+  type ContractToLicense,
 } from "./schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -1824,20 +1827,26 @@ export class DatabaseStorage {
     return results;
   }
 
-  async getContract(id: string): Promise<(Contract & { licenses: License[] }) | undefined> {
+  async getContract(id: string): Promise<(Contract & { files: ContractFile[]; licenseLinks: (ContractToLicense & { license: License })[] }) | undefined> {
     const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
     if (!contract) return undefined;
 
+    const files = await db.select().from(contractFiles)
+      .where(eq(contractFiles.contractId, id))
+      .orderBy(contractFiles.sortOrder);
+
     const links = await db
-      .select({ licenseId: contractsToLicenses.licenseId })
+      .select({ link: contractsToLicenses, license: licenses })
       .from(contractsToLicenses)
-      .where(eq(contractsToLicenses.contractId, id));
+      .innerJoin(licenses, eq(contractsToLicenses.licenseId, licenses.id))
+      .where(eq(contractsToLicenses.contractId, id))
+      .orderBy(contractsToLicenses.sortOrder);
 
-    const linkedLicenses = links.length > 0
-      ? await db.select().from(licenses).where(inArray(licenses.id, links.map(l => l.licenseId)))
-      : [];
-
-    return { ...contract, licenses: linkedLicenses };
+    return {
+      ...contract,
+      files,
+      licenseLinks: links.map(r => ({ ...r.link, license: r.license })),
+    };
   }
 
   async createContract(data: InsertContract & { createdBy: string }): Promise<Contract> {
@@ -1855,12 +1864,36 @@ export class DatabaseStorage {
     return result.length > 0;
   }
 
-  async linkContractToLicense(contractId: string, licenseId: string): Promise<void> {
-    await db.insert(contractsToLicenses).values({ contractId, licenseId }).onConflictDoNothing();
+  // Contract files
+  async addContractFile(data: { contractId: string; fileUrl: string; fileName: string; fileRole?: string; sortOrder?: number; notes?: string }): Promise<ContractFile> {
+    const [created] = await db.insert(contractFiles).values(data).returning();
+    return created;
+  }
+
+  async removeContractFile(fileId: string): Promise<boolean> {
+    const result = await db.delete(contractFiles).where(eq(contractFiles.id, fileId)).returning();
+    return result.length > 0;
+  }
+
+  // Contract-license links with provenance
+  async linkContractToLicense(data: {
+    contractId: string; licenseId: string;
+    sortOrder?: number; sourceTitle?: string; sourceTitles?: any;
+    packageLabel?: string; sourceReference?: string; notes?: string;
+    sourceSnapshot?: any; mappingStatus?: string;
+  }): Promise<ContractToLicense> {
+    const [created] = await db.insert(contractsToLicenses).values(data).onConflictDoNothing().returning();
+    return created;
   }
 
   async unlinkContractFromLicense(contractId: string, licenseId: string): Promise<void> {
     await db.delete(contractsToLicenses).where(
+      and(eq(contractsToLicenses.contractId, contractId), eq(contractsToLicenses.licenseId, licenseId))
+    );
+  }
+
+  async updateContractLicenseLink(contractId: string, licenseId: string, data: Partial<ContractToLicense>): Promise<void> {
+    await db.update(contractsToLicenses).set(data).where(
       and(eq(contractsToLicenses.contractId, contractId), eq(contractsToLicenses.licenseId, licenseId))
     );
   }

@@ -413,11 +413,13 @@ export const contracts = pgTable("contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   distributor: text("distributor").notNull(),
+  contractMode: varchar("contract_mode", { length: 20 }), // umbrella, split, mixed
+  status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, imported, verified, issue
   description: text("description"),
   notes: text("notes"),
-  fileUrl: text("file_url"), // Vercel Blob URL for the contract PDF
-  fileName: text("file_name"), // Original filename for display
-  sharedTerms: jsonb("shared_terms"), // Shared license terms (start, end, runs)
+  totalFeeAmount: text("total_fee_amount"), // Total contract fee
+  totalFeeCurrency: varchar("total_fee_currency", { length: 10 }).default("EUR"),
+  sharedTerms: jsonb("shared_terms"), // Shared license terms (territory, rights, runs, etc.)
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -425,10 +427,31 @@ export const contracts = pgTable("contracts", {
   index("idx_contracts_distributor").on(table.distributor),
 ]);
 
-// Join table: contracts to licenses
+// Contract files — multiple files per contract (main, amendment, appendix, etc.)
+export const contractFiles = pgTable("contract_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileRole: varchar("file_role", { length: 20 }).default("main"), // main, amendment, appendix, schedule, duplicate
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Join table: contracts to licenses — with provenance tracking
 export const contractsToLicenses = pgTable("contracts_to_licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
   licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").default(0),
+  sourceTitle: text("source_title"), // Original programme title from contract
+  sourceTitles: jsonb("source_titles"), // Array of source programme titles if multiple
+  packageLabel: text("package_label"), // Package grouping label
+  sourceReference: text("source_reference"), // Page / appendix / row / article reference
+  notes: text("notes"), // Per-line extracted notes
+  sourceSnapshot: jsonb("source_snapshot"), // Full original data snapshot for provenance
+  mappingStatus: varchar("mapping_status", { length: 20 }).default("mapped"), // mapped, unverified, issue
 }, (t) => [
   uniqueIndex("contract_license_unique_idx").on(t.contractId, t.licenseId),
 ]);
@@ -436,10 +459,12 @@ export const contractsToLicenses = pgTable("contracts_to_licenses", {
 export const insertContractSchema = createInsertSchema(contracts, {
   name: z.string().min(1, "Name is required"),
   distributor: z.string().min(1, "Distributor is required"),
+  contractMode: z.string().optional(),
+  status: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
-  fileUrl: z.string().optional(),
-  fileName: z.string().optional(),
+  totalFeeAmount: z.string().optional(),
+  totalFeeCurrency: z.string().optional(),
 }).omit({
   id: true,
   createdBy: true,
@@ -449,3 +474,5 @@ export const insertContractSchema = createInsertSchema(contracts, {
 
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
+export type ContractFile = typeof contractFiles.$inferSelect;
+export type ContractToLicense = typeof contractsToLicenses.$inferSelect;

@@ -108,7 +108,7 @@ export default function Contracts() {
     new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(amount);
 
   // Create contract state
-  const [newContract, setNewContract] = useState({ name: "", distributor: "", description: "", notes: "" });
+  const [newContract, setNewContract] = useState({ name: "", distributor: "", contractMode: "", status: "draft", description: "", notes: "", totalFeeAmount: "", totalFeeCurrency: "EUR" });
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(null);
 
@@ -120,7 +120,7 @@ export default function Contracts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       setCreateOpen(false);
-      setNewContract({ name: "", distributor: "", description: "", notes: "" });
+      setNewContract({ name: "", distributor: "", contractMode: "", status: "draft", description: "", notes: "", totalFeeAmount: "", totalFeeCurrency: "EUR" });
       setUploadedFile(null);
       toast({ title: "Contract created" });
     },
@@ -329,6 +329,38 @@ export default function Contracts() {
                   onChange={e => setNewContract(p => ({ ...p, distributor: e.target.value }))}
                   placeholder="BBC Studios"
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mode</label>
+                <Select value={newContract.contractMode} onValueChange={v => setNewContract(p => ({ ...p, contractMode: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="split">Split</SelectItem>
+                    <SelectItem value="umbrella">Umbrella</SelectItem>
+                    <SelectItem value="mixed">Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Total Fee</label>
+                <Input
+                  value={newContract.totalFeeAmount}
+                  onChange={e => setNewContract(p => ({ ...p, totalFeeAmount: e.target.value }))}
+                  placeholder="8375.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Currency</label>
+                <Select value={newContract.totalFeeCurrency} onValueChange={v => setNewContract(p => ({ ...p, totalFeeCurrency: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">

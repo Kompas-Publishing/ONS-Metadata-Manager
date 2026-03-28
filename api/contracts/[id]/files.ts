@@ -13,37 +13,33 @@ export default apiHandler(
     if (req.method === "POST") {
       try {
         const schema = z.object({
-          licenseId: z.string().min(1),
+          fileUrl: z.string().min(1),
+          fileName: z.string().min(1),
+          fileRole: z.string().optional(),
           sortOrder: z.number().optional(),
-          sourceTitle: z.string().optional(),
-          sourceTitles: z.any().optional(),
-          packageLabel: z.string().optional(),
-          sourceReference: z.string().optional(),
           notes: z.string().optional(),
-          sourceSnapshot: z.any().optional(),
-          mappingStatus: z.string().optional(),
         });
         const validation = schema.safeParse(req.body);
         if (!validation.success) {
           return res.status(400).json({ message: "Validation failed", errors: validation.error.errors });
         }
-        const link = await storage.linkContractToLicense({ contractId: id, ...validation.data });
-        return res.json(link || { message: "License linked" });
+        const file = await storage.addContractFile({ contractId: id, ...validation.data });
+        return res.json(file);
       } catch (error) {
-        console.error("Error linking license:", error);
-        return res.status(500).json({ message: "Failed to link license" });
+        console.error("Error adding contract file:", error);
+        return res.status(500).json({ message: "Failed to add file" });
       }
     }
 
     if (req.method === "DELETE") {
       try {
-        const { licenseId } = req.body;
-        if (!licenseId) return res.status(400).json({ message: "licenseId is required" });
-        await storage.unlinkContractFromLicense(id, licenseId);
-        return res.json({ message: "License unlinked" });
+        const { fileId } = req.body;
+        if (!fileId) return res.status(400).json({ message: "fileId required" });
+        await storage.removeContractFile(fileId);
+        return res.json({ message: "File removed" });
       } catch (error) {
-        console.error("Error unlinking license:", error);
-        return res.status(500).json({ message: "Failed to unlink license" });
+        console.error("Error removing contract file:", error);
+        return res.status(500).json({ message: "Failed to remove file" });
       }
     }
 

@@ -23,10 +23,12 @@ export default apiHandler(
         const schema = z.object({
           name: z.string().min(1),
           distributor: z.string().min(1),
+          contractMode: z.string().optional(),
+          status: z.string().optional(),
           description: z.string().optional(),
           notes: z.string().optional(),
-          fileUrl: z.string().optional(),
-          fileName: z.string().optional(),
+          totalFeeAmount: z.string().optional(),
+          totalFeeCurrency: z.string().optional(),
           sharedTerms: z.any().optional(),
           licenseIds: z.array(z.string()).optional(),
         });
