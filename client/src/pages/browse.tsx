@@ -1025,17 +1025,19 @@ export default function Browse() {
                     <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                       {canWriteMetadata && (
                         <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="gap-2 h-8"
-                          >
-                            <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}`}>
-                              <Edit className="w-3.5 h-3.5" />
-                              Batch Editor
-                            </Link>
-                          </Button>
+                          {episodes.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              className="gap-2 h-8"
+                            >
+                              <Link href={`/edit-season/${encodeURIComponent(selectedSeriesData?.title || '')}/${seasonNum}?ids=${episodes.map(e => e.id).join(',')}`}>
+                                <Edit className="w-3.5 h-3.5" />
+                                Batch Editor
+                              </Link>
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"

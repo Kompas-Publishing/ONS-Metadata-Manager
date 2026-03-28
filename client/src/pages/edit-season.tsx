@@ -139,22 +139,38 @@ export default function EditSeason() {
   const title = params?.title ? decodeURIComponent(params.title) : "";
   const seasonNum = params?.season ? parseInt(params.season) : 0;
 
+  // Read file IDs from query string if provided (precise mode)
+  const urlIds = new URLSearchParams(window.location.search).get("ids")?.split(",").filter(Boolean) || [];
+
   useEffect(() => {
     document.title = `Edit ${title} S${seasonNum} | ONS Broadcast Portal`;
   }, [title, seasonNum]);
 
   const [rows, setRows] = useState<Record<string, any>[]>([]);
 
-  const { data: seasonData, isLoading } = useQuery<MetadataFile[]>({
-    queryKey: ['/api/metadata/season', title, seasonNum],
-    enabled: !!title && seasonNum != null,
+  // Fetch all metadata, then filter by IDs if provided
+  const { data: allFiles, isLoading: allLoading } = useQuery<MetadataFile[]>({
+    queryKey: ["/api/metadata"],
+    enabled: urlIds.length > 0,
   });
 
+  // Fallback: fetch by title/season if no IDs provided
+  const { data: seasonData, isLoading: seasonLoading } = useQuery<MetadataFile[]>({
+    queryKey: ['/api/metadata/season', title, seasonNum],
+    enabled: urlIds.length === 0 && !!title && seasonNum != null,
+  });
+
+  const isLoading = urlIds.length > 0 ? allLoading : seasonLoading;
+
   useEffect(() => {
-    if (seasonData) {
+    if (urlIds.length > 0 && allFiles) {
+      const idSet = new Set(urlIds);
+      const filtered = allFiles.filter(f => idSet.has(f.id));
+      setRows(filtered.map(initFromFile));
+    } else if (seasonData) {
       setRows(seasonData.map(initFromFile));
     }
-  }, [seasonData]);
+  }, [allFiles, seasonData]);
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Array<{ id: string; data: any }>) => {
