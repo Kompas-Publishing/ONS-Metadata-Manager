@@ -31,6 +31,8 @@ import {
   tasks,
   seriesTable,
   seriesToLicenses,
+  contracts,
+  contractsToLicenses,
   type User,
   type UpsertUser,
   type MetadataFile,
@@ -51,6 +53,8 @@ import {
   type InsertSeries,
   type SeriesToLicense,
   type InsertSeriesToLicense,
+  type Contract,
+  type InsertContract,
 } from "./schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -1790,6 +1794,75 @@ export class DatabaseStorage {
   async getSettingsByKeys(keys: string[]): Promise<Setting[]> {
     if (keys.length === 0) return [];
     return await db.select().from(settings).where(inArray(settings.key, keys));
+  }
+  // --- Contract Management ---
+
+  async listContracts(): Promise<(Contract & { licenseCount: number; totalCost: number })[]> {
+    const allContracts = await db.select().from(contracts).orderBy(contracts.distributor, contracts.name);
+
+    const results = [];
+    for (const contract of allContracts) {
+      const links = await db
+        .select({ licenseId: contractsToLicenses.licenseId })
+        .from(contractsToLicenses)
+        .where(eq(contractsToLicenses.contractId, contract.id));
+
+      let totalCost = 0;
+      if (links.length > 0) {
+        const linkedLicenses = await db
+          .select({ amount: licenses.licenseFeeAmount })
+          .from(licenses)
+          .where(inArray(licenses.id, links.map(l => l.licenseId)));
+        totalCost = linkedLicenses.reduce((sum, l) => {
+          const amt = l.amount ? parseFloat(l.amount) : 0;
+          return sum + (isNaN(amt) ? 0 : amt);
+        }, 0);
+      }
+
+      results.push({ ...contract, licenseCount: links.length, totalCost });
+    }
+    return results;
+  }
+
+  async getContract(id: string): Promise<(Contract & { licenses: License[] }) | undefined> {
+    const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
+    if (!contract) return undefined;
+
+    const links = await db
+      .select({ licenseId: contractsToLicenses.licenseId })
+      .from(contractsToLicenses)
+      .where(eq(contractsToLicenses.contractId, id));
+
+    const linkedLicenses = links.length > 0
+      ? await db.select().from(licenses).where(inArray(licenses.id, links.map(l => l.licenseId)))
+      : [];
+
+    return { ...contract, licenses: linkedLicenses };
+  }
+
+  async createContract(data: InsertContract & { createdBy: string }): Promise<Contract> {
+    const [created] = await db.insert(contracts).values(data).returning();
+    return created;
+  }
+
+  async updateContract(id: string, data: Partial<InsertContract>): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts).set({ ...data, updatedAt: new Date() }).where(eq(contracts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteContract(id: string): Promise<boolean> {
+    const result = await db.delete(contracts).where(eq(contracts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async linkContractToLicense(contractId: string, licenseId: string): Promise<void> {
+    await db.insert(contractsToLicenses).values({ contractId, licenseId }).onConflictDoNothing();
+  }
+
+  async unlinkContractFromLicense(contractId: string, licenseId: string): Promise<void> {
+    await db.delete(contractsToLicenses).where(
+      and(eq(contractsToLicenses.contractId, contractId), eq(contractsToLicenses.licenseId, licenseId))
+    );
   }
 }
 

@@ -407,3 +407,45 @@ export const insertTaskSchema = createInsertSchema(tasks, {
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
+
+// Contracts table
+export const contracts = pgTable("contracts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  distributor: text("distributor").notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  fileUrl: text("file_url"), // Vercel Blob URL for the contract PDF
+  fileName: text("file_name"), // Original filename for display
+  sharedTerms: jsonb("shared_terms"), // Shared license terms (start, end, runs)
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_contracts_distributor").on(table.distributor),
+]);
+
+// Join table: contracts to licenses
+export const contractsToLicenses = pgTable("contracts_to_licenses", {
+  contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+}, (t) => [
+  uniqueIndex("contract_license_unique_idx").on(t.contractId, t.licenseId),
+]);
+
+export const insertContractSchema = createInsertSchema(contracts, {
+  name: z.string().min(1, "Name is required"),
+  distributor: z.string().min(1, "Distributor is required"),
+  description: z.string().optional(),
+  notes: z.string().optional(),
+  fileUrl: z.string().optional(),
+  fileName: z.string().optional(),
+}).omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertContract = z.infer<typeof insertContractSchema>;
+export type Contract = typeof contracts.$inferSelect;
