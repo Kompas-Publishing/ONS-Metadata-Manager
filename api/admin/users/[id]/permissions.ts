@@ -31,6 +31,7 @@ export default apiHandler(
         canWriteTasks: data.canWriteTasks !== undefined ? (data.canWriteTasks ? 1 : 0) : currentUser.canWriteTasks,
         canUseAI: data.canUseAI !== undefined ? (data.canUseAI ? 1 : 0) : currentUser.canUseAI,
         canUseAIChat: data.canUseAIChat !== undefined ? (data.canUseAIChat ? 1 : 0) : currentUser.canUseAIChat,
+        canAccessContracts: data.canAccessContracts !== undefined ? (data.canAccessContracts ? 1 : 0) : (currentUser as any).canAccessContracts || 0,
       };
 
       await storage.updateUserPermissions(id, updates);

@@ -39,6 +39,7 @@ function Router() {
     canWriteTasks, 
     canUseAI,
     canUseAIChat,
+    canAccessContracts,
     isAdmin
   } = useAuth();
 
@@ -160,7 +161,7 @@ function Router() {
 
       <Route path="/contracts">
         <AuthenticatedRoute>
-          {canReadLicenses || canWriteLicenses ? (
+          {canAccessContracts ? (
             <ProtectedLayout>
               <Contracts />
             </ProtectedLayout>

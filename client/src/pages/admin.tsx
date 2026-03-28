@@ -253,7 +253,8 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
           canWriteTasks: number;
           canUseAI: number;
           canUseAIChat: number;
-        } 
+          canAccessContracts?: number;
+        }
       }) => {
         const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, permissions);
         return await res.json();
@@ -852,6 +853,27 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
                                                       canUseAIChat: user.canUseAIChat,
+                                                      canAccessContracts: (user as any).canAccessContracts || 0,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Contracts Access</Label>
+                                                <Switch
+                                                  checked={(user as any).canAccessContracts === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
+                                                      canAccessContracts: checked ? 1 : 0,
                                                     }
                                                   })}
                                                 />

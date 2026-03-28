@@ -12,6 +12,7 @@ export interface UserPermissions {
     tasks: { read: boolean; write: boolean };
     ai: boolean;
     aiChat: boolean;
+    contracts: boolean;
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
@@ -47,13 +48,14 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
       },
       ai: isAdmin || (isActive && user.canUseAI === 1),
       aiChat: isAdmin || (isActive && user.canUseAIChat === 1),
+      contracts: isAdmin || (isActive && user.canAccessContracts === 1),
     },
     fileVisibility: user.fileVisibility as "own" | "all" | "group",
     groupIds: user.groupIds || [],
   };
 }
 
-export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat";
+export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat" | "contracts";
 export type PermissionAction = "read" | "write";
 
 export async function requirePermission(
@@ -80,6 +82,8 @@ export async function requirePermission(
     allowed = permissions.features.ai;
   } else if (feature === "aiChat") {
     allowed = permissions.features.aiChat;
+  } else if (feature === "contracts") {
+    allowed = permissions.features.contracts;
   } else {
     allowed = permissions.features[feature][action];
   }

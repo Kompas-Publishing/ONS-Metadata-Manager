@@ -55,6 +55,7 @@ export const users = pgTable("users", {
   canWriteTasks: integer("can_write_tasks").default(0).notNull(),
   canUseAI: integer("can_use_ai").default(0).notNull(),
   canUseAIChat: integer("can_use_ai_chat").default(0).notNull(),
+  canAccessContracts: integer("can_access_contracts").default(0).notNull(),
   fileVisibility: varchar("file_visibility", { length: 20 }).default("own").notNull(), // own, all, group
   groupIds: text("group_ids").array().default(sql`ARRAY[]::text[]`), // Array of group IDs user belongs to
   createdAt: timestamp("created_at").defaultNow(),

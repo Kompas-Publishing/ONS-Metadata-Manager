@@ -133,7 +133,7 @@ import { upload } from "@vercel/blob/client";
           icon: FileKey,
           testId: "nav-contracts",
           adminOnly: false,
-          permissionKey: "canReadLicenses",
+          permissionKey: "canAccessContracts",
         },
       ]
     },
