@@ -25,6 +25,7 @@ import CreateLicense from "@/pages/create-license";
 import ViewLicense from "@/pages/view-license";
 import EditLicense from "@/pages/edit-license";
 import Contracts from "@/pages/contracts";
+import ViewContract from "@/pages/view-contract";
 import Tasks from "@/pages/tasks";
 import AiUpload from "@/pages/ai-upload";
 import AiChat from "@/pages/ai-chat";
@@ -156,6 +157,16 @@ function Router() {
               <CreateLicense />
             </ProtectedLayout>
           ) : <Redirect to="/licenses" />}
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/contracts/:id">
+        <AuthenticatedRoute>
+          {canAccessContracts ? (
+            <ProtectedLayout>
+              <ViewContract />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
 

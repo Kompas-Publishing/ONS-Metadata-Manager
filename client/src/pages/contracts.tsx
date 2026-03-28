@@ -1,12 +1,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -18,14 +21,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Plus, Search, FileText, Download, Trash2, Pencil, ChevronDown, ChevronUp,
-  Upload, Loader2, ExternalLink, ArrowLeft,
+  Plus, Search, FileText, Download, Trash2, ArrowUpDown, ArrowUp, ArrowDown,
+  Upload, Loader2, Filter, ArrowLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
@@ -35,7 +32,7 @@ import { upload } from "@vercel/blob/client";
 import type { License } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
-interface ContractWithStats {
+interface ContractListItem {
   id: string;
   name: string;
   distributor: string;
@@ -49,57 +46,68 @@ interface ContractWithStats {
   totalCost: number;
 }
 
-interface ContractDetail extends ContractWithStats {
-  licenses: License[];
-}
+type SortKey = "name" | "distributor" | "licenseCount" | "totalCost";
 
 export default function Contracts() {
   const { canAccessContracts } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const [openDistributors, setOpenDistributors] = useState<Record<string, boolean>>({});
+  const [distributorFilter, setDistributorFilter] = useState<string>("all");
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "distributor", direction: "asc" });
   const [createOpen, setCreateOpen] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Contracts | ONS Broadcast Portal";
   }, []);
 
-  const { data: contractsList, isLoading } = useQuery<ContractWithStats[]>({
+  const { data: contractsList, isLoading } = useQuery<ContractListItem[]>({
     queryKey: ["/api/contracts"],
     enabled: !!canAccessContracts,
   });
 
-  const { data: contractDetail } = useQuery<ContractDetail>({
-    queryKey: [`/api/contracts/${detailId}`],
-    enabled: !!detailId,
-  });
+  const distributors = useMemo(() => {
+    if (!contractsList) return [];
+    return Array.from(new Set(contractsList.map(c => c.distributor))).sort();
+  }, [contractsList]);
 
-  const { data: allLicenses } = useQuery<License[]>({
-    queryKey: ["/api/licenses"],
-  });
-
-  // Group by distributor
-  const grouped = useMemo(() => {
-    if (!contractsList) return {};
-    const filtered = contractsList.filter(c =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.distributor.toLowerCase().includes(search.toLowerCase())
-    );
-    const groups: Record<string, ContractWithStats[]> = {};
-    filtered.forEach(c => {
-      if (!groups[c.distributor]) groups[c.distributor] = [];
-      groups[c.distributor].push(c);
-    });
-    return groups;
-  }, [contractsList, search]);
-
-  const toggleDistributor = (d: string) => {
-    setOpenDistributors(prev => ({ ...prev, [d]: !(prev[d] ?? true) }));
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
   };
 
-  // Create mutation
+  const filteredContracts = useMemo(() => {
+    if (!contractsList) return [];
+    return contractsList
+      .filter(c => {
+        const q = search.toLowerCase();
+        const matchesSearch = c.name.toLowerCase().includes(q) || c.distributor.toLowerCase().includes(q);
+        const matchesDistributor = distributorFilter === "all" || c.distributor === distributorFilter;
+        return matchesSearch && matchesDistributor;
+      })
+      .sort((a, b) => {
+        const av = a[sortConfig.key];
+        const bv = b[sortConfig.key];
+        if (av === bv) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        const cmp = av < bv ? -1 : 1;
+        return sortConfig.direction === "asc" ? cmp : -cmp;
+      });
+  }, [contractsList, search, distributorFilter, sortConfig]);
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(amount);
+
+  // Create contract state
   const [newContract, setNewContract] = useState({ name: "", distributor: "", description: "", notes: "" });
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ url: string; name: string } | null>(null);
@@ -127,7 +135,6 @@ export default function Contracts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      if (detailId) setDetailId(null);
       toast({ title: "Contract deleted" });
     },
   });
@@ -137,12 +144,12 @@ export default function Contracts() {
     if (!file) return;
     setUploading(true);
     try {
-      // Randomize filename to prevent duplicates
       const ext = file.name.split(".").pop() || "pdf";
       const randomName = `contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const blob = await upload(randomName, file, {
-        access: "public",
+        access: "private",
         handleUploadUrl: "/api/blob/upload",
+        clientPayload: JSON.stringify({ type: "contract" }),
       });
       setUploadedFile({ url: blob.url, name: file.name });
       toast({ title: "File uploaded" });
@@ -153,307 +160,176 @@ export default function Contracts() {
     }
   };
 
-  const linkLicenseMutation = useMutation({
-    mutationFn: async ({ contractId, licenseId }: { contractId: string; licenseId: string }) => {
-      await apiRequest("POST", `/api/contracts/${contractId}/licenses`, { licenseId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      if (detailId) queryClient.invalidateQueries({ queryKey: [`/api/contracts/${detailId}`] });
-      toast({ title: "License linked" });
-    },
-  });
-
-  const unlinkLicenseMutation = useMutation({
-    mutationFn: async ({ contractId, licenseId }: { contractId: string; licenseId: string }) => {
-      await apiRequest("DELETE", `/api/contracts/${contractId}/licenses`, { licenseId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      if (detailId) queryClient.invalidateQueries({ queryKey: [`/api/contracts/${detailId}`] });
-      toast({ title: "License unlinked" });
-    },
-  });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(amount);
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-3">
-        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
       </div>
     );
   }
 
-  // Detail view
-  if (detailId && contractDetail) {
-    const totalCost = contractDetail.licenses.reduce((sum, l) => {
-      const amt = l.licenseFeeAmount ? parseFloat(l.licenseFeeAmount) : 0;
-      return sum + (isNaN(amt) ? 0 : amt);
-    }, 0);
-
-    return (
-      <div className="space-y-6 max-w-5xl mx-auto">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setDetailId(null)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">{contractDetail.name}</h1>
-            <p className="text-sm text-muted-foreground">{contractDetail.distributor}</p>
-          </div>
-          {contractDetail.fileUrl && (
-            <a href={contractDetail.fileUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="w-4 h-4" />
-                Download Contract
-              </Button>
-            </a>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{contractDetail.licenses.length}</p>
-              <p className="text-xs text-muted-foreground">Linked Licenses</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{formatCurrency(totalCost)}</p>
-              <p className="text-xs text-muted-foreground">Total License Cost</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{contractDetail.createdAt ? format(new Date(contractDetail.createdAt), "dd MMM yyyy") : "—"}</p>
-              <p className="text-xs text-muted-foreground">Created</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Description & Notes */}
-        {(contractDetail.description || contractDetail.notes) && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              {contractDetail.description && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Description</p>
-                  <p className="text-sm">{contractDetail.description}</p>
-                </div>
-              )}
-              {contractDetail.notes && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Notes</p>
-                  <p className="text-sm whitespace-pre-wrap">{contractDetail.notes}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Shared terms */}
-        {contractDetail.sharedTerms && (
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase mb-2">Shared Terms</p>
-              <div className="flex gap-4 text-sm">
-                {contractDetail.sharedTerms.license_period_start && (
-                  <span>Start: {contractDetail.sharedTerms.license_period_start}</span>
-                )}
-                {contractDetail.sharedTerms.license_period_end && (
-                  <span>End: {contractDetail.sharedTerms.license_period_end}</span>
-                )}
-                {contractDetail.sharedTerms.allowed_runs && (
-                  <span>Runs: {contractDetail.sharedTerms.allowed_runs}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Linked licenses */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Linked Licenses</h2>
-            <LinkLicenseButton
-              contractId={detailId}
-              existingIds={contractDetail.licenses.map(l => l.id)}
-              allLicenses={allLicenses || []}
-              onLink={(licenseId) => linkLicenseMutation.mutate({ contractId: detailId, licenseId })}
-            />
-          </div>
-          {contractDetail.licenses.length > 0 ? (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="text-xs">License</TableHead>
-                    <TableHead className="text-xs">Season</TableHead>
-                    <TableHead className="text-xs">Fee</TableHead>
-                    <TableHead className="text-xs text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contractDetail.licenses.map(license => (
-                    <TableRow key={license.id}>
-                      <TableCell>
-                        <Link href={`/licenses/${license.id}`} className="text-primary hover:underline text-sm">
-                          {license.name}
-                        </Link>
-                        {license.contentTitle && license.contentTitle !== license.name && (
-                          <span className="text-xs text-muted-foreground ml-2">{license.contentTitle}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm">{license.season || "—"}</TableCell>
-                      <TableCell className="text-sm font-mono">
-                        {license.licenseFeeAmount ? formatCurrency(parseFloat(license.licenseFeeAmount)) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive h-7"
-                          onClick={() => unlinkLicenseMutation.mutate({ contractId: detailId, licenseId: license.id })}
-                        >
-                          Unlink
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">No licenses linked yet.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // List view
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header — matches License Manager */}
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Contracts</h1>
-          <p className="text-muted-foreground mt-1">
-            {contractsList?.length || 0} contracts from {Object.keys(grouped).length} distributors
+          <p className="text-muted-foreground mt-2">
+            Manage distributor contracts and linked licenses
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4" />
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
           Add Contract
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search contracts or distributors..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-10"
-        />
+      {/* Filters — matches License Manager */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search contracts or distributors..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="w-full md:w-[200px]">
+          <Select value={distributorFilter} onValueChange={setDistributorFilter}>
+            <SelectTrigger>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Filter className="h-4 w-4" />
+                <SelectValue placeholder="Filter by distributor" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Distributors</SelectItem>
+              {distributors.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {Object.keys(grouped).length === 0 ? (
-        <div className="border-2 border-dashed rounded-lg p-12 text-center">
-          <FileText className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No contracts found</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([distributor, items]) => {
-            const isOpen = openDistributors[distributor] ?? true;
-            const distributorTotal = items.reduce((sum, c) => sum + c.totalCost, 0);
-            return (
-              <Collapsible key={distributor} open={isOpen} onOpenChange={() => toggleDistributor(distributor)}>
-                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg cursor-pointer hover:bg-muted/60" onClick={() => toggleDistributor(distributor)}>
-                  <div className="flex items-center gap-3">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="sm" className="p-0 h-6 w-6">
-                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <span className="font-semibold">{distributor}</span>
-                    <Badge variant="secondary" className="text-xs">{items.length}</Badge>
-                  </div>
-                  <span className="text-sm text-muted-foreground font-mono">{formatCurrency(distributorTotal)}</span>
-                </div>
-                <CollapsibleContent>
-                  <div className="ml-4 mt-2 space-y-1 border-l-2 border-muted pl-4">
-                    {items.map(contract => (
-                      <div
-                        key={contract.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => setDetailId(contract.id)}
-                      >
-                        <div className="min-w-0">
-                          <span className="text-sm font-medium">{contract.name}</span>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                            <span>{contract.licenseCount} licenses</span>
-                            <span className="font-mono">{formatCurrency(contract.totalCost)}</span>
-                            {contract.fileUrl && <FileText className="w-3 h-3" />}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={e => e.stopPropagation()}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={e => e.stopPropagation()}>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete contract?</AlertDialogTitle>
-                                <AlertDialogDescription>This will permanently delete "{contract.name}".</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(contract.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
+      {/* Table — matches License Manager */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Contracts ({filteredContracts.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="cursor-pointer hover:text-primary" onClick={() => handleSort("name")}>
+                  <div className="flex items-center">Contract<SortIcon column="name" /></div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:text-primary" onClick={() => handleSort("distributor")}>
+                  <div className="flex items-center">Distributor<SortIcon column="distributor" /></div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:text-primary" onClick={() => handleSort("licenseCount")}>
+                  <div className="flex items-center">Licenses<SortIcon column="licenseCount" /></div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:text-primary" onClick={() => handleSort("totalCost")}>
+                  <div className="flex items-center">Total Cost<SortIcon column="totalCost" /></div>
+                </TableHead>
+                <TableHead>File</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredContracts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No contracts found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredContracts.map(contract => (
+                  <TableRow key={contract.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <Link href={`/contracts/${contract.id}`} className="text-primary hover:underline">
+                          {contract.name}
+                        </Link>
+                        {contract.description && (
+                          <span className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{contract.description}</span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-        </div>
-      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-normal">{contract.distributor}</Badge>
+                    </TableCell>
+                    <TableCell>{contract.licenseCount}</TableCell>
+                    <TableCell className="font-mono">{formatCurrency(contract.totalCost)}</TableCell>
+                    <TableCell>
+                      {contract.fileUrl ? (
+                        <a href={`/api/blob/view?url=${encodeURIComponent(contract.fileUrl)}`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
+                            <Download className="w-3.5 h-3.5" />
+                            {contract.fileName || "PDF"}
+                          </Button>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/contracts/${contract.id}`}>View</Link>
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete contract?</AlertDialogTitle>
+                              <AlertDialogDescription>This will permanently delete "{contract.name}".</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteMutation.mutate(contract.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Contract</DialogTitle>
-            <DialogDescription>Add a new contract with optional file upload.</DialogDescription>
+            <DialogDescription>Create a new contract entry with optional file upload.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Contract Name</label>
-              <Input
-                value={newContract.name}
-                onChange={e => setNewContract(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. BBC - December Package (2024-01-09)"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Distributor</label>
-              <Input
-                value={newContract.distributor}
-                onChange={e => setNewContract(p => ({ ...p, distributor: e.target.value }))}
-                placeholder="e.g. BBC Studios Distribution Limited"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Contract Name *</label>
+                <Input
+                  value={newContract.name}
+                  onChange={e => setNewContract(p => ({ ...p, name: e.target.value }))}
+                  placeholder="BBC - December Package (2024)"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Distributor *</label>
+                <Input
+                  value={newContract.distributor}
+                  onChange={e => setNewContract(p => ({ ...p, distributor: e.target.value }))}
+                  placeholder="BBC Studios"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Description</label>
@@ -474,21 +350,21 @@ export default function Contracts() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Contract File (PDF)</label>
+              <label className="text-sm font-medium">Contract File</label>
               {uploadedFile ? (
                 <div className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="truncate flex-1">{uploadedFile.name}</span>
-                  <Button variant="ghost" size="sm" className="h-6" onClick={() => setUploadedFile(null)}>Remove</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setUploadedFile(null)}>Remove</Button>
                 </div>
               ) : (
-                <div>
+                <>
                   <input type="file" accept=".pdf,.doc,.docx" onChange={handleFileUpload} className="hidden" id="contract-upload" />
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => document.getElementById("contract-upload")?.click()} disabled={uploading}>
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     {uploading ? "Uploading..." : "Upload File"}
                   </Button>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -497,62 +373,17 @@ export default function Contracts() {
             <Button
               onClick={() => createMutation.mutate({
                 ...newContract,
-                fileUrl: uploadedFile?.url || undefined,
-                fileName: uploadedFile?.name || undefined,
+                fileUrl: uploadedFile?.url,
+                fileName: uploadedFile?.name,
               })}
               disabled={!newContract.name || !newContract.distributor || createMutation.isPending}
             >
               {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Create
+              Create Contract
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-// Small helper component for linking licenses
-function LinkLicenseButton({ contractId, existingIds, allLicenses, onLink }: {
-  contractId: string;
-  existingIds: string[];
-  allLicenses: License[];
-  onLink: (licenseId: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState("");
-  const available = allLicenses.filter(l => !existingIds.includes(l.id));
-
-  return (
-    <>
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Plus className="w-3.5 h-3.5" /> Link License
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Link License</DialogTitle>
-          </DialogHeader>
-          <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a license..." />
-            </SelectTrigger>
-            <SelectContent>
-              {available.map(l => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.name} {l.season ? `(S${l.season})` : ""} — {l.distributor}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button disabled={!selected} onClick={() => { onLink(selected); setSelected(""); setOpen(false); }}>
-              Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
