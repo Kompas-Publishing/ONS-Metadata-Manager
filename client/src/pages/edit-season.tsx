@@ -130,12 +130,15 @@ export default function EditSeason() {
 
   const isLoading = urlIds.length > 0 ? allLoading : seasonLoading;
 
+  const sortByEpisode = (rows: Record<string, any>[]) =>
+    [...rows].sort((a, b) => (parseInt(a.episode) || 0) - (parseInt(b.episode) || 0));
+
   useEffect(() => {
     if (urlIds.length > 0 && allFiles) {
       const idSet = new Set(urlIds);
-      setRows(allFiles.filter(f => idSet.has(f.id)).map(initFromFile));
+      setRows(sortByEpisode(allFiles.filter(f => idSet.has(f.id)).map(initFromFile)));
     } else if (seasonData) {
-      setRows(seasonData.map(initFromFile));
+      setRows(sortByEpisode(seasonData.map(initFromFile)));
     }
   }, [allFiles, seasonData]);
 
@@ -219,7 +222,7 @@ export default function EditSeason() {
     });
   }, []);
 
-  const addRow = () => {
+  const addRow = async () => {
     const lastRow = rows[rows.length - 1];
     const row = newEmptyRow();
     // Pre-fill from context
@@ -228,6 +231,17 @@ export default function EditSeason() {
     row.season = lastRow?.season || seasonNum.toString();
     row.channel = lastRow?.channel || "ONS";
     row.episode = lastRow?.episode ? (parseInt(lastRow.episode) + 1).toString() : "";
+    // Auto-generate an ID
+    try {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch("/api/metadata/next-id", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const id = await res.json();
+        row.id = id;
+      }
+    } catch { /* ignore — will be generated server-side on save */ }
     setRows((prev) => [...prev, row]);
   };
 
