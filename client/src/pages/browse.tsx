@@ -371,8 +371,8 @@ export default function Browse() {
         const allEpisodes = Object.values(series.seasons).flat();
         if (statusFilter === "draft" && !allEpisodes.some(f => f.draft === 1)) return false;
         if (statusFilter === "published" && allEpisodes.every(f => f.draft === 1)) return false;
-        if (completionFilter === "incomplete" && !allEpisodes.some(f => computeMetadataStatus(f) !== "green")) return false;
-        if (completionFilter === "complete" && allEpisodes.some(f => computeMetadataStatus(f) !== "green")) return false;
+        if (completionFilter === "incomplete" && !allEpisodes.some(f => computeMetadataStatus(f) === "incomplete")) return false;
+        if (completionFilter === "complete" && allEpisodes.some(f => computeMetadataStatus(f) === "incomplete")) return false;
         return true;
       })
       .sort((a, b) => {
@@ -748,21 +748,18 @@ export default function Browse() {
                         <ShieldCheck className="w-4 h-4" /> Associated Licenses
                       </h4>
                     </div>
-                    <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
                       {seriesDetails?.licenses && seriesDetails.licenses.length > 0 ? (
-                        seriesDetails.licenses.map((license) => (
-                          <div key={license.id} className="flex flex-col border-l-2 border-primary/20 pl-3 py-1">
-                            <Link href={`/licenses/${license.id}`} className="text-sm font-medium hover:underline flex items-center gap-1.5">
+                        seriesDetails.licenses.map((license: any) => (
+                          <Link key={license.id} href={`/licenses/${license.id}`}>
+                            <Badge variant="outline" className="cursor-pointer hover:bg-primary/5 py-1.5 px-2.5">
                               {license.name}
-                              <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                            </Link>
-                            <span className="text-xs text-muted-foreground">
-                              {license.seasonRange ? `Seasons: ${license.seasonRange}` : "All Seasons"}
-                            </span>
-                          </div>
+                              {license.seasonRange && <span className="text-muted-foreground ml-1.5">S{license.seasonRange}</span>}
+                            </Badge>
+                          </Link>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground italic">No licenses linked to this series</p>
+                        <p className="text-sm text-muted-foreground italic">No licenses linked</p>
                       )}
                     </div>
                   </div>

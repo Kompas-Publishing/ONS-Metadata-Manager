@@ -1682,7 +1682,15 @@ export class DatabaseStorage {
   }
 
   async getSeriesLicensesFromEpisodes(seriesId: string): Promise<(License & { seasonRange: string | null })[]> {
+    // Get the series title to also match by title (many files don't have seriesId set)
+    const [series] = await db.select().from(seriesTable).where(eq(seriesTable.id, seriesId));
+    const seriesTitle = series?.title;
+
     // Derive licenses from episode-level links (metadataToLicenses join table)
+    const whereConditions = seriesTitle
+      ? or(eq(metadataFiles.seriesId, seriesId), eq(metadataFiles.title, seriesTitle))
+      : eq(metadataFiles.seriesId, seriesId);
+
     const results = await db
       .select({
         license: licenses,
@@ -1691,7 +1699,7 @@ export class DatabaseStorage {
       .from(metadataToLicenses)
       .innerJoin(metadataFiles, eq(metadataToLicenses.metadataFileId, metadataFiles.id))
       .innerJoin(licenses, eq(metadataToLicenses.licenseId, licenses.id))
-      .where(eq(metadataFiles.seriesId, seriesId));
+      .where(whereConditions);
 
     // Group by license and compute season ranges
     const licenseMap = new Map<string, { license: License; seasons: Set<number> }>();
@@ -1714,7 +1722,10 @@ export class DatabaseStorage {
 
     return Array.from(licenseMap.values()).map(({ license, seasons }) => {
       const sortedSeasons = Array.from(seasons).sort((a, b) => a - b);
-      const seasonRange = sortedSeasons.length > 0 ? compactSeasonRange(sortedSeasons) : null;
+      // Use computed seasons from episodes, or fall back to the license's own season field
+      const seasonRange = sortedSeasons.length > 0
+        ? compactSeasonRange(sortedSeasons)
+        : (license.season || null);
       return { ...license, seasonRange };
     });
   }
