@@ -83,6 +83,7 @@ export const licenses = pgTable("licenses", {
   notes: text("notes"),
   productionYear: integer("production_year"),
   subsFromDistributor: integer("subs_from_distributor").default(0),
+  season: text("season"), // e.g. "1" or "1, 2, 4"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -104,6 +105,7 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
   notes: z.string().optional(),
   productionYear: z.number().int().optional(),
   subsFromDistributor: z.number().int().min(0).max(1).optional(),
+  season: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,

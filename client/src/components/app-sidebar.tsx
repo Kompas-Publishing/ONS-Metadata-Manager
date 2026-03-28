@@ -127,6 +127,14 @@ import { upload } from "@vercel/blob/client";
           adminOnly: false,
           permissionKey: "canWriteLicenses",
         },
+        {
+          title: "Contracts",
+          url: "/contracts",
+          icon: FileKey,
+          testId: "nav-contracts",
+          adminOnly: false,
+          permissionKey: "canReadLicenses",
+        },
       ]
     },
     {

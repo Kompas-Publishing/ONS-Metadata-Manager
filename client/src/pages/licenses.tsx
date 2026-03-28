@@ -43,6 +43,13 @@ type SortConfig = {
   direction: "asc" | "desc" | null;
 };
 
+// Parse first season number for sorting (e.g. "1, 2, 4" → 1, "10" → 10, null → Infinity)
+function parseSeasonNumber(season: string | null | undefined): number {
+  if (!season) return Infinity;
+  const first = parseInt(season.split(",")[0].trim());
+  return isNaN(first) ? Infinity : first;
+}
+
 export default function Licenses() {
   const { canWriteLicenses, canReadLicenses } = useAuth();
 
@@ -117,7 +124,15 @@ export default function Licenses() {
           bValue = b[sortConfig.key as keyof License];
         }
 
-        if (aValue === bValue) return 0;
+        if (aValue === bValue) {
+          // Secondary sort by season when names match
+          if (sortConfig.key === "name") {
+            const aSeason = parseSeasonNumber(a.season);
+            const bSeason = parseSeasonNumber(b.season);
+            if (aSeason !== bSeason) return aSeason - bSeason;
+          }
+          return 0;
+        }
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
 
@@ -273,11 +288,18 @@ export default function Licenses() {
                             <FileText className="w-4 h-4 text-muted-foreground" />
                             {license.name}
                           </div>
-                          {license.contentTitle && license.contentTitle !== license.name && (
-                            <span className="text-xs text-muted-foreground ml-6 italic">
-                              {license.contentTitle}
-                            </span>
-                          )}
+                          <div className="ml-6 flex items-center gap-2">
+                            {license.season && (
+                              <span className="text-xs text-primary font-medium">
+                                Season {license.season}
+                              </span>
+                            )}
+                            {license.contentTitle && license.contentTitle !== license.name && (
+                              <span className="text-xs text-muted-foreground italic">
+                                {license.contentTitle}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

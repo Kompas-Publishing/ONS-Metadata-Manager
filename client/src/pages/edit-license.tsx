@@ -74,6 +74,7 @@ export default function EditLicense() {
       notes: "",
       productionYear: undefined,
       subsFromDistributor: 0,
+      season: "",
     },
   });
 
@@ -97,6 +98,7 @@ export default function EditLicense() {
           notes: license.notes || "",
           productionYear: license.productionYear || undefined,
           subsFromDistributor: license.subsFromDistributor || 0,
+          season: license.season || "",
         });
       } catch {
         // Form reset failed silently
@@ -414,6 +416,20 @@ export default function EditLicense() {
                           value={field.value || ""} 
                           onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="season"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Season</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 1 or 1, 2, 4" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

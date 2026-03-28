@@ -74,6 +74,7 @@ export default function CreateLicense() {
       notes: "",
       productionYear: undefined,
       subsFromDistributor: 0,
+      season: "",
       metadataIds: [],
       newBatches: [],
     },
@@ -397,6 +398,20 @@ export default function CreateLicense() {
                           value={field.value || ""} 
                           onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="season"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Season</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 1 or 1, 2, 4" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
