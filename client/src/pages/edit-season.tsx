@@ -147,7 +147,7 @@ export default function EditSeason() {
 
   const { data: seasonData, isLoading } = useQuery<MetadataFile[]>({
     queryKey: ['/api/metadata/season', title, seasonNum],
-    enabled: !!title && !!seasonNum,
+    enabled: !!title && seasonNum != null,
   });
 
   useEffect(() => {
