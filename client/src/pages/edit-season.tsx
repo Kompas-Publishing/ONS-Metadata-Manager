@@ -3,132 +3,104 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Save, Loader2, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { MetadataFile } from "@shared/schema";
 
-// Matches the export XLSX column structure
-const COLUMNS = [
-  { key: "channel", label: "Channel", width: "w-20", type: "text" },
-  { key: "id", label: "ID", width: "w-36", type: "readonly" },
-  { key: "title", label: "Title", width: "w-40", type: "readonly" },
-  { key: "description", label: "Description", width: "w-64", type: "text" },
-  { key: "genre", label: "Genre", width: "w-40", type: "tags" },
-  { key: "programRating", label: "Rating", width: "w-20", type: "select", options: ["AL", "6", "9", "12", "16", "18"] },
-  { key: "productionCountry", label: "Country", width: "w-20", type: "text" },
-  { key: "yearOfProduction", label: "Year", width: "w-20", type: "number" },
-  { key: "catchUp", label: "CatchUp", width: "w-16", type: "bool" },
-  { key: "season", label: "S", width: "w-12", type: "readonly" },
-  { key: "episodeCount", label: "Eps", width: "w-12", type: "readonly" },
-  { key: "episodeTitle", label: "Episode Title", width: "w-48", type: "text" },
-  { key: "episode", label: "Ep#", width: "w-14", type: "readonly" },
-  { key: "duration", label: "Duration", width: "w-24", type: "text" },
-  { key: "segmented", label: "Seg", width: "w-14", type: "bool" },
-  { key: "breakTimes", label: "Break Times", width: "w-36", type: "tags" },
-  { key: "subtitles", label: "Subs", width: "w-14", type: "bool" },
-  { key: "endCredits", label: "End Credits", width: "w-24", type: "text" },
-  { key: "contentType", label: "Type", width: "w-28", type: "select", options: ["Long Form", "Short Form", "program", "commercial", "Promo", "Filler"] },
-  { key: "seasonType", label: "Season Type", width: "w-24", type: "select", options: ["Winter", "Summer", "Autumn", "Spring"] },
-  { key: "draft", label: "Draft", width: "w-14", type: "bool" },
-  { key: "subsStatus", label: "Subs Status", width: "w-28", type: "select", options: ["Incomplete", "Complete"] },
-  { key: "metadataTimesStatus", label: "Meta Status", width: "w-28", type: "select", options: ["Incomplete", "Complete"] },
-  { key: "actors", label: "Actors", width: "w-48", type: "tags" },
-  { key: "tags", label: "Tags", width: "w-36", type: "tags" },
-] as const;
-
-type ColDef = (typeof COLUMNS)[number];
+// Column definitions — tooltip shows help text on hover
+const COLUMNS: { key: string; label: string; width: string; type: "text" | "bool" | "readonly" | "tags"; tooltip?: string }[] = [
+  { key: "channel", label: "Channel", width: "w-24", type: "text", tooltip: "Broadcasting channel (e.g. ONS)" },
+  { key: "id", label: "ID", width: "w-32", type: "readonly", tooltip: "Auto-generated file ID" },
+  { key: "title", label: "Title", width: "w-44", type: "text", tooltip: "Series title (Clipnaam)" },
+  { key: "description", label: "Description", width: "w-64", type: "text", tooltip: "Episode description (nl)" },
+  { key: "genre", label: "Genre", width: "w-40", type: "tags", tooltip: "Pipe-separated: Action|Drama|Comedy" },
+  { key: "programRating", label: "Rating", width: "w-20", type: "text", tooltip: "AL, 6, 9, 12, 16, 18" },
+  { key: "productionCountry", label: "Country", width: "w-24", type: "text", tooltip: "Production country code (e.g. NL, DE, US)" },
+  { key: "seriesTitle", label: "Series", width: "w-40", type: "text", tooltip: "Series title (if different from Title)" },
+  { key: "yearOfProduction", label: "Year", width: "w-20", type: "text", tooltip: "Year of production (e.g. 2024)" },
+  { key: "catchUp", label: "CU", width: "w-12", type: "bool", tooltip: "CatchUp availability" },
+  { key: "season", label: "S", width: "w-14", type: "text", tooltip: "Season number" },
+  { key: "episodeTitle", label: "Episode Title", width: "w-48", type: "text", tooltip: "Episode-specific title" },
+  { key: "episode", label: "Ep#", width: "w-14", type: "text", tooltip: "Episode number" },
+  { key: "episodeDescription", label: "Ep Description", width: "w-64", type: "text", tooltip: "Episode-specific description" },
+  { key: "duration", label: "Duration", width: "w-24", type: "text", tooltip: "Format: HH:MM:SS" },
+  { key: "segmented", label: "Seg", width: "w-12", type: "bool", tooltip: "Segmented content" },
+  { key: "breakTimes", label: "Break Times", width: "w-40", type: "tags", tooltip: "Comma-separated: 00:12:30, 00:25:00" },
+  { key: "dateStart", label: "Start", width: "w-28", type: "text", tooltip: "Start date (YYYY-MM-DD)" },
+  { key: "dateEnd", label: "End", width: "w-28", type: "text", tooltip: "End date (YYYY-MM-DD)" },
+  { key: "subtitles", label: "Subs", width: "w-12", type: "bool", tooltip: "Subtitles available" },
+  { key: "subtitlesId", label: "Subs ID", width: "w-28", type: "text", tooltip: "Subtitle file identifier" },
+  { key: "contentType", label: "Type", width: "w-28", type: "text", tooltip: "Long Form, Short Form, program, commercial, Promo, Filler" },
+  { key: "seasonType", label: "Season", width: "w-24", type: "text", tooltip: "Winter, Summer, Autumn, Spring" },
+  { key: "subsStatus", label: "Subs Status", width: "w-28", type: "text", tooltip: "Incomplete or Complete" },
+  { key: "tags", label: "Tags", width: "w-36", type: "tags", tooltip: "Comma-separated tags" },
+];
 
 function initFromFile(ep: MetadataFile): Record<string, any> {
   return {
     id: ep.id,
+    _isNew: false,
     channel: ep.channel || "ONS",
     title: ep.title || "",
     description: ep.description || "",
     genre: ep.genre || [],
     programRating: ep.programRating || "",
     productionCountry: ep.productionCountry || "",
-    yearOfProduction: ep.yearOfProduction || "",
+    seriesTitle: ep.seriesTitle || "",
+    yearOfProduction: ep.yearOfProduction?.toString() || "",
     catchUp: ep.catchUp ?? 0,
-    season: ep.season || 0,
-    episodeCount: ep.episodeCount || 0,
+    season: ep.season?.toString() || "",
     episodeTitle: ep.episodeTitle || "",
-    episode: ep.episode || 0,
+    episode: ep.episode?.toString() || "",
+    episodeDescription: ep.episodeDescription || "",
     duration: ep.duration || "",
     segmented: ep.segmented ?? 0,
     breakTimes: ep.breakTimes || [],
+    dateStart: ep.dateStart ? new Date(ep.dateStart).toISOString().split("T")[0] : "",
+    dateEnd: ep.dateEnd ? new Date(ep.dateEnd).toISOString().split("T")[0] : "",
     subtitles: ep.subtitles ?? 0,
-    endCredits: ep.endCredits || "",
+    subtitlesId: ep.subtitlesId || "",
     contentType: ep.contentType || "",
     seasonType: ep.seasonType || "",
-    draft: ep.draft ?? 0,
     subsStatus: ep.subsStatus || "Incomplete",
-    metadataTimesStatus: ep.metadataTimesStatus || "Incomplete",
-    actors: ep.actors || [],
     tags: ep.tags || [],
   };
 }
 
-function CellInput({ col, value, onChange }: { col: ColDef; value: any; onChange: (v: any) => void }) {
-  const base = "h-7 text-xs rounded-none border-0 border-b border-transparent focus:border-primary focus:ring-0 bg-transparent px-2";
-
-  if (col.type === "readonly") {
-    return <span className="text-xs text-muted-foreground px-2 py-1 truncate block">{value}</span>;
-  }
-  if (col.type === "bool") {
-    return (
-      <div className="flex items-center justify-center h-7">
-        <Checkbox checked={value === 1} onCheckedChange={(c) => onChange(c ? 1 : 0)} className="h-3.5 w-3.5" />
-      </div>
-    );
-  }
-  if (col.type === "select") {
-    return (
-      <Select value={value || ""} onValueChange={onChange}>
-        <SelectTrigger className={`${base} h-7 text-xs`}>
-          <SelectValue placeholder="-" />
-        </SelectTrigger>
-        <SelectContent>
-          {(col as any).options.map((opt: string) => (
-            <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-  if (col.type === "number") {
-    return (
-      <Input
-        type="number"
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : "")}
-        className={base}
-      />
-    );
-  }
-  if (col.type === "tags") {
-    const arr = Array.isArray(value) ? value : [];
-    return (
-      <Input
-        value={arr.join(", ")}
-        onChange={(e) => onChange(e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
-        className={base}
-        placeholder="comma, separated"
-      />
-    );
-  }
-  return (
-    <Input
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
-      className={base}
-    />
-  );
+function newEmptyRow(): Record<string, any> {
+  return {
+    id: "",
+    _isNew: true,
+    channel: "ONS",
+    title: "",
+    description: "",
+    genre: [],
+    programRating: "",
+    productionCountry: "",
+    seriesTitle: "",
+    yearOfProduction: "",
+    catchUp: 0,
+    season: "",
+    episodeTitle: "",
+    episode: "",
+    episodeDescription: "",
+    duration: "",
+    segmented: 0,
+    breakTimes: [],
+    dateStart: "",
+    dateEnd: "",
+    subtitles: 0,
+    subtitlesId: "",
+    contentType: "",
+    seasonType: "",
+    subsStatus: "Incomplete",
+    tags: [],
+  };
 }
 
 export default function EditSeason() {
@@ -138,8 +110,6 @@ export default function EditSeason() {
 
   const title = params?.title ? decodeURIComponent(params.title) : "";
   const seasonNum = params?.season ? parseInt(params.season) : 0;
-
-  // Read file IDs from query string if provided (precise mode)
   const urlIds = new URLSearchParams(window.location.search).get("ids")?.split(",").filter(Boolean) || [];
 
   useEffect(() => {
@@ -148,13 +118,11 @@ export default function EditSeason() {
 
   const [rows, setRows] = useState<Record<string, any>[]>([]);
 
-  // Fetch all metadata, then filter by IDs if provided
   const { data: allFiles, isLoading: allLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
     enabled: urlIds.length > 0,
   });
 
-  // Fallback: fetch by title/season if no IDs provided
   const { data: seasonData, isLoading: seasonLoading } = useQuery<MetadataFile[]>({
     queryKey: ['/api/metadata/season', title, seasonNum],
     enabled: urlIds.length === 0 && !!title && seasonNum != null,
@@ -165,8 +133,7 @@ export default function EditSeason() {
   useEffect(() => {
     if (urlIds.length > 0 && allFiles) {
       const idSet = new Set(urlIds);
-      const filtered = allFiles.filter(f => idSet.has(f.id));
-      setRows(filtered.map(initFromFile));
+      setRows(allFiles.filter(f => idSet.has(f.id)).map(initFromFile));
     } else if (seasonData) {
       setRows(seasonData.map(initFromFile));
     }
@@ -187,23 +154,61 @@ export default function EditSeason() {
     },
   });
 
-  const handleSave = () => {
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('POST', '/api/metadata', data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/metadata'] });
+    },
+  });
+
+  const handleSave = async () => {
     const editableKeys = COLUMNS.filter(c => c.type !== "readonly").map(c => c.key);
-    const updates = rows.map((row) => {
+
+    // Separate existing rows from new rows
+    const existingUpdates = rows.filter(r => !r._isNew).map((row) => {
       const data: Record<string, any> = {};
       editableKeys.forEach((key) => {
         const val = row[key];
-        if (key === "catchUp" || key === "subtitles" || key === "segmented" || key === "draft") {
+        if (key === "catchUp" || key === "subtitles" || key === "segmented") {
           data[key] = val ? 1 : 0;
-        } else if (key === "yearOfProduction") {
-          data[key] = val || null;
+        } else if (key === "yearOfProduction" || key === "season" || key === "episode") {
+          data[key] = val ? parseInt(val) : null;
+        } else if (key === "dateStart" || key === "dateEnd") {
+          data[key] = val ? new Date(val).toISOString() : null;
         } else {
           data[key] = val === "" ? null : val;
         }
       });
       return { id: row.id, data };
     });
-    updateMutation.mutate(updates);
+
+    // Create new rows
+    const newRows = rows.filter(r => r._isNew && r.title);
+    for (const row of newRows) {
+      const data: Record<string, any> = {};
+      editableKeys.forEach((key) => {
+        const val = row[key];
+        if (key === "catchUp" || key === "subtitles" || key === "segmented") {
+          data[key] = val ? 1 : 0;
+        } else if (key === "yearOfProduction" || key === "season" || key === "episode") {
+          data[key] = val ? parseInt(val) : null;
+        } else if (key === "dateStart" || key === "dateEnd") {
+          data[key] = val ? new Date(val).toISOString() : null;
+        } else {
+          data[key] = val === "" ? null : val;
+        }
+      });
+      await createMutation.mutateAsync(data);
+    }
+
+    if (existingUpdates.length > 0) {
+      updateMutation.mutate(existingUpdates);
+    } else if (newRows.length > 0) {
+      toast({ title: "Created", description: `${newRows.length} new episodes created` });
+    }
   };
 
   const updateCell = useCallback((rowIdx: number, key: string, value: any) => {
@@ -214,6 +219,22 @@ export default function EditSeason() {
     });
   }, []);
 
+  const addRow = () => {
+    const lastRow = rows[rows.length - 1];
+    const row = newEmptyRow();
+    // Pre-fill from context
+    row.title = lastRow?.title || title;
+    row.seriesTitle = lastRow?.seriesTitle || title;
+    row.season = lastRow?.season || seasonNum.toString();
+    row.channel = lastRow?.channel || "ONS";
+    row.episode = lastRow?.episode ? (parseInt(lastRow.episode) + 1).toString() : "";
+    setRows((prev) => [...prev, row]);
+  };
+
+  const noData = urlIds.length > 0
+    ? (!allFiles || allFiles.filter(f => new Set(urlIds).has(f.id)).length === 0)
+    : (!seasonData || seasonData.length === 0);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -223,7 +244,7 @@ export default function EditSeason() {
     );
   }
 
-  if (!seasonData || seasonData.length === 0) {
+  if (noData && rows.length === 0) {
     return (
       <Card className="p-12 text-center">
         <p className="text-muted-foreground mb-4">No episodes found for this season</p>
@@ -247,8 +268,8 @@ export default function EditSeason() {
             <p className="text-xs text-muted-foreground">Season {seasonNum} — {rows.length} episodes</p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={updateMutation.isPending} size="sm" className="gap-2">
-          {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        <Button onClick={handleSave} disabled={updateMutation.isPending || createMutation.isPending} size="sm" className="gap-2">
+          {(updateMutation.isPending || createMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save All
         </Button>
       </div>
@@ -256,33 +277,63 @@ export default function EditSeason() {
       {/* Spreadsheet grid */}
       <div className="border rounded-lg overflow-hidden bg-background">
         <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
-          <table className="text-xs border-collapse" style={{ minWidth: "2400px" }}>
+          <table className="text-xs border-collapse" style={{ minWidth: "2800px" }}>
             <thead className="sticky top-0 z-20">
               <tr className="bg-muted">
                 <th className="sticky left-0 z-30 bg-muted px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r w-10">#</th>
                 {COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`px-1 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r ${col.width}`}
-                  >
-                    {col.label}
+                  <th key={col.key} className={`px-1 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r ${col.width}`}>
+                    {col.tooltip ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help border-b border-dotted border-muted-foreground/40">{col.label}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                          {col.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : col.label}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row, rowIdx) => (
-                <tr key={row.id} className="border-b hover:bg-muted/30 transition-colors group">
+                <tr key={row.id || `new-${rowIdx}`} className="border-b hover:bg-muted/30 transition-colors group">
                   <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/30 px-2 py-0 text-center border-r">
-                    <Badge variant="outline" className="font-mono text-xs h-5">{row.episode}</Badge>
+                    {row._isNew ? (
+                      <Badge className="bg-green-100 text-green-700 border-none text-xs h-5">NEW</Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-mono text-xs h-5">{row.episode || "—"}</Badge>
+                    )}
                   </td>
                   {COLUMNS.map((col) => (
                     <td key={col.key} className={`px-0 py-0 border-r ${col.width}`}>
-                      <CellInput
-                        col={col}
-                        value={row[col.key]}
-                        onChange={(v) => updateCell(rowIdx, col.key, v)}
-                      />
+                      {col.type === "readonly" && !row._isNew ? (
+                        <span className="text-xs text-muted-foreground px-2 py-1 truncate block">{row[col.key]}</span>
+                      ) : col.type === "bool" ? (
+                        <div className="flex items-center justify-center h-7">
+                          <Checkbox
+                            checked={row[col.key] === 1}
+                            onCheckedChange={(c) => updateCell(rowIdx, col.key, c ? 1 : 0)}
+                            className="h-3.5 w-3.5"
+                          />
+                        </div>
+                      ) : col.type === "tags" ? (
+                        <input
+                          className="w-full h-7 text-xs bg-transparent px-2 border-0 border-b border-transparent focus:border-primary focus:outline-none resize-x"
+                          value={Array.isArray(row[col.key]) ? row[col.key].join(", ") : row[col.key] || ""}
+                          onChange={(e) => updateCell(rowIdx, col.key, e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+                          placeholder="comma, separated"
+                        />
+                      ) : (
+                        <input
+                          className="w-full h-7 text-xs bg-transparent px-2 border-0 border-b border-transparent focus:border-primary focus:outline-none"
+                          style={{ minWidth: "60px", resize: "horizontal", overflow: "hidden" }}
+                          value={row[col.key] || ""}
+                          onChange={(e) => updateCell(rowIdx, col.key, e.target.value)}
+                        />
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -290,17 +341,27 @@ export default function EditSeason() {
             </tbody>
           </table>
         </div>
+
+        {/* Add row button */}
+        <div className="border-t p-2 bg-muted/20">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={addRow}>
+            <Plus className="w-3.5 h-3.5" />
+            Add episode
+          </Button>
+        </div>
       </div>
 
       {/* Sticky save bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t px-6 py-3 flex items-center justify-between z-50">
         <p className="text-xs text-muted-foreground">
-          <strong>{rows.length}</strong> episodes — <strong>{title}</strong> Season {seasonNum}
+          <strong>{rows.filter(r => !r._isNew).length}</strong> episodes
+          {rows.filter(r => r._isNew).length > 0 && <> + <strong>{rows.filter(r => r._isNew).length}</strong> new</>}
+          {" — "}<strong>{title}</strong> Season {seasonNum}
         </p>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>Cancel</Button>
-          <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
-            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending || createMutation.isPending} className="gap-2">
+            {(updateMutation.isPending || createMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save All
           </Button>
         </div>
