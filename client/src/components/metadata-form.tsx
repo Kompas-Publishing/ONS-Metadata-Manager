@@ -268,7 +268,7 @@ export function MetadataForm({
                       <FormLabel>Category</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -389,7 +389,7 @@ export function MetadataForm({
                       <FormLabel>Season</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -706,6 +706,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter channel"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-channel"
                         />
                       </FormControl>
@@ -722,7 +723,7 @@ export function MetadataForm({
                       <FormLabel>Program Rating</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -774,7 +775,7 @@ export function MetadataForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={field.value}
+                            selected={field.value ?? undefined}
                             onSelect={field.onChange}
                             initialFocus
                           />
@@ -815,7 +816,7 @@ export function MetadataForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={field.value}
+                            selected={field.value ?? undefined}
                             onSelect={field.onChange}
                             initialFocus
                           />
@@ -841,6 +842,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter series title"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-series-title"
                         />
                       </FormControl>
@@ -859,6 +861,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter episode title"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-episode-title"
                         />
                       </FormControl>
@@ -933,6 +936,7 @@ export function MetadataForm({
                         placeholder="Enter episode description..."
                         className="min-h-32"
                         {...field}
+                        value={field.value ?? ""}
                         data-testid="input-episode-description"
                       />
                     </FormControl>
@@ -955,7 +959,7 @@ export function MetadataForm({
                       <FormLabel>Production Country</FormLabel>
                       <FormControl>
                         <CountrySelect
-                          value={field.value}
+                          value={field.value ?? undefined}
                           onChange={field.onChange}
                           placeholder="Select country..."
                           disabled={readOnly}
@@ -1010,6 +1014,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter original filename"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-original-filename"
                         />
                       </FormControl>
@@ -1047,6 +1052,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter subtitles ID"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-subtitles-id"
                         />
                       </FormControl>
@@ -1134,7 +1140,7 @@ export function MetadataForm({
                         <FormLabel>Subtitles Status</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          value={field.value}
+                          value={field.value ?? undefined}
                           disabled={readOnly}
                         >
                           <FormControl>

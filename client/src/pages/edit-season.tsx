@@ -13,6 +13,19 @@ import { useToast } from "@/hooks/use-toast";
 import type { MetadataFile } from "@shared/schema";
 
 // Column definitions — tooltip shows help text on hover
+// Auto-format raw digits to HH:MM:SS (e.g. "004512" → "00:45:12", "1230" → "00:12:30")
+function formatDuration(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 0) return raw;
+  // Already formatted
+  if (raw.includes(":")) return raw;
+  const padded = digits.padStart(6, "0");
+  const h = padded.slice(0, padded.length - 4);
+  const m = padded.slice(padded.length - 4, padded.length - 2);
+  const s = padded.slice(padded.length - 2);
+  return `${h.padStart(2, "0")}:${m}:${s}`;
+}
+
 const COLUMNS: { key: string; label: string; width: string; type: "text" | "bool" | "readonly" | "tags"; tooltip?: string }[] = [
   { key: "channel", label: "Channel", width: "w-24", type: "text", tooltip: "Broadcasting channel (e.g. ONS)" },
   { key: "id", label: "ID", width: "w-32", type: "readonly", tooltip: "Auto-generated file ID" },
@@ -346,6 +359,11 @@ export default function EditSeason() {
                           style={{ minWidth: "60px", resize: "horizontal", overflow: "hidden" }}
                           value={row[col.key] || ""}
                           onChange={(e) => updateCell(rowIdx, col.key, e.target.value)}
+                          onBlur={(e) => {
+                            if (col.key === "duration" && e.target.value) {
+                              updateCell(rowIdx, col.key, formatDuration(e.target.value));
+                            }
+                          }}
                         />
                       )}
                     </td>
