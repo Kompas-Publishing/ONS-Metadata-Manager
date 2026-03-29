@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
@@ -9,7 +9,7 @@ export default apiHandler(
     }
 
     try {
-      const files = await storage.getRecentMetadataFiles(10, req.permissions!);
+      const files = await storage.getRecentMetadataFiles(10, req.userPermissions!);
       res.json(files);
     } catch (error) {
       console.error("Error fetching recent files:", error);

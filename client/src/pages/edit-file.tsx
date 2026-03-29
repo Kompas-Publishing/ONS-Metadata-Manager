@@ -26,20 +26,17 @@ export default function EditFile() {
   }, [params?.id]);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (authLoading) return;
+    if (!isAuthenticated) {
       toast({
         title: "Unauthorized",
         description: "You are logged out. Logging in again...",
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/login";
       }, 500);
-    }
-  }, [isAuthenticated, authLoading, toast]);
-
-  useEffect(() => {
-    if (!authLoading && !canWriteMetadata) {
+    } else if (!canWriteMetadata) {
       toast({
         title: "Permission Denied",
         description: "You don't have permission to edit files.",
@@ -47,7 +44,7 @@ export default function EditFile() {
       });
       setLocation(`/view/${params?.id}`);
     }
-  }, [authLoading, canWriteMetadata, params?.id, toast, setLocation]);
+  }, [authLoading, isAuthenticated, canWriteMetadata, params?.id, toast, setLocation]);
 
   const { data: file, isLoading } = useQuery<MetadataFileWithLicenses>({
     queryKey: ["/api/metadata", params?.id],
@@ -78,7 +75,7 @@ export default function EditFile() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -143,9 +140,13 @@ export default function EditFile() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">Edit Metadata File</h1>
+        <h1 className="text-3xl font-semibold text-foreground">
+          {file.seriesTitle || file.title}
+          {file.season && ` S${file.season}`}
+          {file.episode && ` E${file.episode}`}
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Update the metadata for file ID: <span className="font-mono">{file.id}</span>
+          Editing metadata for file ID: <span className="font-mono">{file.id}</span>
         </p>
       </div>
 
@@ -182,6 +183,8 @@ export default function EditFile() {
             audioId: file.audioId ?? "",
             originalFilename: file.originalFilename ?? "",
             googleDriveLink: file.googleDriveLink ?? "",
+            subsStatus: file.subsStatus ?? "Incomplete",
+            metadataTimesStatus: file.metadataTimesStatus ?? "Incomplete",
             draft: file.draft ?? 0,
             licenseIds: file.licenseIds || (file.licenseId ? [file.licenseId] : []),
           }}
@@ -236,13 +239,4 @@ export default function EditFile() {
       )}
     </div>
   );
-}
-
-// Helper to determine the correct data type for the mutation
-function prepareMutationData(data: InsertMetadataFile & { licenseIds?: string[] }): InsertMetadataFile & { licenseIds?: string[] } {
-  const { licenseId, licenseIds, ...rest } = data;
-  return {
-    ...rest,
-    licenseIds: licenseIds || (licenseId ? [licenseId] : []),
-  };
 }

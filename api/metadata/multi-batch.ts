@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
@@ -19,7 +19,7 @@ export default apiHandler(
           batches: req.body.batches,
           taskDescription: req.body.taskDescription
         },
-        req.permissions!,
+        req.userPermissions!,
       );
 
       res.json({

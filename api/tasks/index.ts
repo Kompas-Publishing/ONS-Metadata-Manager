@@ -1,14 +1,18 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 
 export default apiHandler(
   requirePermission("tasks", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
     if (req.method === "GET") {
       try {
-        const { status } = req.query;
-        // requirePermission sets req.permissions
-        const tasks = await storage.listTasks(req.permissions!, typeof status === "string" ? status : undefined);
+        const { status, assignedTo } = req.query;
+        // requirePermission sets req.userPermissions
+        const tasks = await storage.listTasks(
+          req.userPermissions!,
+          typeof status === "string" ? status : undefined,
+          typeof assignedTo === "string" ? assignedTo : undefined
+        );
         return res.json(tasks);
       } catch (error) {
         console.error("Error fetching tasks:", error);

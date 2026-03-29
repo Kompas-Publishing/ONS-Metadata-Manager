@@ -1,19 +1,29 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage } from "./storage.js";
-import { 
-  type InsertLicense, 
+import {
+  type InsertLicense,
   type InsertMetadataFile,
   type License,
-  type MetadataFile 
-} from "../_shared/schema.js";
-import { type UserPermissions } from "../_shared/types.js";
+  type MetadataFile
+} from "./schema.js";
+import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
+import mammoth from "mammoth";
+
+function parseAiJson(raw: string): any {
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw new Error(`AI returned invalid JSON: ${cleaned.slice(0, 200)}`);
+  }
+}
 
 export class AiService {
-  private genAI: GoogleGenerativeAI | null = null;
-  private model: string = "gemini-3-pro-preview";
+  genAI: GoogleGenerativeAI | null = null;
+  model: string = "gemini-3-pro-preview";
 
-  private async initialize() {
+  async initialize() {
     const apiKey = (await storage.getSetting("ai_api_key"))?.value;
     const provider = (await storage.getSetting("ai_provider"))?.value;
     const configuredModel = (await storage.getSetting("ai_model"))?.value;
@@ -26,7 +36,7 @@ export class AiService {
     this.model = configuredModel || "gemini-3-pro-preview";
   }
 
-  private async extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {
+  async extractTextFromBuffer(fileBuffer: Buffer, mimeType: string): Promise<string> {
     if (mimeType === "text/csv" || mimeType === "text/plain") {
       return fileBuffer.toString("utf-8");
     } else if (
@@ -54,7 +64,7 @@ export class AiService {
     const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
 
     // Phase 1: Extract basic info to find candidates
-    const searchPrompt = `Task: Extract the license name and distributor from this contract. 
+    const searchPrompt = `Task: Extract the license name and distributor from this contract.
 Return ONLY a JSON object with "name" and "distributor" strings.
 
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
@@ -65,11 +75,11 @@ Example: { "name": "Ballykissangel", "distributor": "BBC" }`;
     if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const phase1Result = await model.generateContent(phase1Content);
-    const searchData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
-    
+    const searchData = parseAiJson(phase1Result.response.text());
+
     // Search DB for candidate licenses
     const allLicenses = await storage.listLicenses();
-    const candidates = allLicenses.filter(l => 
+    const candidates = allLicenses.filter(l =>
       (l.distributor?.toLowerCase() === searchData.distributor?.toLowerCase()) ||
       (l.name.toLowerCase().includes(searchData.name?.toLowerCase()))
     ).slice(0, 10);
@@ -89,6 +99,8 @@ Data Rules:
 - Comparison: If an entry in CANDIDATES matches the name and distributor AND has overlapping or identical dates, propose an "update" with that ID.
 - NEW LICENSE TERMS: If the dates (start/end) are significantly different from the CANDIDATES (e.g., a new contract for a different year), propose a "create" action even if the name matches.
 - Season Rule: If a season is 0 or missing, set it to 1.
+- Production Year: Extract the original production year of the series or movie if available.
+- Subtitles: Determine if ONS receives the subtitles from the distributor or needs to create/buy them. Set "subsFromDistributor" to 1 if the contract states ONS gets them, otherwise 0.
 
 JSON Schema (MATCH EXACT DATABASE FIELDS):
 {
@@ -107,6 +119,8 @@ JSON Schema (MATCH EXACT DATABASE FIELDS):
         "licenseStart": "YYYY-MM-DD",
         "licenseEnd": "YYYY-MM-DD",
         "allowedRuns": number, (STRICTLY A NUMBER)
+        "productionYear": number,
+        "subsFromDistributor": 0 | 1,
         "description": "string",
         "notes": "string", (Include legal context or variation in rules here)
         "content_items": [{ "title": "string", "episodes": number, "season": number }]
@@ -123,7 +137,7 @@ Only return the JSON object.`;
     if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const finalResult = await model.generateContent(finalContent);
-    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(finalResult.response.text());
 
     // Enrich and normalize
     for (const p of resultJson.proposals || []) {
@@ -191,7 +205,7 @@ Only return the JSON object. Do not include markdown formatting.`;
     if (isPdf) content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const result = await model.generateContent(content);
-    const resultJson = JSON.parse(result.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(result.response.text());
 
     // Normalize results as in original methods
     for (const p of resultJson.proposals || []) {
@@ -204,7 +218,7 @@ Only return the JSON object. Do not include markdown formatting.`;
           p.data.season = 1;
         }
       }
-      
+
       // Try to restore existingData from previous proposals if the ID matches
       if (p.action === "update" && p.data.id) {
         const prev = previousProposals.find(pp => pp.data?.id === p.data.id);
@@ -226,7 +240,7 @@ Only return the JSON object. Do not include markdown formatting.`;
     const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
 
     // Phase 1: Extract titles to find candidates
-    const searchPrompt = `Task: Extract the series title or main title from this metadata document. 
+    const searchPrompt = `Task: Extract the series title or main title from this metadata document.
 Return ONLY a JSON object with a "keywords" array of strings to search for in a database.
 
 ${!isPdf ? `The document content is as follows:\n\n${extractedText}` : ""}
@@ -237,8 +251,8 @@ Example: { "keywords": ["Holland Heritage", "Heritage"] }`;
     if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const phase1Result = await model.generateContent(phase1Content);
-    const keywordsData = JSON.parse(phase1Result.response.text().replace(/```json|```/g, "").trim());
-    
+    const keywordsData = parseAiJson(phase1Result.response.text());
+
     // Search DB for candidates
     let candidates: MetadataFile[] = [];
     for (const kw of keywordsData.keywords || []) {
@@ -283,7 +297,7 @@ JSON Schema:
         "genre": ["string"],
         "actors": ["string"],
         "productionCountry": "string",
-        "year_of_production": number,
+        "yearOfProduction": number,
         "originalFilename": "string",
         "programRating": "string",
         "channel": "string",
@@ -309,7 +323,7 @@ Only return the JSON object. Do not include markdown formatting.`;
     if (isPdf) finalContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
 
     const finalResult = await model.generateContent(finalContent);
-    const resultJson = JSON.parse(finalResult.response.text().replace(/```json|```/g, "").trim());
+    const resultJson = parseAiJson(finalResult.response.text());
 
     // Enrich proposals with existingData for UI comparison and normalize season
     for (const proposal of resultJson.proposals || []) {

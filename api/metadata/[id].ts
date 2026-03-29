@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { insertMetadataFileSchema } from "../_shared/schema.js";
+import { insertMetadataFileSchema } from "../../shared/schema.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
   const { id } = req.query;
@@ -14,8 +14,8 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "GET") {
     return requirePermission("metadata", "read")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.permissions);
-        const file = await storage.getMetadataFile(id, req.permissions!);
+        console.log(`[GET metadata/${id}] User: ${req.user?.id}, Permissions:`, req.userPermissions);
+        const file = await storage.getMetadataFile(id, req.userPermissions!);
         console.log(`[GET metadata/${id}] File found:`, !!file);
         if (!file) {
           return res.status(404).json({ message: "File not found" });
@@ -32,7 +32,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "PATCH") {
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const permissions = req.permissions!;
+        const permissions = req.userPermissions!;
 
         // Check if file exists and user can see it
         const existingFile = await storage.getMetadataFile(id, permissions);
@@ -69,6 +69,39 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
         }
 
         const updatedFile = await storage.updateMetadataFile(id, data, permissions!);
+
+        // Auto-create tasks when status flags are set to Incomplete
+        const userId = req.user!.id;
+        const existingTasks = await storage.getTasksByFileId(id, permissions);
+
+        if (data.subsStatus === "Incomplete") {
+          const hasSubsTask = existingTasks.some(
+            t => t.status === "pending" && /subtitle/i.test(t.description)
+          );
+          if (!hasSubsTask) {
+            await storage.createTask({
+              metadataFileId: id,
+              description: "Subtitles incomplete – create or obtain subtitles",
+              status: "pending",
+              createdBy: userId,
+            });
+          }
+        }
+
+        if (data.metadataTimesStatus === "Incomplete") {
+          const hasTimesTask = existingTasks.some(
+            t => t.status === "pending" && /metadata times/i.test(t.description)
+          );
+          if (!hasTimesTask) {
+            await storage.createTask({
+              metadataFileId: id,
+              description: "Metadata times incomplete – add timing data",
+              status: "pending",
+              createdBy: userId,
+            });
+          }
+        }
+
         res.json(updatedFile);
       } catch (error: any) {
         console.error("Error updating metadata file:", error);
@@ -81,7 +114,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (req.method === "DELETE") {
     return requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
       try {
-        const permissions = req.permissions!;
+        const permissions = req.userPermissions!;
 
         // Check if file exists and user can see it
         const existingFile = await storage.getMetadataFile(id, permissions);

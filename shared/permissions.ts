@@ -1,16 +1,18 @@
-import { storage } from "./storage";
-import type { User } from "@shared/schema";
+import { storage } from "./storage.js";
+import type { User } from "./schema.js";
 
 export interface UserPermissions {
   user: User;
+  userId: string;
   isAdmin: boolean;
   isActive: boolean;
-  permissions: {
+  features: {
     metadata: { read: boolean; write: boolean };
     licenses: { read: boolean; write: boolean };
     tasks: { read: boolean; write: boolean };
     ai: boolean;
     aiChat: boolean;
+    contracts: boolean;
   };
   fileVisibility: "own" | "all" | "group";
   groupIds: string[];
@@ -18,7 +20,7 @@ export interface UserPermissions {
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   const user = await storage.getUser(userId);
-  
+
   if (!user) {
     return null;
   }
@@ -28,9 +30,10 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
   return {
     user,
+    userId,
     isAdmin,
     isActive,
-    permissions: {
+    features: {
       metadata: {
         read: isAdmin || (isActive && user.canReadMetadata === 1),
         write: isAdmin || (isActive && user.canWriteMetadata === 1),
@@ -45,22 +48,23 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
       },
       ai: isAdmin || (isActive && user.canUseAI === 1),
       aiChat: isAdmin || (isActive && user.canUseAIChat === 1),
+      contracts: isAdmin || (isActive && user.canAccessContracts === 1),
     },
     fileVisibility: user.fileVisibility as "own" | "all" | "group",
     groupIds: user.groupIds || [],
   };
 }
 
-export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat";
+export type PermissionFeature = "metadata" | "licenses" | "tasks" | "ai" | "aiChat" | "contracts";
 export type PermissionAction = "read" | "write";
 
 export async function requirePermission(
-  userId: string, 
+  userId: string,
   feature: PermissionFeature,
   action: PermissionAction = "read"
 ): Promise<{ allowed: boolean; permissions: UserPermissions | null; reason?: string }> {
   const permissions = await getUserPermissions(userId);
-  
+
   if (!permissions) {
     return { allowed: false, permissions: null, reason: "User not found" };
   }
@@ -75,13 +79,15 @@ export async function requirePermission(
 
   let allowed = false;
   if (feature === "ai") {
-    allowed = permissions.permissions.ai;
+    allowed = permissions.features.ai;
   } else if (feature === "aiChat") {
-    allowed = permissions.permissions.aiChat;
+    allowed = permissions.features.aiChat;
+  } else if (feature === "contracts") {
+    allowed = permissions.features.contracts;
   } else {
-    allowed = permissions.permissions[feature][action];
+    allowed = permissions.features[feature][action];
   }
-  
+
   return {
     allowed,
     permissions,
@@ -93,17 +99,19 @@ export async function requirePermission(
  * Validates that a URL belongs to Vercel Blob storage.
  * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
  */
+const BLOB_STORE_ID = process.env.BLOB_STORE_ID || "rwcuq3rxnmz4nbvx";
+
 export function isValidBlobUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') return false;
-    
+
     const hostname = parsed.hostname.toLowerCase();
     // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
     // This is the most robust way to prevent SSRF and token leakage.
     return (
-      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
-      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
+      hostname === `${BLOB_STORE_ID}.public.blob.vercel-storage.com` ||
+      hostname === `${BLOB_STORE_ID}.private.blob.vercel-storage.com`
     );
   } catch {
     return false;

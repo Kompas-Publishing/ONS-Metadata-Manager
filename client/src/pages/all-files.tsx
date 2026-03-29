@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Pencil, Trash2, Download, FileText, Calendar, Tv, X, Eye } from "lucide-react";
+import { Search, Pencil, Trash2, Download, FileText, Calendar, Tv, X, Eye, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile } from "@shared/schema";
@@ -56,15 +56,16 @@ export default function AllFiles() {
       await apiRequest("DELETE", `/api/metadata/${id}`, undefined);
     },
     onSuccess: () => {
+      setDeleteId(null);
       toast({
         title: "Success",
         description: "File deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      setDeleteId(null);
     },
     onError: (error: Error) => {
+      setDeleteId(null);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -72,7 +73,7 @@ export default function AllFiles() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -127,13 +128,16 @@ export default function AllFiles() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${id}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${id}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        window.URL.revokeObjectURL(url);
+      }
       
       toast({
         title: "Success",
@@ -185,9 +189,9 @@ export default function AllFiles() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground">All Files</h1>
+        <h1 className="text-3xl font-bold tracking-tight">All Files</h1>
         <p className="text-muted-foreground mt-2">
           View, search, and manage all metadata files
         </p>
@@ -276,7 +280,7 @@ export default function AllFiles() {
             {filteredFiles.map((file) => (
               <div
                 key={file.id}
-                className={`p-4 border rounded-lg hover-elevate ${(file.draft === 1 || file.draft === '1' || file.draft === true) ? '!bg-orange-100/80 !border-orange-400' : ''}`}
+                className={`p-4 border rounded-lg hover-elevate ${file.draft === 1 ? '!bg-orange-100/80 !border-orange-400' : ''}`}
                 data-testid={`file-row-${file.id}`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -286,7 +290,7 @@ export default function AllFiles() {
                         {file.id}
                       </span>
                       {file.season && file.episode && (
-                        <Badge variant="outline" data-testid={`file-season-episode-${file.id}`}>
+                        <Badge variant="secondary" data-testid={`file-season-episode-${file.id}`}>
                           S{file.season}E{file.episode}
                         </Badge>
                       )}
@@ -314,8 +318,8 @@ export default function AllFiles() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
-                        <Badge variant="outline" className="border-orange-500 text-orange-700 bg-orange-50" data-testid={`file-draft-${file.id}`}>
+                      {file.draft === 1 && (
+                        <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-xs h-5 px-1.5" data-testid={`file-draft-${file.id}`}>
                           Draft
                         </Badge>
                       )}
@@ -348,6 +352,7 @@ export default function AllFiles() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hidden md:inline-flex"
                       onClick={() => handleDownload(file.id, "xml")}
                       data-testid={`button-download-xml-${file.id}`}
                       title="Download XML"
@@ -358,6 +363,7 @@ export default function AllFiles() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="hidden md:inline-flex"
                       onClick={() => handleDownload(file.id, "xlsx")}
                       data-testid={`button-download-xlsx-${file.id}`}
                       title="Download XLSX"
@@ -399,6 +405,14 @@ export default function AllFiles() {
           <div className="text-center py-12">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No files found</p>
+            {canWriteMetadata && (
+              <Link href="/create">
+                <Button className="mt-4">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Metadata
+                </Button>
+              </Link>
+            )}
           </div>
         )}
       </Card>

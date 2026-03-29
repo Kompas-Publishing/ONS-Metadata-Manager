@@ -1,39 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  FileText, 
-  Layers, 
-  Film, 
-  Plus, 
-  Tv, 
-  Calendar, 
-  Eye, 
-  Pencil, 
-  CheckSquare, 
-  FileKey, 
-  Sparkles,
-  ArrowRight,
-  Clock,
-  LayoutDashboard
-} from "lucide-react";
+import { Plus, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 
 interface Stats {
   totalFiles: number;
   recentFiles: number;
   totalSeries: number;
+  overdueTasks: number;
+  expiringLicenses: number;
+  incompleteMeta: number;
+  drafts: number;
 }
 
 export default function Dashboard() {
-  const { user, isAdmin, canWriteMetadata, canReadMetadata, canReadLicenses, canReadTasks } = useAuth();
+  const { user, canWriteMetadata, canReadMetadata, canReadLicenses, canReadTasks } = useAuth();
 
   useEffect(() => {
     document.title = "Dashboard | ONS Broadcast Portal";
@@ -67,262 +58,187 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
-      {/* Header & Greeting */}
-      <div className="relative overflow-hidden rounded-3xl bg-primary/5 border border-primary/10 p-8 md:p-12">
-        <div className="relative z-10">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-            {getGreeting()}, {user?.firstName || 'User'}!
+    <div className="space-y-6">
+      {/* Page header — matches License Manager pattern */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {getGreeting()}, {user?.firstName || "User"}
           </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl text-lg">
-            Welcome back here's what's going on across your metadata and licenses today.
+          <p className="text-muted-foreground mt-2">
+            {!statsLoading && stats
+              ? `${stats.totalFiles} files across ${stats.totalSeries} series${stats.recentFiles > 0 ? ` · ${stats.recentFiles} added today` : ""}`
+              : "Loading your workspace..."}
           </p>
-          <div className="flex gap-3 mt-6">
-            {canWriteMetadata && (
-              <Link href="/create">
-                <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Metadata
-                </Button>
-              </Link>
+        </div>
+        {canWriteMetadata && (
+          <Link href="/create">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Metadata
+            </Button>
+          </Link>
+        )}
+      </div>
+
+      {/* Alerts — inline text, not cards */}
+      {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0) && (
+        <Card className="border-destructive/20">
+          <CardContent className="p-4 text-sm space-y-1">
+            {stats.overdueTasks > 0 && (
+              <p><Link href="/tasks" className="text-destructive font-medium hover:underline">{stats.overdueTasks} overdue {stats.overdueTasks === 1 ? "task" : "tasks"}</Link></p>
             )}
+            {stats.expiringLicenses > 0 && (
+              <p><Link href="/licenses" className="font-medium hover:underline">{stats.expiringLicenses} {stats.expiringLicenses === 1 ? "license" : "licenses"} expiring within 30 days</Link></p>
+            )}
+            {stats.incompleteMeta > 0 && (
+              <p><Link href="/all-files" className="font-medium hover:underline">{stats.incompleteMeta} files with incomplete metadata</Link></p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent files — table in a Card like License Manager */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-lg">Recent Metadata</CardTitle>
+          <Link href="/all-files">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="overflow-x-auto pt-0">
+          {filesLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : recentFiles && recentFiles.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs">ID</TableHead>
+                  <TableHead className="text-xs">Title</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Episode</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Added</TableHead>
+                  <TableHead className="text-xs text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentFiles.slice(0, 8).map(file => (
+                  <TableRow key={file.id}>
+                    <TableCell>
+                      <Link href={`/view/${file.id}`} className="font-mono text-xs text-primary hover:underline">{file.id}</Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/view/${file.id}`} className="hover:underline text-sm truncate block max-w-[250px]">{file.title}</Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">
+                      {file.season ? `S${file.season}E${file.episode}` : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs hidden md:table-cell">
+                      {file.createdAt ? format(new Date(file.createdAt), "dd MMM") : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {file.draft === 1
+                        ? <span className="text-xs text-orange-600 font-medium">Draft</span>
+                        : <span className="text-xs text-muted-foreground">Published</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">No metadata files yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tasks + Licenses side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tasks */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-lg">Pending Tasks</CardTitle>
             <Link href="/tasks">
-              <Button variant="outline" className="rounded-full px-6 bg-background">
-                View Tasks
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+                All tasks <ArrowRight className="w-3 h-3" />
               </Button>
             </Link>
-          </div>
-        </div>
-        <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-48 h-48 bg-primary/5 rounded-full blur-2xl" />
-      </div>
-
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard 
-          title="Total Metadata" 
-          value={stats?.totalFiles} 
-          loading={statsLoading} 
-          icon={FileText} 
-          description="Files in database"
-        />
-        <StatsCard 
-          title="Recent Activity" 
-          value={stats?.recentFiles} 
-          loading={statsLoading} 
-          icon={Clock} 
-          description="Added in last 24h"
-          highlight
-        />
-        <StatsCard 
-          title="Active Series" 
-          value={stats?.totalSeries} 
-          loading={statsLoading} 
-          icon={Film} 
-          description="Unique series titles"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Recent Metadata */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-sm border-muted">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <LayoutDashboard className="w-5 h-5 text-primary" />
-                  Recent Metadata
-                </CardTitle>
-                <CardDescription>The latest additions to the portal</CardDescription>
-              </div>
-              <Link href="/all-files">
-                <Button variant="ghost" size="sm" className="text-primary hover:text-primary hover:bg-primary/5">
-                  View All <ArrowRight className="ml-2 w-4 h-4" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {filesLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
-                </div>
-              ) : recentFiles && recentFiles.length > 0 ? (
-                <div className="space-y-3">
-                  {recentFiles.slice(0, 5).map((file) => (
-                    <div
-                      key={file.id}
-                      className={cn(
-                        "group flex items-center justify-between p-4 border rounded-xl transition-all hover:border-primary/30 hover:shadow-md",
-                        (file.draft === 1 || file.draft === '1' || file.draft === true) && "bg-orange-50/50 border-orange-200"
-                      )}
-                    >
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-tighter">
-                            {file.id}
-                          </span>
-                          {file.season && (
-                            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-medium">
-                              S{file.season}E{file.episode}
-                            </Badge>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {tasks && tasks.length > 0 ? (
+              <Table>
+                <TableBody>
+                  {tasks.slice(0, 5).map(task => {
+                    const isOverdue = task.deadline && new Date(task.deadline) < new Date();
+                    return (
+                      <TableRow key={task.id}>
+                        <TableCell className="py-2">
+                          <Link href={`/view/${task.metadataFileId}`} className="text-sm hover:underline">
+                            {task.description}
+                          </Link>
+                          <span className="text-xs text-muted-foreground ml-2">{task.metadataFile?.title}</span>
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          {task.deadline && (
+                            <span className={cn("text-xs", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
+                              {isOverdue ? "Overdue" : format(new Date(task.deadline), "dd MMM")}
+                            </span>
                           )}
-                          {(file.draft === 1 || file.draft === '1' || file.draft === true) && (
-                            <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none text-[10px] h-5 px-1.5">
-                              Draft
-                            </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No pending tasks.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Licenses */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-lg">Licenses</CardTitle>
+            <Link href="/licenses">
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7 gap-1">
+                All licenses <ArrowRight className="w-3 h-3" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {licenses && licenses.length > 0 ? (
+              <Table>
+                <TableBody>
+                  {licenses.slice(0, 5).map(license => {
+                    const endDate = license.licenseEnd ? new Date(license.licenseEnd) : null;
+                    const isExpired = endDate && endDate < new Date();
+                    return (
+                      <TableRow key={license.id}>
+                        <TableCell className="py-2">
+                          <Link href={`/licenses/${license.id}`} className="text-sm hover:underline">{license.name}</Link>
+                          {license.season && <span className="text-xs text-muted-foreground ml-2">S{license.season}</span>}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          {endDate && (
+                            <span className={cn("text-xs", isExpired ? "text-destructive" : "text-muted-foreground")}>
+                              {isExpired ? "Expired" : format(endDate, "dd MMM yy")}
+                            </span>
                           )}
-                        </div>
-                        <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                          {file.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {file.seriesTitle || 'Stand-alone content'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/view/${file.id}`}>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/edit/${file.id}`}>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 border-2 border-dashed rounded-xl">
-                  <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground font-medium">No metadata files yet</p>
-                  <Link href="/create">
-                    <Button variant="link" className="text-primary">Create your first record</Button>
-                  </Link>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Tasks & Quick Actions */}
-        <div className="space-y-6">
-          {/* Tasks Overview */}
-          <Card className="shadow-sm border-muted h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-orange-500" />
-                Pending Tasks
-              </CardTitle>
-              <CardDescription>Action items requiring attention</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tasks && tasks.length > 0 ? (
-                <div className="space-y-4">
-                  {tasks.slice(0, 4).map((task) => (
-                    <div key={task.id} className="flex gap-3">
-                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground line-clamp-2">{task.description}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase font-semibold">
-                          File: {task.metadataFile?.title}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  <Link href="/tasks">
-                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
-                      View all {tasks.length} tasks
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="py-6 text-center">
-                  <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <CheckSquare className="w-5 h-5 text-green-600" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">All caught up!</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Licenses Preview */}
-          <Card className="shadow-sm border-muted h-fit">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <FileKey className="w-5 h-5 text-blue-500" />
-                Latest Licenses
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {licenses && licenses.length > 0 ? (
-                <div className="space-y-3">
-                  {licenses.slice(0, 3).map((license) => (
-                    <div key={license.id} className="p-3 bg-muted/30 rounded-lg border border-transparent hover:border-blue-200 transition-colors">
-                      <p className="text-sm font-semibold truncate">{license.name}</p>
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                          {license.distributor}
-                        </span>
-                        {license.licenseEnd && (
-                          <span className="text-[10px] text-muted-foreground italic">
-                            Ends {format(new Date(license.licenseEnd), "MMM yyyy")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <Link href="/licenses">
-                    <Button variant="outline" className="w-full text-xs h-8 mt-2 rounded-lg">
-                      Open License Manager
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No licenses found.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No licenses.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
-}
-
-function StatsCard({ title, value, loading, icon: Icon, description, highlight }: any) {
-  return (
-    <Card className={cn(
-      "border-muted shadow-sm transition-all hover:shadow-md",
-      highlight && "border-primary/20 bg-primary/5 shadow-primary/5"
-    )}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-              {title}
-            </p>
-            {loading ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <p className="text-3xl font-black tracking-tight text-foreground">
-                {value || 0}
-              </p>
-            )}
-            <p className="text-[10px] text-muted-foreground font-medium">
-              {description}
-            </p>
-          </div>
-          <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
-            highlight ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-          )}>
-            <Icon className="w-6 h-6" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

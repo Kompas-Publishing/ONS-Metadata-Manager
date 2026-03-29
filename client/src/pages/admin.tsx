@@ -253,7 +253,8 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
           canWriteTasks: number;
           canUseAI: number;
           canUseAIChat: number;
-        } 
+          canAccessContracts?: number;
+        }
       }) => {
         const res = await apiRequest('PATCH', `/api/admin/users/${userId}/permissions`, permissions);
         return await res.json();
@@ -533,7 +534,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                 <p className="text-muted-foreground">No users found</p>
               </Card>
             ) : (
-              <Card className="p-6">
+              <Card className="p-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -596,28 +597,28 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                               <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-[200px]">
                                   {user.canReadMetadata === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Meta:R</Badge>
                                   )}
                                   {user.canWriteMetadata === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Meta:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Meta:W</Badge>
                                   )}
                                   {user.canReadLicenses === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Lic:R</Badge>
                                   )}
                                   {user.canWriteLicenses === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Lic:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Lic:W</Badge>
                                   )}
                                   {user.canReadTasks === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:R</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Task:R</Badge>
                                   )}
                                   {user.canWriteTasks === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">Task:W</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">Task:W</Badge>
                                   )}
                                   {user.canUseAI === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">AI</Badge>
                                   )}
                                   {user.canUseAIChat === 1 && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">AI Chat</Badge>
+                                    <Badge variant="secondary" className="text-xs px-1 h-5">AI Chat</Badge>
                                   )}
                                 </div>
                               </TableCell>
@@ -652,7 +653,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                           {user.status === "pending" && (
                                             <Button
                                               variant="outline"
-                                              size="sm"
                                               onClick={() =>
                                                 updateStatusMutation.mutate({
                                                   userId: user.id,
@@ -669,7 +669,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                           {user.status === "active" && !isCurrentUser && (
                                             <Button
                                               variant="outline"
-                                              size="sm"
                                               onClick={() =>
                                                 updateStatusMutation.mutate({
                                                   userId: user.id,
@@ -686,7 +685,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                           {user.status === "archived" && (
                                             <Button
                                               variant="outline"
-                                              size="sm"
                                               onClick={() =>
                                                 updateStatusMutation.mutate({
                                                   userId: user.id,
@@ -703,7 +701,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                           {!isCurrentUser && (
                                             <Button
                                               variant="outline"
-                                              size="sm"
                                               onClick={() => setDeleteUserConfirm(user.id)}
                                               disabled={deleteUserMutation.isPending}
                                               data-testid={`button-delete-${user.id}`}
@@ -750,7 +747,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                             </div>
                                             <Button
                                               variant="outline"
-                                              size="sm"
                                               onClick={() => setResetConfirmUser(user)}
                                               disabled={resetPasswordMutation.isPending}
                                               className="w-full justify-start"
@@ -778,7 +774,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Read Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canReadMetadata === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -798,7 +793,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Write Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canWriteMetadata === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -828,7 +822,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Read Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canReadLicenses === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -848,7 +841,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Write Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canWriteLicenses === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -861,6 +853,27 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                       canWriteTasks: user.canWriteTasks,
                                                       canUseAI: user.canUseAI,
                                                       canUseAIChat: user.canUseAIChat,
+                                                      canAccessContracts: (user as any).canAccessContracts || 0,
+                                                    }
+                                                  })}
+                                                />
+                                              </div>
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">Contracts Access</Label>
+                                                <Switch
+                                                  checked={(user as any).canAccessContracts === 1}
+                                                  onCheckedChange={(checked) => updatePermissionsMutation.mutate({
+                                                    userId: user.id,
+                                                    permissions: {
+                                                      canReadMetadata: user.canReadMetadata,
+                                                      canWriteMetadata: user.canWriteMetadata,
+                                                      canReadLicenses: user.canReadLicenses,
+                                                      canWriteLicenses: user.canWriteLicenses,
+                                                      canReadTasks: user.canReadTasks,
+                                                      canWriteTasks: user.canWriteTasks,
+                                                      canUseAI: user.canUseAI,
+                                                      canUseAIChat: user.canUseAIChat,
+                                                      canAccessContracts: checked ? 1 : 0,
                                                     }
                                                   })}
                                                 />
@@ -878,7 +891,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Read Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canReadTasks === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -898,7 +910,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">Write Access</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canWriteTasks === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -928,7 +939,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">AI Uploader</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canUseAI === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -948,7 +958,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                               <div className="flex items-center justify-between">
                                                 <Label className="text-xs">AI Chat</Label>
                                                 <Switch
-                                                  size="sm"
                                                   checked={user.canUseAIChat === 1}
                                                   onCheckedChange={(checked) => updatePermissionsMutation.mutate({
                                                     userId: user.id,
@@ -965,7 +974,7 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                                                   })}
                                                 />
                                               </div>
-                                              <p className="text-[10px] text-muted-foreground leading-tight pt-1">
+                                              <p className="text-xs text-muted-foreground leading-tight pt-1">
                                                 AI Chat is read/write scoped by the user's existing permissions.
                                               </p>
                                             </div>
@@ -1159,7 +1168,6 @@ export default function Admin({ tab = "users" }: { tab?: "users" | "settings" })
                           <TableCell className="text-right">
                             <Button
                               variant="outline"
-                              size="sm"
                               onClick={() => setDeleteGroupConfirm(group.id)}
                               disabled={deleteGroupMutation.isPending}
                               data-testid={`button-delete-group-${group.id}`}

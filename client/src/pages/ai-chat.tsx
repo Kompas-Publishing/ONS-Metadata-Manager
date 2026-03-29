@@ -180,7 +180,7 @@ export default function AiChat() {
     try {
       let blobUrl = "";
       if (currentAttachment) {
-        const newBlob = await upload(currentAttachment.name, currentAttachment, {
+        const newBlob = await upload(`ai-chat/${currentAttachment.name}`, currentAttachment, {
           access: "private",
           handleUploadUrl: "/api/blob/upload",
           clientPayload: JSON.stringify({ type: "ai-chat" }),
@@ -406,10 +406,10 @@ export default function AiChat() {
                     {message.sources && message.sources.length > 0 && (
                       <div className="mt-2 w-full max-w-[90%] rounded-xl border bg-background px-3 py-2 text-xs shadow-sm">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Sources
                           </span>
-                          <Badge variant="secondary" className="h-4 text-[10px] px-1">{message.sources.length}</Badge>
+                          <Badge variant="secondary" className="h-4 text-xs px-1">{message.sources.length}</Badge>
                         </div>
                         <div className="space-y-1">
                           {message.sources.map((source) => (
@@ -504,7 +504,7 @@ export default function AiChat() {
                   className="hidden"
                 />
               </div>
-              <p className="text-[10px] text-center text-muted-foreground px-2">
+              <p className="text-xs text-center text-muted-foreground px-2">
                 AI may generate inaccurate information. Verify important details.
               </p>
             </div>
@@ -527,7 +527,7 @@ export default function AiChat() {
                   {proposalGroups.map((group) => (
                     <div key={group.messageIndex} className="space-y-2">
                       <div className="flex items-center justify-between gap-2 px-1">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                           From message {group.messageIndex + 1}
                         </p>
                         {group.proposals.length > 1 && (
@@ -536,7 +536,7 @@ export default function AiChat() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-[10px] font-semibold shadow-sm border-primary/20 hover:bg-primary/5 px-2"
+                                className="h-7 text-xs font-semibold shadow-sm border-primary/20 hover:bg-primary/5 px-2"
                                 disabled={isExecuting}
                               >
                                 <Check className="w-3 h-3 mr-1" />
@@ -576,13 +576,13 @@ export default function AiChat() {
                               </CardTitle>
                             </div>
                             {proposal.explanation && (
-                              <CardDescription className="text-[10px] leading-tight">
+                              <CardDescription className="text-xs leading-tight">
                                 {proposal.explanation}
                               </CardDescription>
                             )}
                           </CardHeader>
                           <CardContent className="px-3 py-0">
-                            <div className="text-[10px] bg-background/50 p-2 rounded border border-primary/10 max-h-32 overflow-auto font-mono">
+                            <div className="text-xs bg-background/50 p-2 rounded border border-primary/10 max-h-32 overflow-auto font-mono">
                               <pre className="whitespace-pre-wrap break-words">
                                 {JSON.stringify(proposal.data, null, 2)}
                               </pre>
@@ -592,7 +592,7 @@ export default function AiChat() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 text-[10px] px-2"
+                              className="h-7 text-xs px-2"
                               onClick={() => {
                                 setMessages(prev => prev.map((msg, mIdx) => {
                                   if (mIdx === group.messageIndex && msg.proposals) {
@@ -606,7 +606,7 @@ export default function AiChat() {
                             </Button>
                             <Button
                               size="sm"
-                              className="h-7 text-[10px] px-2"
+                              className="h-7 text-xs px-2"
                               disabled={isExecuting}
                               onClick={() => handleExecuteProposal(proposal, group.messageIndex, pIdx)}
                             >

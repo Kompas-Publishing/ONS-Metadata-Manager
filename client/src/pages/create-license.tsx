@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, Loader2, Database, Layers, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Database, Layers, Plus, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LicenseContentManager } from "@/components/license-content-manager";
@@ -72,6 +72,9 @@ export default function CreateLicense() {
       imdbLink: "",
       googleDriveLink: "",
       notes: "",
+      productionYear: undefined,
+      subsFromDistributor: 0,
+      season: "",
       metadataIds: [],
       newBatches: [],
     },
@@ -129,11 +132,16 @@ export default function CreateLicense() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
-        <p className="text-muted-foreground mt-2">
-          Add a new content license with detailed contract information
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" type="button" onClick={() => setLocation("/licenses")}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Create License</h1>
+          <p className="text-muted-foreground mt-2">
+            Add a new content license with detailed contract information
+          </p>
+        </div>
       </div>
 
       <Form {...form}>
@@ -241,6 +249,23 @@ export default function CreateLicense() {
                         </FormControl>
                         <div className="leading-none">
                           <FormLabel>Paid (Betaald)</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="subsFromDistributor"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
+                          />
+                        </FormControl>
+                        <div className="leading-none">
+                          <FormLabel>Subtitles from Distributor (Ondertiteling inclusief)</FormLabel>
                         </div>
                       </FormItem>
                     )}
@@ -361,6 +386,40 @@ export default function CreateLicense() {
 
                 <FormField
                   control={form.control}
+                  name="productionYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Production Year (Productiejaar)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 2023" 
+                          {...field} 
+                          value={field.value || ""} 
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="season"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Season</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 1 or 1, 2, 4" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="imdbLink"
                   render={({ field }) => (
                     <FormItem>
@@ -472,6 +531,9 @@ export default function CreateLicense() {
                           seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
                           channel: "ONS",
                           draft: 1,
+                          breakTimes: [],
+                          actors: [],
+                          genre: [],
                         })}
                       >
                         <Plus className="w-4 h-4 mr-2" /> Add a Batch

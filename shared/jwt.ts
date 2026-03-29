@@ -1,7 +1,14 @@
 import jwt from "jsonwebtoken";
-import type { User } from "@shared/schema";
+import type { User } from "./schema.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET!;
+const _jwtSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+if (!_jwtSecret) {
+  throw new Error("Missing JWT secret: set JWT_SECRET or SESSION_SECRET environment variable.");
+}
+if (_jwtSecret.length < 32) {
+  throw new Error("JWT secret must be at least 32 characters long.");
+}
+const JWT_SECRET: string = _jwtSecret;
 const JWT_EXPIRES_IN = "7d"; // 7 days to match old session TTL
 
 export interface JWTPayload {
@@ -17,6 +24,14 @@ export function signToken(user: User): string {
     email: user.email,
   };
 
+  // @ts-ignore - jsonwebtoken types can be tricky in ESM
+  const sign = (jwt.sign || (jwt as any).default?.sign);
+  if (typeof sign === 'function') {
+    return sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+  }
+  
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
@@ -24,8 +39,13 @@ export function signToken(user: User): string {
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    return payload;
+    // @ts-ignore
+    const verify = (jwt.verify || (jwt as any).default?.verify);
+    const opts = { algorithms: ["HS256" as const] };
+    if (typeof verify === 'function') {
+      return verify(token, JWT_SECRET, opts) as JWTPayload;
+    }
+    return jwt.verify(token, JWT_SECRET, opts) as JWTPayload;
   } catch (error) {
     console.error("JWT verification failed:", error);
     return null;
@@ -52,7 +72,10 @@ export function extractTokenFromCookie(cookieHeader: string | undefined): string
 
   // Parse cookie string to find auth_token
   const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split('=');
+    const eqIndex = cookie.indexOf('=');
+    if (eqIndex === -1) return acc;
+    const key = cookie.substring(0, eqIndex).trim();
+    const value = cookie.substring(eqIndex + 1).trim();
     acc[key] = value;
     return acc;
   }, {} as Record<string, string>);

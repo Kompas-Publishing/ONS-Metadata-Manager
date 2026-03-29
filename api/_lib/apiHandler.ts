@@ -1,14 +1,13 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
-import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPayload } from "../_server/jwt.js";
-import type { User } from "../_shared/schema.js";
-import { getUserPermissions, requirePermission as checkPermission } from "../_server/permissions.js";
-import type { UserPermissions, PermissionFeature, PermissionAction } from "../_shared/types.js";
+import { storage } from "../../shared/storage.js";
+import { verifyToken, extractTokenFromHeader, extractTokenFromCookie, type JWTPayload } from "../../shared/jwt.js";
+import type { User } from "../../shared/schema.js";
+import { getUserPermissions, requirePermission as checkPermission, isValidBlobUrl, type UserPermissions, type PermissionFeature, type PermissionAction } from "../../shared/permissions.js";
 
 export interface AuthenticatedRequest extends VercelRequest {
   user?: User;
   userId?: string;
-  permissions?: UserPermissions;
+  userPermissions?: UserPermissions;
 }
 
 export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Promise<void | VercelResponse> | void | VercelResponse;
@@ -16,10 +15,13 @@ export type ApiHandler = (req: AuthenticatedRequest, res: VercelResponse) => Pro
 export function corsMiddleware(req: AuthenticatedRequest, res: VercelResponse) {
   const origin = req.headers.origin;
   const allowedOrigins = ['https://metadata.onstv.nl'];
-  
+  // In development, also allow the Vite dev server on port 5173 only
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:5173');
+  }
+
   let currentOrigin = allowedOrigins[0];
-  // Allow primary domain and any Vercel preview URLs
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.startsWith('http://localhost'))) {
+  if (origin && allowedOrigins.includes(origin)) {
     currentOrigin = origin;
   }
 
@@ -77,6 +79,10 @@ export function requireAuth(handler: ApiHandler): ApiHandler {
       return res.status(423).json({ message: "Account is not active. Please contact an administrator." });
     }
 
+    // Populate permissions so downstream handlers can use them
+    const permissions = await getUserPermissions(user.id);
+    req.userPermissions = permissions || undefined;
+
     return handler(req, res);
   };
 }
@@ -97,7 +103,7 @@ export function requirePermission(feature: PermissionFeature, action: Permission
         return res.status(statusCode).json({ message: reason });
       }
 
-      req.permissions = permissions || undefined;
+      req.userPermissions = permissions || undefined;
       return handler(req, res);
     };
   };
@@ -116,7 +122,7 @@ export function requireAdmin(handler: ApiHandler): ApiHandler {
     }
 
     const permissions = await getUserPermissions(user.id);
-    req.permissions = permissions || undefined;
+    req.userPermissions = permissions || undefined;
 
     return handler(req, res);
   };
@@ -135,26 +141,7 @@ export function withCors(handler: ApiHandler): ApiHandler {
   };
 }
 
-/**
- * Validates that a URL belongs to Vercel Blob storage.
- * This prevents SSRF attacks where a malicious URL could be used to leak sensitive tokens.
- */
-export function isValidBlobUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:') return false;
-    
-    const hostname = parsed.hostname.toLowerCase();
-    // Pentest Fix (Ultra-Strict): Exact match for our specific store hostnames.
-    // This is the most robust way to prevent SSRF and token leakage.
-    return (
-      hostname === "rwcuq3rxnmz4nbvx.public.blob.vercel-storage.com" ||
-      hostname === "rwcuq3rxnmz4nbvx.private.blob.vercel-storage.com"
-    );
-  } catch {
-    return false;
-  }
-}
+export { isValidBlobUrl };
 
 export function apiHandler(handler: ApiHandler): ApiHandler {
   return withCors(handler);

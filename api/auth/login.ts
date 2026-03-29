@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
-import { storage } from "../_server/storage.js";
-import { signToken } from "../_server/jwt.js";
+import { storage } from "../../shared/storage.js";
+import { signToken } from "../../shared/jwt.js";
 import { apiHandler } from "../_lib/apiHandler.js";
 import { serialize } from "cookie";
 
@@ -58,7 +58,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
 
     res.setHeader('Set-Cookie', cookie);
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: removedPassword, ...userWithoutPassword } = user;
     res.json({
       user: userWithoutPassword,
       token, // Also send in response for Authorization header usage

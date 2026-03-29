@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { 
@@ -20,12 +21,15 @@ import {
   Trash2,
   Layers,
   Database,
-  CheckSquare
+  CheckSquare,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import type { Task, MetadataFile, MultiBatchCreate } from "@shared/schema";
 import { multiBatchCreateSchema } from "@shared/schema";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -42,6 +46,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExistingContentSelector } from "@/components/existing-content-selector";
@@ -51,11 +62,23 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 const PREDEFINED_DESCRIPTIONS = [
-  "heeft meta nodig",
-  "heeft subs nodig",
-  "heeft QC nodig",
-  "is klaar voor export",
+  "Needs metadata",
+  "Needs subtitles",
+  "Needs QC",
+  "Send to OD",
 ] as const;
 
 type TaskWithFile = Task & { metadataFile: MetadataFile };
@@ -72,17 +95,63 @@ export default function Tasks() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [descFilter, setDescFilter] = useState<string>("all");
-  
+
   // Dialog state
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeAddTab, setActiveAddTab] = useState<"existing" | "new">("existing");
   const [selectedExistingIds, setSelectedExistingIds] = useState<string[]>([]);
   const [taskDescription, setTaskDescription] = useState("");
+  const [taskDeadline, setTaskDeadline] = useState<Date | undefined>(undefined);
+  const [taskPriority, setTaskPriority] = useState<string>("medium");
+  const [taskAssignee, setTaskAssignee] = useState<string>("");
 
   const { data: tasks, isLoading } = useQuery<TaskWithFile[]>({
     queryKey: ["/api/tasks"],
     enabled: canReadTasks || canWriteTasks,
   });
+
+  // Fetch users for assignee dropdown
+  const { data: usersData } = useQuery<{ users: { id: string; email: string; firstName: string | null; lastName: string | null }[] }>({
+    queryKey: ["/api/admin/users"],
+    enabled: canWriteTasks,
+  });
+
+  // Grouping logic
+  const groupedTasks = useMemo(() => {
+    if (!tasks) return {};
+    
+    const filtered = tasks.filter((t) => {
+      const matchesSearch = 
+        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.metadataFile.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.metadataFileId.includes(searchTerm);
+      
+      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+      const matchesDesc = descFilter === "all" || t.description === descFilter;
+
+      return matchesSearch && matchesStatus && matchesDesc;
+    });
+
+    const groups: Record<string, Record<number, TaskWithFile[]>> = {};
+    
+    filtered.forEach(task => {
+      const title = task.metadataFile.title || "Uncategorized";
+      const season = task.metadataFile.season || 0;
+      
+      if (!groups[title]) groups[title] = {};
+      if (!groups[title][season]) groups[title][season] = [];
+      
+      groups[title][season].push(task);
+    });
+    
+    return groups;
+  }, [tasks, searchTerm, statusFilter, descFilter]);
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Form for New Assets tab
   const batchForm = useForm<MultiBatchCreate & { taskDescription: string }>({
@@ -147,8 +216,21 @@ export default function Tasks() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await apiRequest("POST", "/api/tasks/bulk-delete", { ids });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Success", description: "Tasks deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete tasks", variant: "destructive" });
+    }
+  });
+
   const bulkAddMutation = useMutation({
-    mutationFn: async (data: { metadataFileIds: string[], description: string }) => {
+    mutationFn: async (data: { metadataFileIds: string[]; description: string; deadline?: Date; priority?: string; assignedTo?: string }) => {
       await apiRequest("POST", "/api/tasks/bulk", data);
     },
     onSuccess: () => {
@@ -156,6 +238,9 @@ export default function Tasks() {
       setIsAddDialogOpen(false);
       setSelectedExistingIds([]);
       setTaskDescription("");
+      setTaskDeadline(undefined);
+      setTaskPriority("medium");
+      setTaskAssignee("");
       toast({ title: "Success", description: "Tasks assigned successfully." });
     },
   });
@@ -185,7 +270,10 @@ export default function Tasks() {
       }
       bulkAddMutation.mutate({
         metadataFileIds: selectedExistingIds,
-        description: taskDescription
+        description: taskDescription,
+        deadline: taskDeadline,
+        priority: taskPriority,
+        assignedTo: taskAssignee && taskAssignee !== "unassigned" ? taskAssignee : undefined,
       });
     } else {
       batchForm.handleSubmit((data) => {
@@ -193,22 +281,6 @@ export default function Tasks() {
       })();
     }
   };
-
-  const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    
-    return tasks.filter((t) => {
-      const matchesSearch = 
-        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.metadataFile.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.metadataFileId.includes(searchTerm);
-      
-      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
-      const matchesDesc = descFilter === "all" || t.description === descFilter;
-
-      return matchesSearch && matchesStatus && matchesDesc;
-    });
-  }, [tasks, searchTerm, statusFilter, descFilter]);
 
   const uniqueDescriptions = useMemo(() => {
     if (!tasks) return [];
@@ -218,8 +290,8 @@ export default function Tasks() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
       </div>
     );
   }
@@ -260,20 +332,78 @@ export default function Tasks() {
                 </TabsList>
 
                 <TabsContent value="existing" className="flex-1 overflow-hidden flex flex-col space-y-4 px-1">
-                  <div className="space-y-2">
-                    <Label>Task Description</Label>
-                    <Select value={taskDescription} onValueChange={setTaskDescription}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a task description" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PREDEFINED_DESCRIPTIONS.map((desc) => (
-                          <SelectItem key={desc} value={desc}>
-                            {desc}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Task Description</Label>
+                      <Select value={taskDescription} onValueChange={setTaskDescription}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a task description" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PREDEFINED_DESCRIPTIONS.map((desc) => (
+                            <SelectItem key={desc} value={desc}>
+                              {desc}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Deadline (Optional)</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !taskDeadline && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {taskDeadline ? format(taskDeadline, "PPP") : <span>Set deadline</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={taskDeadline}
+                            onSelect={setTaskDeadline}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Priority</Label>
+                      <Select value={taskPriority} onValueChange={setTaskPriority}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Assign To (Optional)</Label>
+                      <Select value={taskAssignee} onValueChange={setTaskAssignee}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {usersData?.users?.filter(u => u.firstName || u.lastName || u.email).map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <Label className="mb-2 block">Select Files</Label>
@@ -330,6 +460,9 @@ export default function Tasks() {
                             seasons: [{ season: 1, episodeCount: 1, startEpisode: 1 }],
                             channel: "ONS",
                             draft: 1,
+                            breakTimes: [],
+                            actors: [],
+                            genre: [],
                           })}
                         >
                           <Plus className="w-4 h-4 mr-2" /> Add Another Batch
@@ -381,6 +514,7 @@ export default function Tasks() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
             </Select>
@@ -400,83 +534,229 @@ export default function Tasks() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
-            <Card key={task.id} className={cn(
-              "transition-all",
-              task.status === "completed" ? "bg-muted/40 opacity-80" : "bg-card hover:shadow-md"
-            )}>
-              <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
-                  <Checkbox 
-                    checked={task.status === "completed"}
-                    onCheckedChange={(checked) => {
-                      toggleMutation.mutate({ 
-                        id: task.id, 
-                        status: checked ? "completed" : "pending" 
-                      });
-                    }}
-                    className="h-5 w-5"
-                    disabled={!canWriteTasks}
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={cn(
-                        "font-semibold text-lg leading-none",
-                        task.status === "completed" && "line-through text-muted-foreground"
-                      )}>
-                        {task.description}
-                      </span>
-                      {task.status === "completed" ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
-                          <CheckCircle2 className="w-3 h-3 mr-1" /> Done
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                          <Clock className="w-3 h-3 mr-1" /> Pending
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {task.metadataFile.title}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        ID: <span className="font-mono">{task.metadataFileId}</span>
-                      </span>
-                      {task.metadataFile.season && (
-                        <span>S{task.metadataFile.season} E{task.metadataFile.episode}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+      <div className="space-y-6">
+        {Object.keys(groupedTasks).length > 0 ? (
+          Object.entries(groupedTasks)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([title, seasons]) => {
+              const totalPending = Object.values(seasons).flat().filter(t => t.status !== 'completed').length;
+              const isGroupOpen = openGroups[title] ?? true;
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {canReadMetadata && (
-                    <Button variant="ghost" size="icon" asChild title="View File">
-                      <Link href={`/view/${task.metadataFileId}`}>
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                  )}
-                  {canWriteTasks && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-destructive hover:bg-destructive/10"
-                      title="Delete Task"
-                      onClick={() => {
-                        if(confirm("Delete this task?")) deleteMutation.mutate(task.id);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+              return (
+                <div key={title} className="space-y-3">
+                  <div 
+                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg cursor-pointer hover:bg-muted/60 transition-colors group/series"
+                    onClick={() => toggleGroup(title)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {isGroupOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+                      {totalPending > 0 && (
+                        <Badge variant="destructive" className="animate-pulse">
+                          {totalPending} pending
+                        </Badge>
+                      )}
+                    </div>
+                    {canWriteTasks && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="opacity-0 group-hover/series:opacity-100 text-destructive hover:bg-destructive/10 h-8 gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete All Series Tasks
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete all tasks for {title}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete all tasks associated with any episode of <strong>{title}</strong>.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => {
+                                const allIds = Object.values(seasons).flat().map(t => t.id);
+                                bulkDeleteMutation.mutate(allIds);
+                              }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete Tasks
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+
+                  {isGroupOpen && (
+                    <div className="pl-4 space-y-6 border-l-2 border-muted ml-2 pt-2">
+                      {Object.entries(seasons)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([season, seasonTasks]) => (
+                          <div key={`${title}-${season}`} className="space-y-3">
+                            <div className="flex items-center justify-between group/season">
+                              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <CheckSquare className="w-3.5 h-3.5" />
+                                {season === "0" ? "Single Item / Unknown" : `Season ${season}`}
+                              </h3>
+                              {canWriteTasks && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="opacity-0 group-hover/season:opacity-100 text-destructive hover:bg-destructive/10 h-7 text-xs gap-1.5"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Delete Season Tasks
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete season tasks?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Delete all tasks for <strong>{title} Season {season}</strong>?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => bulkDeleteMutation.mutate(seasonTasks.map(t => t.id))}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                              {seasonTasks.map((task) => (
+                                <Card key={task.id} className={cn(
+                                  "transition-all",
+                                  task.status === "completed" ? "bg-muted/40 opacity-80" : "bg-card hover:shadow-md"
+                                )}>
+                                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                      <Checkbox
+                                        checked={task.status === "completed" ? true : task.status === "in_progress" ? "indeterminate" : false}
+                                        onCheckedChange={() => {
+                                          const next = task.status === "pending" ? "in_progress" : task.status === "in_progress" ? "completed" : "pending";
+                                          toggleMutation.mutate({ id: task.id, status: next });
+                                        }}
+                                        className="h-5 w-5"
+                                        disabled={!canWriteTasks}
+                                      />
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                          <span className={cn(
+                                            "font-semibold text-lg leading-none",
+                                            task.status === "completed" && "line-through text-muted-foreground"
+                                          )}>
+                                            {task.description}
+                                          </span>
+                                          {task.status === "in_progress" && (
+                                            <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                                              In Progress
+                                            </Badge>
+                                          )}
+                                          {(task as any).priority && (task as any).priority !== "medium" && (
+                                            <Badge variant="outline" className={cn(
+                                              "text-xs",
+                                              (task as any).priority === "high" ? "border-orange-400 text-orange-600 bg-orange-50" : "text-muted-foreground"
+                                            )}>
+                                              {(task as any).priority}
+                                            </Badge>
+                                          )}
+                                          {task.deadline && (
+                                            <Badge variant="outline" className={cn(
+                                              "text-xs font-mono",
+                                              new Date(task.deadline) < new Date() && task.status !== 'completed' ? "border-destructive text-destructive bg-destructive/5" : ""
+                                            )}>
+                                              Due: {format(new Date(task.deadline), "dd-MM-yyyy")}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                          <span className="flex items-center gap-1">
+                                            ID: <span className="font-mono text-xs">{task.metadataFileId}</span>
+                                          </span>
+                                          {task.metadataFile.episode && (
+                                            <span className="font-medium text-foreground">Episode {task.metadataFile.episode}</span>
+                                          )}
+                                          {task.metadataFile.episodeTitle && (
+                                            <span className="italic">"{task.metadataFile.episodeTitle}"</span>
+                                          )}
+                                          {(task as any).assignedTo && usersData?.users && (() => {
+                                            const assignee = usersData.users.find(u => u.id === (task as any).assignedTo);
+                                            return assignee ? (
+                                              <span className="text-primary font-medium">
+                                                {assignee.firstName || assignee.email}
+                                              </span>
+                                            ) : null;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {canReadMetadata && (
+                                        <Button variant="ghost" size="icon" asChild title="View File">
+                                          <Link href={`/view/${task.metadataFileId}`}>
+                                            <ExternalLink className="w-4 h-4" />
+                                          </Link>
+                                        </Button>
+                                      )}
+                                      {canWriteTasks && (
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="text-destructive hover:bg-destructive/10"
+                                              title="Delete Task"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Are you sure you want to delete this task?
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                              <AlertDialogAction 
+                                                onClick={() => deleteMutation.mutate(task.id)}
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                              >
+                                                Delete
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              );
+            })
         ) : (
           <div className="text-center py-20 border-2 border-dashed rounded-lg bg-muted/20">
             <CheckCircle2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />

@@ -41,14 +41,10 @@ export default function EditLicense() {
     document.title = "Edit License | ONS Broadcast Portal";
   }, []);
 
-  console.log("EditLicense: id =", id);
-
   const { data: license, isLoading, isError, error: queryError } = useQuery<License>({
     queryKey: [`/api/licenses/${id}`],
     enabled: !!id && (canReadLicenses || canWriteLicenses),
   });
-
-  if (queryError) console.error("EditLicense: Query error =", queryError);
 
   useEffect(() => {
     if (!isLoading && !canWriteLicenses) {
@@ -76,12 +72,14 @@ export default function EditLicense() {
       imdbLink: "",
       googleDriveLink: "",
       notes: "",
+      productionYear: undefined,
+      subsFromDistributor: 0,
+      season: "",
     },
   });
 
   useEffect(() => {
     if (license) {
-      console.log("EditLicense: resetting form with license data", license);
       try {
         form.reset({
           name: license.name || "",
@@ -98,9 +96,12 @@ export default function EditLicense() {
           imdbLink: license.imdbLink || "",
           googleDriveLink: license.googleDriveLink || "",
           notes: license.notes || "",
+          productionYear: license.productionYear || undefined,
+          subsFromDistributor: license.subsFromDistributor || 0,
+          season: license.season || "",
         });
-      } catch (err) {
-        console.error("EditLicense: error resetting form", err);
+      } catch {
+        // Form reset failed silently
       }
     }
   }, [license, form.reset]);
@@ -270,6 +271,23 @@ export default function EditLicense() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="subsFromDistributor"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) => field.onChange(checked ? 1 : 0)}
+                          />
+                        </FormControl>
+                        <div className="leading-none">
+                          <FormLabel>Subtitles from Distributor (Ondertiteling inclusief)</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
@@ -379,6 +397,40 @@ export default function EditLicense() {
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="productionYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Production Year (Productiejaar)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          placeholder="e.g., 2023" 
+                          {...field} 
+                          value={field.value || ""} 
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="season"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Season</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 1 or 1, 2, 4" {...field} value={field.value || ""} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { corsMiddleware, authenticate, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { storage } from "../_server/storage.js";
-import { requirePermission as checkPermission } from "../_server/permissions.js";
+import { storage } from "../../shared/storage.js";
+import { requirePermission as checkPermission } from "../../shared/permissions.js";
 
 export default async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   // 1. Handle CORS and Options

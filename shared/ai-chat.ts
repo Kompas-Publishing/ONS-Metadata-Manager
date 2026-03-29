@@ -2,13 +2,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { extname } from "path";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-import { storage } from "./storage";
-import type { UserPermissions } from "./permissions";
-import { 
-  insertMetadataFileSchema, 
-  insertLicenseSchema, 
-  insertTaskSchema 
-} from "@shared/schema";
+import { storage } from "./storage.js";
+import type { UserPermissions } from "./permissions.js";
+import {
+  insertMetadataFileSchema,
+  insertLicenseSchema,
+  insertTaskSchema
+} from "./schema.js";
 
 export type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool";
@@ -186,6 +186,51 @@ async function buildAttachmentParts(attachment: ChatAttachment) {
   return [{ text: `Attachment: ${attachment.fileName}\n\n${trimmedText}` }];
 }
 
+/**
+ * Helper to normalize metadata fields before database operations.
+ */
+function normalizeMetadataData(data: Record<string, any>): Record<string, any> {
+  const normalized = { ...data };
+
+  // Fields that MUST be arrays in the database
+  const arrayFields = ['genre', 'actors', 'tags', 'breakTimes'];
+
+  for (const field of arrayFields) {
+    if (normalized[field] !== undefined && normalized[field] !== null) {
+      if (typeof normalized[field] === 'string') {
+        normalized[field] = normalized[field].split(',').map((s: string) => s.trim()).filter(Boolean);
+      } else if (!Array.isArray(normalized[field])) {
+        normalized[field] = [normalized[field].toString()];
+      }
+    }
+  }
+
+  // Common AI misnamings mapped to schema keys
+  const mapping: Record<string, string> = {
+    'series title': 'seriesTitle',
+    'Series Title': 'seriesTitle',
+    'production country': 'productionCountry',
+    'Production Country': 'productionCountry',
+    'year of production': 'yearOfProduction',
+    'Year of Production': 'yearOfProduction',
+    'episode title': 'episodeTitle',
+    'Episode Title': 'episodeTitle',
+    'episode description': 'episodeDescription',
+    'Episode Description': 'episodeDescription',
+    'original filename': 'originalFilename',
+    'Original Filename': 'originalFilename'
+  };
+
+  for (const [badKey, goodKey] of Object.entries(mapping)) {
+    if (normalized[badKey] !== undefined && normalized[goodKey] === undefined) {
+      normalized[goodKey] = normalized[badKey];
+      delete normalized[badKey];
+    }
+  }
+
+  return normalized;
+}
+
 const DEFAULT_CHAT_MODEL = "gemini-3-pro-preview";
 
 async function getModel(systemPrompt: string, modelOverride?: string) {
@@ -199,7 +244,7 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
   // Use the configured model or fallback
   const modelName = modelOverride || configuredModel || DEFAULT_CHAT_MODEL;
-  
+
   const tools: any[] = [
     {
       functionDeclarations: [
@@ -344,51 +389,6 @@ function isToolUnsupportedError(error: any) {
 }
 
 /**
- * Helper to normalize metadata fields before database operations.
- */
-function normalizeMetadataData(data: Record<string, any>): Record<string, any> {
-  const normalized = { ...data };
-  
-  // Fields that MUST be arrays in the database
-  const arrayFields = ['genre', 'actors', 'tags', 'breakTimes'];
-  
-  for (const field of arrayFields) {
-    if (normalized[field] !== undefined && normalized[field] !== null) {
-      if (typeof normalized[field] === 'string') {
-        normalized[field] = normalized[field].split(',').map((s: string) => s.trim()).filter(Boolean);
-      } else if (!Array.isArray(normalized[field])) {
-        normalized[field] = [normalized[field].toString()];
-      }
-    }
-  }
-
-  // Common AI misnamings mapped to schema keys
-  const mapping: Record<string, string> = {
-    'series title': 'seriesTitle',
-    'Series Title': 'seriesTitle',
-    'production country': 'productionCountry',
-    'Production Country': 'productionCountry',
-    'year of production': 'yearOfProduction',
-    'Year of Production': 'yearOfProduction',
-    'episode title': 'episodeTitle',
-    'Episode Title': 'episodeTitle',
-    'episode description': 'episodeDescription',
-    'Episode Description': 'episodeDescription',
-    'original filename': 'originalFilename',
-    'Original Filename': 'originalFilename'
-  };
-
-  for (const [badKey, goodKey] of Object.entries(mapping)) {
-    if (normalized[badKey] !== undefined && normalized[goodKey] === undefined) {
-      normalized[goodKey] = normalized[badKey];
-      delete normalized[badKey];
-    }
-  }
-  
-  return normalized;
-}
-
-/**
  * AI Chat runner.
  */
 export async function runAiChat(
@@ -396,15 +396,15 @@ export async function runAiChat(
   permissions: UserPermissions,
   options?: { debug?: boolean; attachment?: ChatAttachment }
 ) {
-  const systemPrompt = `You are the ONS Broadcast Portal Assistant. 
+  const systemPrompt = `You are the ONS Broadcast Portal Assistant.
 You help users manage metadata, licenses, and tasks.
 You have access to tools to search the database and propose changes.
 
 PERMISSION RULES:
-- Metadata Read: ${permissions.permissions.metadata.read ? "ALLOWED" : "DENIED"}
-- Metadata Write: ${permissions.permissions.metadata.write ? "ALLOWED" : "DENIED"}
-- License Read: ${permissions.permissions.licenses.read ? "ALLOWED" : "DENIED"}
-- License Write: ${permissions.permissions.licenses.write ? "ALLOWED" : "DENIED"}
+- Metadata Read: ${permissions.features.metadata.read ? "ALLOWED" : "DENIED"}
+- Metadata Write: ${permissions.features.metadata.write ? "ALLOWED" : "DENIED"}
+- License Read: ${permissions.features.licenses.read ? "ALLOWED" : "DENIED"}
+- License Write: ${permissions.features.licenses.write ? "ALLOWED" : "DENIED"}
 
 LANGUAGE RULES:
 - IMPORTANT: All descriptions (description, episodeDescription) MUST be in Dutch (Nederlands).
@@ -416,7 +416,7 @@ DATA TYPE RULES:
 - Use EXACT database field names: 'seriesTitle', 'productionCountry', 'yearOfProduction', 'episodeTitle', 'episodeDescription'.
 
 TOOL USAGE RULES:
-- If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS. 
+- If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS.
 - DO NOT just say "I have updated it" or "I will do it". You MUST call the 'proposeMetadataChange' or 'proposeLicenseChange' tool for EACH item you intend to change.
 - If updating multiple episodes, call the tool multiple times (once for each episode).
 - After calling a tool, summarize what you've done and inform the user you have created a proposal for them to review.
@@ -427,7 +427,7 @@ GENERAL RULES:
 - IMPORTANT: You MUST generate a text response AFTER calling tools. Never leave the final response blank.
 - If a user asks for something they don't have permission for, politely explain that you cannot access that information.
 - When searching, if no results are found, you can offer to perform a general knowledge search or suggest corrections.
-- If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools. 
+- If you find missing information (like on IMDb via your internal knowledge), use the 'proposeMetadataChange' or 'proposeLicenseChange' tools.
 - Changes are NOT applied automatically; they are shown to the user as proposals to accept or reject.
 - ALWAYS provide a text response explaining what you found or what you proposed. NEVER return an empty message.
 
@@ -489,15 +489,15 @@ Always be professional and helpful.`;
 
   // Handle function calls in a loop to allow multiple steps
   let functionCalls = response.response.functionCalls();
-  
+
   while (functionCalls && functionCalls.length > 0) {
     const toolResults: any[] = [];
-    
+
     for (const call of functionCalls) {
       if (options?.debug) {
         debugLogs.push({ type: "tool_call", name: call.name, args: call.args });
       }
-      
+
       let result: any;
       try {
         switch (call.name) {
@@ -518,23 +518,23 @@ Always be professional and helpful.`;
             }
             break;
           case "searchMetadata":
-            if (!permissions.permissions.metadata.read) {
+            if (!permissions.features.metadata.read) {
               result = { error: "Permission denied: Cannot read metadata." };
             } else {
               result = await storage.searchMetadata(call.args.query as string, permissions);
             }
             break;
-            
+
           case "searchLicenses":
-            if (!permissions.permissions.licenses.read) {
+            if (!permissions.features.licenses.read) {
               result = { error: "Permission denied: Cannot read licenses." };
             } else {
               result = await storage.searchLicenses(call.args.query as string);
             }
             break;
-            
+
           case "proposeMetadataChange":
-            if (!permissions.permissions.metadata.write) {
+            if (!permissions.features.metadata.write) {
               result = { error: "Permission denied: Cannot write metadata." };
             } else {
               proposals.push({
@@ -549,7 +549,7 @@ Always be professional and helpful.`;
             break;
 
           case "proposeLicenseChange":
-            if (!permissions.permissions.licenses.write) {
+            if (!permissions.features.licenses.write) {
               result = { error: "Permission denied: Cannot write licenses." };
             } else {
               proposals.push({
@@ -562,7 +562,7 @@ Always be professional and helpful.`;
               result = { status: "Proposal recorded. Inform the user." };
             }
             break;
-            
+
           default:
             result = { error: "Unknown tool." };
         }
@@ -591,20 +591,19 @@ Always be professional and helpful.`;
   let responseText = "";
   try {
     responseText = response.response.text();
-  } catch (e: any) {
-    // If we fail to read the model's text response, capture this in debug logs (when enabled)
-    if (options?.debug) {
-      debugLogs.push({
-        type: "error",
-        source: "response_text",
-        message: typeof e?.message === "string" ? e.message : String(e),
-      });
-    }
+  } catch (e) {
+    // text() might throw if there are no text parts
   }
 
-  // If the model returned no usable text, surface a clear failure message
   if (!responseText || responseText.trim() === "") {
-    responseText = "I am having trouble right now, please try again later.";
+    if (proposals.length > 0) {
+      responseText = `I have generated ${proposals.length} proposal${proposals.length > 1 ? "s" : ""} for you to review and accept. These include updates for: ${proposals.map(p => p.data.title || p.data.seriesTitle || p.type).join(", ")}.`;
+    } else if (debugLogs.some(log => log.type === 'tool_call')) {
+      const toolNames = Array.from(new Set(debugLogs.filter(d => d.type === "tool_call").map(d => d.name)));
+      responseText = `I've performed a search via the ${toolNames.join(", ")} tool(s) but didn't find specific changes to propose. You can view the search results to see what I found.`;
+    } else {
+      responseText = "I've analyzed your request. Please clarify what information you'd like me to find or change, and I will do my best to assist.";
+    }
   }
 
   return {
@@ -626,15 +625,15 @@ export async function executeChatProposal(
   userId: string
 ) {
   if (proposal.type === "metadata") {
-    if (!permissions.permissions.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
-    
+    if (!permissions.features.metadata.write) throw new Error("Permission denied: Cannot write metadata.");
+
     const normalizedData = normalizeMetadataData(proposal.data);
     const { licenseIds, ...dataWithoutLicenses } = normalizedData as any;
 
     if (proposal.action === "create") {
       const validation = insertMetadataFileSchema.safeParse(normalizedData);
       if (!validation.success) throw new Error("Validation failed: " + JSON.stringify(validation.error.errors));
-      
+
       const nextId = await storage.consumeNextId();
       return await storage.createMetadataFile({
         ...validation.data,
@@ -648,7 +647,7 @@ export async function executeChatProposal(
       }, permissions);
     }
   } else if (proposal.type === "license") {
-    if (!permissions.permissions.licenses.write) throw new Error("Permission denied: Cannot write licenses.");
+    if (!permissions.features.licenses.write) throw new Error("Permission denied: Cannot write licenses.");
 
     if (proposal.action === "create") {
       const validation = insertLicenseSchema.safeParse(proposal.data);
@@ -659,6 +658,6 @@ export async function executeChatProposal(
       return await storage.updateLicense(proposal.id, proposal.data);
     }
   }
-  
+
   throw new Error(`Unsupported proposal type: ${proposal.type}`);
 }

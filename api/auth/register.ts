@@ -1,7 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import bcrypt from "bcryptjs";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler } from "../_lib/apiHandler.js";
+import { signToken } from "../../shared/jwt.js";
+import { serialize } from "cookie";
 
 export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
   if (req.method !== "POST") {
@@ -17,7 +19,7 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
 
     const existingUser = await storage.getUserByEmail(email);
     if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
+      return res.status(400).json({ message: "Registration failed. Please check your details and try again." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -36,13 +38,12 @@ export default apiHandler(async (req: VercelRequest, res: VercelResponse) => {
       canReadTasks: 1,
       canWriteTasks: 0,
       canUseAI: 0,
+      canUseAIChat: 0,
       fileVisibility: "own",
       isAdmin: 0,
     });
 
     // Generate JWT token for auto-login
-    const { signToken } = await import("../_server/jwt.js");
-    const { serialize } = await import("cookie");
     const token = signToken(user);
 
     // Set HTTP-only cookie

@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { runAiChat } from "../../_server/ai-chat.js";
+import { runAiChat } from "../../../shared/ai-chat.js";
 import { apiHandler, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 export default apiHandler(
@@ -49,7 +49,7 @@ export default apiHandler(
         };
       }
 
-      const result = await runAiChat(messages, req.permissions!, { debug, attachment });
+      const result = await runAiChat(messages, req.userPermissions!, { debug, attachment });
       return res.json(result);
     } catch (error: any) {
       console.error("Error in AI chat:", error);

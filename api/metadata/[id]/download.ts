@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../../_server/storage.js";
+import { storage } from "../../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 import { transformFileForDownload, buildMetadataXml, buildMetadataXlsx } from "../../_lib/downloadUtils.js";
 import * as XLSX from "xlsx";
@@ -17,7 +17,7 @@ export default apiHandler(
         return res.status(400).json({ message: "Invalid ID" });
       }
 
-      const file = await storage.getMetadataFile(id, req.permissions!);
+      const file = await storage.getMetadataFile(id, req.userPermissions!);
       if (!file) {
         return res.status(404).json({ message: "File not found" });
       }

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -41,6 +42,13 @@ type SortConfig = {
   key: keyof License | "status";
   direction: "asc" | "desc" | null;
 };
+
+// Parse first season number for sorting (e.g. "1, 2, 4" → 1, "10" → 10, null → Infinity)
+function parseSeasonNumber(season: string | null | undefined): number {
+  if (!season) return Infinity;
+  const first = parseInt(season.split(",")[0].trim());
+  return isNaN(first) ? Infinity : first;
+}
 
 export default function Licenses() {
   const { canWriteLicenses, canReadLicenses } = useAuth();
@@ -116,7 +124,15 @@ export default function Licenses() {
           bValue = b[sortConfig.key as keyof License];
         }
 
-        if (aValue === bValue) return 0;
+        if (aValue === bValue) {
+          // Secondary sort by season when names match
+          if (sortConfig.key === "name") {
+            const aSeason = parseSeasonNumber(a.season);
+            const bSeason = parseSeasonNumber(b.season);
+            if (aSeason !== bSeason) return aSeason - bSeason;
+          }
+          return 0;
+        }
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
 
@@ -136,8 +152,8 @@ export default function Licenses() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
       </div>
     );
   }
@@ -192,7 +208,7 @@ export default function Licenses() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Licenses ({filteredAndSortedLicenses.length})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -272,11 +288,18 @@ export default function Licenses() {
                             <FileText className="w-4 h-4 text-muted-foreground" />
                             {license.name}
                           </div>
-                          {license.contentTitle && license.contentTitle !== license.name && (
-                            <span className="text-xs text-muted-foreground ml-6 italic">
-                              {license.contentTitle}
-                            </span>
-                          )}
+                          <div className="ml-6 flex items-center gap-2">
+                            {license.season && (
+                              <span className="text-xs text-primary font-medium">
+                                Season {license.season}
+                              </span>
+                            )}
+                            {license.contentTitle && license.contentTitle !== license.name && (
+                              <span className="text-xs text-muted-foreground italic">
+                                {license.contentTitle}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -316,7 +339,7 @@ export default function Licenses() {
                         {isExpired ? (
                           <Badge variant="destructive" className="w-20 justify-center">Expired</Badge>
                         ) : (
-                          <Badge variant="active" className="w-20 justify-center bg-green-100 text-green-800 border-green-200">Active</Badge>
+                          <Badge variant="secondary" className="w-20 justify-center bg-green-100 text-green-800 border-green-200">Active</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

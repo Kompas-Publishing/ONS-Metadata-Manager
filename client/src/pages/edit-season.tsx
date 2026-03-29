@@ -1,370 +1,402 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Save } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Save, Loader2, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CountrySelect } from "@/components/country-select";
-import { TagInput } from "@/components/tag-input";
 import type { MetadataFile } from "@shared/schema";
 
-interface EpisodeEdit {
-  id: string;
-  episode: number | null;
-  title: string;
-  channel?: string;
-  seasonType?: string;
-  contentType?: string;
-  genre?: string[];
-  programRating?: string;
-  productionCountry?: string;
-  yearOfProduction?: number;
-  catchUp?: number;
-  subtitles?: number;
-  segmented?: number;
+// Column definitions — tooltip shows help text on hover
+// Auto-format raw digits to HH:MM:SS (e.g. "004512" → "00:45:12", "1230" → "00:12:30")
+function formatDuration(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 0) return raw;
+  // Already formatted
+  if (raw.includes(":")) return raw;
+  const padded = digits.padStart(6, "0");
+  const h = padded.slice(0, padded.length - 4);
+  const m = padded.slice(padded.length - 4, padded.length - 2);
+  const s = padded.slice(padded.length - 2);
+  return `${h.padStart(2, "0")}:${m}:${s}`;
+}
+
+const COLUMNS: { key: string; label: string; width: string; type: "text" | "bool" | "readonly" | "tags"; tooltip?: string }[] = [
+  { key: "channel", label: "Channel", width: "w-24", type: "text", tooltip: "Broadcasting channel (e.g. ONS)" },
+  { key: "id", label: "ID", width: "w-32", type: "readonly", tooltip: "Auto-generated file ID" },
+  { key: "title", label: "Title", width: "w-44", type: "text", tooltip: "Series title (Clipnaam)" },
+  { key: "description", label: "Description", width: "w-64", type: "text", tooltip: "Episode description (nl)" },
+  { key: "genre", label: "Genre", width: "w-40", type: "tags", tooltip: "Pipe-separated: Action|Drama|Comedy" },
+  { key: "programRating", label: "Rating", width: "w-20", type: "text", tooltip: "AL, 6, 9, 12, 16, 18" },
+  { key: "productionCountry", label: "Country", width: "w-24", type: "text", tooltip: "Production country code (e.g. NL, DE, US)" },
+  { key: "seriesTitle", label: "Series", width: "w-40", type: "text", tooltip: "Series title (if different from Title)" },
+  { key: "yearOfProduction", label: "Year", width: "w-20", type: "text", tooltip: "Year of production (e.g. 2024)" },
+  { key: "catchUp", label: "CU", width: "w-12", type: "bool", tooltip: "CatchUp availability" },
+  { key: "season", label: "S", width: "w-14", type: "text", tooltip: "Season number" },
+  { key: "episodeTitle", label: "Episode Title", width: "w-48", type: "text", tooltip: "Episode-specific title" },
+  { key: "episode", label: "Ep#", width: "w-14", type: "text", tooltip: "Episode number" },
+  { key: "episodeDescription", label: "Ep Description", width: "w-64", type: "text", tooltip: "Episode-specific description" },
+  { key: "duration", label: "Duration", width: "w-24", type: "text", tooltip: "Format: HH:MM:SS" },
+  { key: "segmented", label: "Seg", width: "w-12", type: "bool", tooltip: "Segmented content" },
+  { key: "breakTimes", label: "Break Times", width: "w-40", type: "tags", tooltip: "Comma-separated: 00:12:30, 00:25:00" },
+  { key: "dateStart", label: "Start", width: "w-28", type: "text", tooltip: "Start date (YYYY-MM-DD)" },
+  { key: "dateEnd", label: "End", width: "w-28", type: "text", tooltip: "End date (YYYY-MM-DD)" },
+  { key: "subtitles", label: "Subs", width: "w-12", type: "bool", tooltip: "Subtitles available" },
+  { key: "subtitlesId", label: "Subs ID", width: "w-28", type: "text", tooltip: "Subtitle file identifier" },
+  { key: "contentType", label: "Type", width: "w-28", type: "text", tooltip: "Long Form, Short Form, program, commercial, Promo, Filler" },
+  { key: "seasonType", label: "Season", width: "w-24", type: "text", tooltip: "Winter, Summer, Autumn, Spring" },
+  { key: "subsStatus", label: "Subs Status", width: "w-28", type: "text", tooltip: "Incomplete or Complete" },
+  { key: "tags", label: "Tags", width: "w-36", type: "tags", tooltip: "Comma-separated tags" },
+];
+
+function initFromFile(ep: MetadataFile): Record<string, any> {
+  return {
+    id: ep.id,
+    _isNew: false,
+    channel: ep.channel || "ONS",
+    title: ep.title || "",
+    description: ep.description || "",
+    genre: ep.genre || [],
+    programRating: ep.programRating || "",
+    productionCountry: ep.productionCountry || "",
+    seriesTitle: ep.seriesTitle || "",
+    yearOfProduction: ep.yearOfProduction?.toString() || "",
+    catchUp: ep.catchUp ?? 0,
+    season: ep.season?.toString() || "",
+    episodeTitle: ep.episodeTitle || "",
+    episode: ep.episode?.toString() || "",
+    episodeDescription: ep.episodeDescription || "",
+    duration: ep.duration || "",
+    segmented: ep.segmented ?? 0,
+    breakTimes: ep.breakTimes || [],
+    dateStart: ep.dateStart ? new Date(ep.dateStart).toISOString().split("T")[0] : "",
+    dateEnd: ep.dateEnd ? new Date(ep.dateEnd).toISOString().split("T")[0] : "",
+    subtitles: ep.subtitles ?? 0,
+    subtitlesId: ep.subtitlesId || "",
+    contentType: ep.contentType || "",
+    seasonType: ep.seasonType || "",
+    subsStatus: ep.subsStatus || "Incomplete",
+    tags: ep.tags || [],
+  };
+}
+
+function newEmptyRow(): Record<string, any> {
+  return {
+    id: "",
+    _isNew: true,
+    channel: "ONS",
+    title: "",
+    description: "",
+    genre: [],
+    programRating: "",
+    productionCountry: "",
+    seriesTitle: "",
+    yearOfProduction: "",
+    catchUp: 0,
+    season: "",
+    episodeTitle: "",
+    episode: "",
+    episodeDescription: "",
+    duration: "",
+    segmented: 0,
+    breakTimes: [],
+    dateStart: "",
+    dateEnd: "",
+    subtitles: 0,
+    subtitlesId: "",
+    contentType: "",
+    seasonType: "",
+    subsStatus: "Incomplete",
+    tags: [],
+  };
 }
 
 export default function EditSeason() {
   const [, params] = useRoute("/edit-season/:title/:season");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const title = params?.title ? decodeURIComponent(params.title) : "";
   const seasonNum = params?.season ? parseInt(params.season) : 0;
+  const urlIds = new URLSearchParams(window.location.search).get("ids")?.split(",").filter(Boolean) || [];
 
   useEffect(() => {
-    document.title = `Edit ${title} Season ${seasonNum} | ONS Broadcast Portal`;
+    document.title = `Edit ${title} S${seasonNum} | ONS Broadcast Portal`;
   }, [title, seasonNum]);
 
-  const [episodes, setEpisodes] = useState<EpisodeEdit[]>([]);
+  const [rows, setRows] = useState<Record<string, any>[]>([]);
 
-  const { data: seasonData, isLoading } = useQuery<MetadataFile[]>({
-    queryKey: ['/api/metadata/season', title, seasonNum],
-    enabled: !!title && !!seasonNum,
+  const { data: allFiles, isLoading: allLoading } = useQuery<MetadataFile[]>({
+    queryKey: ["/api/metadata"],
+    enabled: urlIds.length > 0,
   });
 
+  const { data: seasonData, isLoading: seasonLoading } = useQuery<MetadataFile[]>({
+    queryKey: ['/api/metadata/season', title, seasonNum],
+    enabled: urlIds.length === 0 && !!title && seasonNum != null,
+  });
+
+  const isLoading = urlIds.length > 0 ? allLoading : seasonLoading;
+
+  const sortByEpisode = (rows: Record<string, any>[]) =>
+    [...rows].sort((a, b) => (parseInt(a.episode) || 0) - (parseInt(b.episode) || 0));
+
   useEffect(() => {
-    if (seasonData) {
-      setEpisodes(
-        seasonData.map((ep) => ({
-          id: ep.id,
-          episode: ep.episode,
-          title: ep.title,
-          channel: ep.channel || "",
-          seasonType: ep.seasonType || "",
-          contentType: ep.contentType || "",
-          genre: ep.genre || [],
-          programRating: ep.programRating || "",
-          productionCountry: ep.productionCountry || "",
-          yearOfProduction: ep.yearOfProduction || undefined,
-          catchUp: ep.catchUp ?? 0,
-          subtitles: ep.subtitles ?? 0,
-          segmented: ep.segmented ?? 0,
-        }))
-      );
+    if (urlIds.length > 0 && allFiles) {
+      const idSet = new Set(urlIds);
+      setRows(sortByEpisode(allFiles.filter(f => idSet.has(f.id)).map(initFromFile)));
+    } else if (seasonData) {
+      setRows(sortByEpisode(seasonData.map(initFromFile)));
     }
-  }, [seasonData]);
+  }, [allFiles, seasonData]);
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Array<{ id: string; data: any }>) => {
-      const normalized = updates.map(u => ({
-        id: u.id,
-        data: {
-          channel: u.data.channel,
-          seasonType: u.data.seasonType,
-          contentType: u.data.contentType,
-          genre: u.data.genre,
-          programRating: u.data.programRating,
-          productionCountry: u.data.productionCountry,
-          yearOfProduction: u.data.yearOfProduction,
-          catchUp: u.data.catchUp ? 1 : 0,
-          segmented: u.data.segmented ? 1 : 0,
-          subtitles: u.data.subtitles ? 1 : 0,
-        }
-      }));
-
-      const response = await apiRequest('PATCH', '/api/metadata/bulk-update', {
-        updates: normalized,
-      });
+      const response = await apiRequest('PATCH', '/api/metadata/bulk-update', { updates });
       return await response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/metadata'] });
       queryClient.invalidateQueries({ queryKey: ['/api/metadata/season', title, seasonNum] });
-      toast({
-        title: "Success",
-        description: `Updated ${data.count} episodes successfully`,
-      });
-      setLocation("/browse");
+      toast({ title: "Saved", description: `Updated ${data.count} episodes` });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error updating episodes",
-        description: error.message || "Failed to update episodes",
-        variant: "destructive",
-      });
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleSave = () => {
-    const updates = episodes.map((ep) => ({
-      id: ep.id,
-      data: {
-        channel: ep.channel,
-        seasonType: ep.seasonType as "Winter" | "Summer" | "Autumn" | "Spring" | undefined,
-        contentType: ep.contentType,
-        genre: ep.genre,
-        programRating: ep.programRating as "AL" | "6" | "9" | "12" | "16" | "18" | undefined,
-        productionCountry: ep.productionCountry,
-        yearOfProduction: ep.yearOfProduction,
-        catchUp: ep.catchUp,
-        subtitles: ep.subtitles,
-        segmented: ep.segmented,
-      },
-    }));
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('POST', '/api/metadata', data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/metadata'] });
+    },
+  });
 
-    updateMutation.mutate(updates);
+  const handleSave = async () => {
+    const editableKeys = COLUMNS.filter(c => c.type !== "readonly").map(c => c.key);
+
+    // Separate existing rows from new rows
+    const existingUpdates = rows.filter(r => !r._isNew).map((row) => {
+      const data: Record<string, any> = {};
+      editableKeys.forEach((key) => {
+        const val = row[key];
+        if (key === "catchUp" || key === "subtitles" || key === "segmented") {
+          data[key] = val ? 1 : 0;
+        } else if (key === "yearOfProduction" || key === "season" || key === "episode") {
+          data[key] = val ? parseInt(val) : null;
+        } else if (key === "dateStart" || key === "dateEnd") {
+          data[key] = val ? new Date(val).toISOString() : null;
+        } else {
+          data[key] = val === "" ? null : val;
+        }
+      });
+      return { id: row.id, data };
+    });
+
+    // Create new rows
+    const newRows = rows.filter(r => r._isNew && r.title);
+    for (const row of newRows) {
+      const data: Record<string, any> = {};
+      editableKeys.forEach((key) => {
+        const val = row[key];
+        if (key === "catchUp" || key === "subtitles" || key === "segmented") {
+          data[key] = val ? 1 : 0;
+        } else if (key === "yearOfProduction" || key === "season" || key === "episode") {
+          data[key] = val ? parseInt(val) : null;
+        } else if (key === "dateStart" || key === "dateEnd") {
+          data[key] = val ? new Date(val).toISOString() : null;
+        } else {
+          data[key] = val === "" ? null : val;
+        }
+      });
+      await createMutation.mutateAsync(data);
+    }
+
+    if (existingUpdates.length > 0) {
+      updateMutation.mutate(existingUpdates);
+    } else if (newRows.length > 0) {
+      toast({ title: "Created", description: `${newRows.length} new episodes created` });
+    }
   };
 
-  const updateEpisode = (id: string, field: keyof EpisodeEdit, value: any) => {
-    setEpisodes((prev) =>
-      prev.map((ep) => (ep.id === id ? { ...ep, [field]: value } : ep))
-    );
+  const updateCell = useCallback((rowIdx: number, key: string, value: any) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], [key]: value };
+      return next;
+    });
+  }, []);
+
+  const addRow = async () => {
+    const lastRow = rows[rows.length - 1];
+    const row = newEmptyRow();
+    // Pre-fill from context
+    row.title = lastRow?.title || title;
+    row.seriesTitle = lastRow?.seriesTitle || title;
+    row.season = lastRow?.season || seasonNum.toString();
+    row.channel = lastRow?.channel || "ONS";
+    row.episode = lastRow?.episode ? (parseInt(lastRow.episode) + 1).toString() : "";
+    // Auto-generate an ID
+    try {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch("/api/metadata/next-id", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const id = await res.json();
+        row.id = id;
+      }
+    } catch { /* ignore — will be generated server-side on save */ }
+    setRows((prev) => [...prev, row]);
   };
+
+  const noData = urlIds.length > 0
+    ? (!allFiles || allFiles.filter(f => new Set(urlIds).has(f.id)).length === 0)
+    : (!seasonData || seasonData.length === 0);
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-1/3" />
-        <Card className="p-6">
-          <Skeleton className="h-96 w-full" />
-        </Card>
+        <Card className="p-6"><Skeleton className="h-96 w-full" /></Card>
       </div>
     );
   }
 
-  if (!seasonData || seasonData.length === 0) {
+  if (noData && rows.length === 0) {
     return (
       <Card className="p-12 text-center">
         <p className="text-muted-foreground mb-4">No episodes found for this season</p>
-        <Button onClick={() => setLocation("/browse")} data-testid="button-back-to-browse">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Browse
+        <Button onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Series
         </Button>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 pb-20">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-semibold text-foreground">
-            Edit Season {seasonNum}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {title} - Editing {episodes.length} episodes
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setLocation("/browse")}
-            data-testid="button-cancel"
-          >
-            Cancel
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>
+            <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-            data-testid="button-save-all"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {updateMutation.isPending ? "Saving..." : "Save All Changes"}
+          <div>
+            <h1 className="text-xl font-bold">{title}</h1>
+            <p className="text-xs text-muted-foreground">Season {seasonNum} — {rows.length} episodes</p>
+          </div>
+        </div>
+        <Button onClick={handleSave} disabled={updateMutation.isPending || createMutation.isPending} size="sm" className="gap-2">
+          {(updateMutation.isPending || createMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save All
+        </Button>
+      </div>
+
+      {/* Spreadsheet grid */}
+      <div className="border rounded-lg overflow-hidden bg-background">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
+          <table className="text-xs border-collapse" style={{ minWidth: "2800px" }}>
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-muted">
+                <th className="sticky left-0 z-30 bg-muted px-2 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r w-10">#</th>
+                {COLUMNS.map((col) => (
+                  <th key={col.key} className={`px-1 py-2 text-left font-semibold text-xs uppercase tracking-wider border-b border-r ${col.width}`}>
+                    {col.tooltip ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help border-b border-dotted border-muted-foreground/40">{col.label}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                          {col.tooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIdx) => (
+                <tr key={row.id || `new-${rowIdx}`} className="border-b hover:bg-muted/30 transition-colors group">
+                  <td className="sticky left-0 z-10 bg-background group-hover:bg-muted/30 px-2 py-0 text-center border-r">
+                    {row._isNew ? (
+                      <Badge className="bg-green-100 text-green-700 border-none text-xs h-5">NEW</Badge>
+                    ) : (
+                      <Badge variant="outline" className="font-mono text-xs h-5">{row.episode || "—"}</Badge>
+                    )}
+                  </td>
+                  {COLUMNS.map((col) => (
+                    <td key={col.key} className={`px-0 py-0 border-r ${col.width}`}>
+                      {col.type === "readonly" && !row._isNew ? (
+                        <span className="text-xs text-muted-foreground px-2 py-1 truncate block">{row[col.key]}</span>
+                      ) : col.type === "bool" ? (
+                        <div className="flex items-center justify-center h-7">
+                          <Checkbox
+                            checked={row[col.key] === 1}
+                            onCheckedChange={(c) => updateCell(rowIdx, col.key, c ? 1 : 0)}
+                            className="h-3.5 w-3.5"
+                          />
+                        </div>
+                      ) : col.type === "tags" ? (
+                        <input
+                          className="w-full h-7 text-xs bg-transparent px-2 border-0 border-b border-transparent focus:border-primary focus:outline-none resize-x"
+                          value={Array.isArray(row[col.key]) ? row[col.key].join(", ") : row[col.key] || ""}
+                          onChange={(e) => updateCell(rowIdx, col.key, e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+                          placeholder="comma, separated"
+                        />
+                      ) : (
+                        <input
+                          className="w-full h-7 text-xs bg-transparent px-2 border-0 border-b border-transparent focus:border-primary focus:outline-none"
+                          style={{ minWidth: "60px", resize: "horizontal", overflow: "hidden" }}
+                          value={row[col.key] || ""}
+                          onChange={(e) => updateCell(rowIdx, col.key, e.target.value)}
+                          onBlur={(e) => {
+                            if (col.key === "duration" && e.target.value) {
+                              updateCell(rowIdx, col.key, formatDuration(e.target.value));
+                            }
+                          }}
+                        />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Add row button */}
+        <div className="border-t p-2 bg-muted/20">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground" onClick={addRow}>
+            <Plus className="w-3.5 h-3.5" />
+            Add episode
           </Button>
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-card z-10">
-              <TableRow>
-                <TableHead className="w-20">Episode</TableHead>
-                <TableHead className="w-32">Channel</TableHead>
-                <TableHead className="w-32">Season Type</TableHead>
-                <TableHead className="w-40">Content Type</TableHead>
-                <TableHead className="w-32">Rating</TableHead>
-                <TableHead className="w-48">Country</TableHead>
-                <TableHead className="w-32">Year</TableHead>
-                <TableHead className="w-24">Catch Up</TableHead>
-                <TableHead className="w-24">Subtitles</TableHead>
-                <TableHead className="w-24">Segmented</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {episodes.map((ep, index) => (
-                <TableRow key={ep.id} data-testid={`row-episode-${ep.episode}`}>
-                  <TableCell className="font-medium">
-                    <Badge variant="outline">{ep.episode}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={ep.channel || ""}
-                      onChange={(e) => updateEpisode(ep.id, "channel", e.target.value)}
-                      placeholder="Channel"
-                      className="min-h-8"
-                      data-testid={`input-channel-${index}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={ep.seasonType}
-                      onValueChange={(value) => updateEpisode(ep.id, "seasonType", value)}
-                    >
-                      <SelectTrigger className="min-h-8" data-testid={`select-season-type-${index}`}>
-                        <SelectValue placeholder="Season" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Winter">Winter</SelectItem>
-                        <SelectItem value="Summer">Summer</SelectItem>
-                        <SelectItem value="Autumn">Autumn</SelectItem>
-                        <SelectItem value="Spring">Spring</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={ep.contentType}
-                      onValueChange={(value) => updateEpisode(ep.id, "contentType", value)}
-                    >
-                      <SelectTrigger className="min-h-8" data-testid={`select-content-type-${index}`}>
-                        <SelectValue placeholder="Content Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="program">Program</SelectItem>
-                        <SelectItem value="commercial">Commercial</SelectItem>
-                        {/* <SelectItem value="Short Form">Short Form</SelectItem>
-                        <SelectItem value="Long form format">
-                          Long Form
-                        </SelectItem>
-                        <SelectItem value="Promo">Promo</SelectItem>
-                        <SelectItem value="Campaign">Campaign</SelectItem>
-                        <SelectItem value="Commercial">Commercial</SelectItem>
-                        <SelectItem value="Filler">Filler</SelectItem>
-                        <SelectItem value="OSD">OSD</SelectItem>
-                        <SelectItem value="Ad">Ad</SelectItem>
-                        <SelectItem value="bumper">bumper</SelectItem>
-                        <SelectItem value="Ident">Ident</SelectItem> */}
-                        </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={ep.programRating}
-                      onValueChange={(value) => updateEpisode(ep.id, "programRating", value)}
-                    >
-                      <SelectTrigger className="min-h-8" data-testid={`select-program-rating-${index}`}>
-                        <SelectValue placeholder="Rating" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AL">AL</SelectItem>
-                        <SelectItem value="6">6</SelectItem>
-                        <SelectItem value="9">9</SelectItem>
-                        <SelectItem value="12">12</SelectItem>
-                        <SelectItem value="16">16</SelectItem>
-                        <SelectItem value="18">18</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <CountrySelect
-                      value={ep.productionCountry || ""}
-                      onChange={(value) => updateEpisode(ep.id, "productionCountry", value)}
-                      placeholder="Country"
-                      data-testid={`select-production-country-${index}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={ep.yearOfProduction || ""}
-                      onChange={(e) =>
-                        updateEpisode(
-                          ep.id,
-                          "yearOfProduction",
-                          e.target.value ? parseInt(e.target.value) : undefined
-                        )
-                      }
-                      placeholder="Year"
-                      className="min-h-8"
-                      data-testid={`input-year-${index}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        checked={ep.catchUp === 1}
-                        onCheckedChange={(checked) =>
-                          updateEpisode(ep.id, "catchUp", checked ? 1 : 0)
-                        }
-                        data-testid={`checkbox-catchup-${index}`}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        checked={ep.subtitles === 1}
-                        onCheckedChange={(checked) =>
-                          updateEpisode(ep.id, "subtitles", checked ? 1 : 0)
-                        }
-                        data-testid={`checkbox-subtitles-${index}`}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        checked={ep.segmented === 1}
-                        onCheckedChange={(checked) =>
-                          updateEpisode(ep.id, "segmented", checked ? 1 : 0)
-                        }
-                        data-testid={`checkbox-segmented-${index}`}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {/* Sticky save bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t px-6 py-3 flex items-center justify-between z-50">
+        <p className="text-xs text-muted-foreground">
+          <strong>{rows.filter(r => !r._isNew).length}</strong> episodes
+          {rows.filter(r => r._isNew).length > 0 && <> + <strong>{rows.filter(r => r._isNew).length}</strong> new</>}
+          {" — "}<strong>{title}</strong> Season {seasonNum}
+        </p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setLocation(`/browse/${encodeURIComponent(title)}`)}>Cancel</Button>
+          <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending || createMutation.isPending} className="gap-2">
+            {(updateMutation.isPending || createMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save All
+          </Button>
         </div>
-      </Card>
-
-      <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={() => setLocation("/browse")}
-          data-testid="button-cancel-bottom"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={updateMutation.isPending}
-          data-testid="button-save-all-bottom"
-        >
-          <Save className="w-4 h-4 mr-2" />
-          {updateMutation.isPending ? "Saving..." : "Save All Changes"}
-        </Button>
       </div>
     </div>
   );

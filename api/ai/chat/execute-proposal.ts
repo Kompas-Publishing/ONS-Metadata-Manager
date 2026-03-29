@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { executeChatProposal } from "../../_server/ai-chat.js";
+import { executeChatProposal } from "../../../shared/ai-chat.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../../_lib/apiHandler.js";
 
 export default apiHandler(
@@ -14,7 +14,7 @@ export default apiHandler(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const result = await executeChatProposal(req.body, req.permissions!, userId);
+      const result = await executeChatProposal(req.body, req.userPermissions!, userId);
       return res.json(result);
     } catch (error: any) {
       console.error("Error executing AI chat proposal:", error);

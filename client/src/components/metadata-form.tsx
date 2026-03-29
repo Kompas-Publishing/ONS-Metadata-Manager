@@ -38,7 +38,7 @@ import { CalendarIcon, X, Check, ChevronsUpDown, FileKey, ExternalLink } from "l
 import { SiGoogledrive } from "react-icons/si";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TagInput } from "@/components/tag-input";
 import { CountrySelect } from "@/components/country-select";
 import { TimeInput } from "@/components/time-input";
@@ -130,6 +130,8 @@ export function MetadataForm({
       originalFilename: "",
       subtitlesId: "",
       googleDriveLink: "",
+      subsStatus: "Incomplete",
+      metadataTimesStatus: "Incomplete",
       catchUp: undefined,
       segmented: undefined,
       subtitles: undefined,
@@ -142,6 +144,30 @@ export function MetadataForm({
 
   const actors = form.watch("actors") || [];
   const breakTimes = form.watch("breakTimes") || [];
+  const duration = form.watch("duration");
+
+  // Automatic calculation of metadataTimesStatus
+  const metadataTimesStatus = form.watch("metadataTimesStatus");
+  const hasDuration = !!duration && duration !== "00:00:00";
+  const hasBreakTimes = breakTimes.length > 0;
+
+  useEffect(() => {
+    if (readOnly) return;
+    
+    let newStatus = "Incomplete";
+    if (hasDuration && hasBreakTimes) {
+      newStatus = "Complete";
+    } else if (hasDuration || hasBreakTimes) {
+      const missing = !hasDuration ? "Duration" : "Breaktimes";
+      newStatus = `${missing} Missing`;
+    } else {
+      newStatus = "MISSING";
+    }
+
+    if (metadataTimesStatus !== newStatus) {
+      form.setValue("metadataTimesStatus", newStatus);
+    }
+  }, [hasDuration, hasBreakTimes, metadataTimesStatus, form, readOnly]);
 
   const addActor = () => {
     if (actorInput.trim()) {
@@ -177,7 +203,7 @@ export function MetadataForm({
   const handleSubmit = (data: InsertMetadataFile & { licenseIds?: string[] }) => {
     const convertedData = {
       ...data,
-      licenseId: data.licenseIds && data.licenseIds.length > 0 ? data.licenseIds[0] : null, // Set primary legacy ID
+      licenseId: data.licenseIds && data.licenseIds.length > 0 ? data.licenseIds[0] : undefined, // Set primary legacy ID
       breakTime:
         data.breakTimes && data.breakTimes.length > 0 ? data.breakTimes[0] : "",
       breakTimes: data.breakTimes || [],
@@ -190,51 +216,44 @@ export function MetadataForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleSubmit, () => {
+        // Scroll to first error field
+        setTimeout(() => {
+          const firstError = document.querySelector('[aria-invalid="true"]');
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 100);
+      })} className="space-y-8">
         <div className="space-y-8">
           <fieldset disabled={readOnly} className="contents">
-            {generatedId && (
-              <div className="p-6 border rounded-lg bg-card">
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                  Generated ID
-                </p>
-                <p
-                  className="text-2xl font-mono font-semibold text-foreground"
-                  data-testid="generated-id"
-                >
-                  {generatedId}
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 p-6 border-b bg-muted/20 -mx-6 -mt-8 mb-8">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest">Metadata Editor</p>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {form.watch("seriesTitle") || form.watch("title") || "Untitled Content"}
+                </h2>
+                {(form.watch("season") || form.watch("episode")) && (
+                  <p className="text-muted-foreground font-medium">
+                    {form.watch("season") ? `Season ${form.watch("season")}` : ""}
+                    {form.watch("season") && form.watch("episode") ? " • " : ""}
+                    {form.watch("episode") ? `Episode ${form.watch("episode")}` : ""}
+                    {form.watch("episodeTitle") ? `: ${form.watch("episodeTitle")}` : ""}
+                  </p>
+                )}
               </div>
-            )}
-
-            <div className="border-t pt-8">
-              <h3 className="text-xl font-semibold mb-6 flex items-center gap-2">
-                <FileKey className="w-5 h-5 text-muted-foreground" />
-                Contract & License
-              </h3>
-              <div className="grid grid-cols-1 gap-6 max-w-md">
-                <FormField
-                  control={form.control}
-                  name="licenseIds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>License Association</FormLabel>
-                      <MultiSelect
-                        options={licenseOptions}
-                        value={licenseOptions.filter(opt => field.value?.includes(opt.value))}
-                        onChange={(selectedOptions) => field.onChange(selectedOptions.map(opt => opt.value))}
-                        placeholder="Select licenses..."
-                        disabled={readOnly}
-                      />
-                      <FormDescription>
-                        Link this file to one or more content licenses/contracts.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {generatedId && (
+                <div className="text-right">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                    Internal ID
+                  </p>
+                  <p className="text-lg font-mono font-bold text-foreground">
+                    {generatedId}
+                  </p>
+                </div>
+              )}
             </div>
+
           </fieldset>
 
           <div className="border-t pt-8">
@@ -249,7 +268,7 @@ export function MetadataForm({
                       <FormLabel>Category</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -370,7 +389,7 @@ export function MetadataForm({
                       <FormLabel>Season</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -409,8 +428,12 @@ export function MetadataForm({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="Long Form">Long Form</SelectItem>
+                          <SelectItem value="Short Form">Short Form</SelectItem>
                           <SelectItem value="program">Program</SelectItem>
                           <SelectItem value="commercial">Commercial</SelectItem>
+                          <SelectItem value="Promo">Promo</SelectItem>
+                          <SelectItem value="Filler">Filler</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -418,43 +441,6 @@ export function MetadataForm({
                   )}
                 />
               </fieldset>
-
-              <FormField
-                control={form.control}
-                name="googleDriveLink"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Google Drive Link</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input
-                          placeholder="https://drive.google.com/..."
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="input-google-drive-link"
-                          readOnly={readOnly}
-                          className={cn(readOnly && "bg-muted font-mono text-xs")}
-                        />
-                      </FormControl>
-                      {field.value && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="shrink-0 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                          onClick={() => window.open(field.value, '_blank', 'noopener,noreferrer')}
-                        >
-                          <SiGoogledrive className="w-4 h-4 mr-2 text-[#4285F4]" />
-                          Open Assets
-                        </Button>
-                      )}
-                    </div>
-                    <FormDescription>
-                      Link to promotional material, thumbnails, or videos
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <fieldset disabled={readOnly} className="contents">
                 <FormField
@@ -720,6 +706,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter channel"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-channel"
                         />
                       </FormControl>
@@ -736,7 +723,7 @@ export function MetadataForm({
                       <FormLabel>Program Rating</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value}
+                        value={field.value ?? undefined}
                         disabled={readOnly}
                       >
                         <FormControl>
@@ -788,7 +775,7 @@ export function MetadataForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={field.value}
+                            selected={field.value ?? undefined}
                             onSelect={field.onChange}
                             initialFocus
                           />
@@ -829,7 +816,7 @@ export function MetadataForm({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={field.value}
+                            selected={field.value ?? undefined}
                             onSelect={field.onChange}
                             initialFocus
                           />
@@ -855,6 +842,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter series title"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-series-title"
                         />
                       </FormControl>
@@ -873,6 +861,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter episode title"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-episode-title"
                         />
                       </FormControl>
@@ -947,6 +936,7 @@ export function MetadataForm({
                         placeholder="Enter episode description..."
                         className="min-h-32"
                         {...field}
+                        value={field.value ?? ""}
                         data-testid="input-episode-description"
                       />
                     </FormControl>
@@ -969,7 +959,7 @@ export function MetadataForm({
                       <FormLabel>Production Country</FormLabel>
                       <FormControl>
                         <CountrySelect
-                          value={field.value}
+                          value={field.value ?? undefined}
                           onChange={field.onChange}
                           placeholder="Select country..."
                           disabled={readOnly}
@@ -1024,6 +1014,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter original filename"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-original-filename"
                         />
                       </FormControl>
@@ -1061,6 +1052,7 @@ export function MetadataForm({
                         <Input
                           placeholder="Enter subtitles ID"
                           {...field}
+                          value={field.value ?? ""}
                           data-testid="input-subtitles-id"
                         />
                       </FormControl>
@@ -1072,70 +1064,101 @@ export function MetadataForm({
             </div>
 
             <div className="border-t pt-8">
-              <h3 className="text-xl font-semibold mb-6">Flags</h3>
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="catchUp"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-catch-up"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Catch-Up</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+              <h3 className="text-xl font-semibold mb-6">Flags & Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="catchUp"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-catch-up"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Catch-Up</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="segmented"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-segmented"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Segmented</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="segmented"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-segmented"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Segmented</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="subtitles"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value === 1}
-                          onCheckedChange={(checked) =>
-                            field.onChange(checked ? 1 : 0)
-                          }
-                          data-testid="checkbox-subtitles"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Subtitles</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="subtitles"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value === 1}
+                            onCheckedChange={(checked) =>
+                              field.onChange(checked ? 1 : 0)
+                            }
+                            data-testid="checkbox-subtitles"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Subtitles</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="subsStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subtitles Status</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value ?? undefined}
+                          disabled={readOnly}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Incomplete">Incomplete</SelectItem>
+                            <SelectItem value="Complete">Complete</SelectItem>
+                            <SelectItem value="Not needed">Not needed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             </div>
 

@@ -4,10 +4,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MetadataForm } from "@/components/metadata-form";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { InsertMetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
 
 export default function CreateFile() {
   const [, setLocation] = useLocation();
@@ -18,11 +20,6 @@ export default function CreateFile() {
   useEffect(() => {
     document.title = "Create Metadata | ONS Broadcast Portal";
   }, []);
-
-  const { data: nextId } = useQuery<string>({
-    queryKey: ["/api/metadata/next-id"],
-    enabled: canWriteMetadata,
-  });
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertMetadataFile) => {
@@ -48,7 +45,7 @@ export default function CreateFile() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -69,12 +66,17 @@ export default function CreateFile() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">Create Metadata File</h1>
-        <p className="text-muted-foreground mt-2">
-          Create a single metadata file with a unique auto-generated ID
-        </p>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Create Metadata File</h1>
+          <p className="text-muted-foreground mt-2">
+            Create a single metadata file with a unique auto-generated ID
+          </p>
+        </div>
       </div>
 
       <Card className="p-6">
@@ -83,7 +85,7 @@ export default function CreateFile() {
           onSaveDraft={handleSaveDraft}
           isPending={createMutation.isPending}
           submitLabel="Create File"
-          generatedId={nextId}
+          generatedId="Auto-generated"
         />
       </Card>
     </div>

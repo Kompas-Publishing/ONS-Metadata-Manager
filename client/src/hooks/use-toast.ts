@@ -6,7 +6,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // 5 seconds after dismiss
 
 type ToasterToast = ToastProps & {
   id: string
@@ -114,10 +114,17 @@ export const reducer = (state: State, action: Action): State => {
     }
     case "REMOVE_TOAST":
       if (action.toastId === undefined) {
+        toastTimeouts.forEach((timeout) => clearTimeout(timeout))
+        toastTimeouts.clear()
         return {
           ...state,
           toasts: [],
         }
+      }
+      // Cancel the pending timeout if removed early
+      if (toastTimeouts.has(action.toastId)) {
+        clearTimeout(toastTimeouts.get(action.toastId))
+        toastTimeouts.delete(action.toastId)
       }
       return {
         ...state,
@@ -179,7 +186,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,21 +30,31 @@ import {
   LayoutDashboard,
   FilePlus,
   Layers,
-    List,
-    FileText,
-    LogOut,
-    Shield,
-    FileKey,
-    CheckSquare,
-    Sparkles,
-    Settings,
-    User,
-    Camera,
-    Key,
-    Save,
-    Loader2,
-    Upload,
-  } from "lucide-react";
+  List,
+  FileText,
+  LogOut,
+  Shield,
+  FileKey,
+  CheckSquare,
+  Sparkles,
+  Settings,
+  User,
+  Camera,
+  Key,
+  Save,
+  Loader2,
+  Upload,
+  Search,
+  Film,
+} from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { upload } from "@vercel/blob/client";
   
   const menuGroups = [
@@ -73,7 +83,7 @@ import { upload } from "@vercel/blob/client";
           permissionKey: "canReadMetadata",
         },
         {
-          title: "Create File",
+          title: "Create Metadata",
           url: "/create",
           icon: FilePlus,
           testId: "nav-create",
@@ -116,6 +126,14 @@ import { upload } from "@vercel/blob/client";
           testId: "nav-create-license",
           adminOnly: false,
           permissionKey: "canWriteLicenses",
+        },
+        {
+          title: "Contracts",
+          url: "/contracts",
+          icon: FileKey,
+          testId: "nav-contracts",
+          adminOnly: false,
+          permissionKey: "canAccessContracts",
         },
       ]
     },
@@ -217,6 +235,41 @@ export function AppSidebar() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Global search
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ metadata: any[]; licenses: any[]; series: any[] }>({ metadata: [], licenses: [], series: [] });
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchOpen(open => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (value.trim().length < 2) {
+      setSearchResults({ metadata: [], licenses: [], series: [] });
+      return;
+    }
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        const res = await fetch(`/api/search?q=${encodeURIComponent(value)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) setSearchResults(await res.json());
+      } catch { /* ignore */ }
+    }, 300);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
   };
@@ -227,7 +280,7 @@ export function AppSidebar() {
 
     try {
       setIsUploading(true);
-      const newBlob = await upload(file.name, file, {
+      const newBlob = await upload(`avatars/${file.name}`, file, {
         access: 'private',
         handleUploadUrl: '/api/blob/upload',
         clientPayload: JSON.stringify({ type: 'avatar' }),
@@ -310,6 +363,64 @@ export function AppSidebar() {
           <h2 className="text-xl font-bold tracking-tight text-primary">ONS Portal</h2>
           <p className="text-xs text-muted-foreground mt-1 font-medium">Broadcast Management System</p>
         </div>
+
+        <div className="px-3 mb-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start text-muted-foreground text-sm h-9 gap-2"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="w-4 h-4" />
+            Search...
+            <kbd className="ml-auto pointer-events-none text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Ctrl+K</kbd>
+          </Button>
+        </div>
+
+        <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+          <DialogContent className="overflow-hidden p-0 shadow-lg">
+            <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
+          <CommandInput placeholder="Search metadata, licenses, series..." value={searchQuery} onValueChange={handleSearchChange} />
+          <CommandList className="max-h-[300px]">
+            <CommandEmpty>{searchQuery.length < 2 ? "Type at least 2 characters..." : "No results found."}</CommandEmpty>
+            {searchResults.metadata.length > 0 && (
+              <CommandGroup heading="Metadata">
+                {searchResults.metadata.map((f: any) => (
+                  <CommandItem key={f.id} onSelect={() => { setSearchOpen(false); setLocation(`/view/${f.id}`); }}>
+                    <FileText className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium">{f.title}</span>
+                      {f.season && <span className="text-muted-foreground text-xs ml-2">S{f.season}E{f.episode}</span>}
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground">{f.id}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {searchResults.licenses.length > 0 && (
+              <CommandGroup heading="Licenses">
+                {searchResults.licenses.map((l: any) => (
+                  <CommandItem key={l.id} onSelect={() => { setSearchOpen(false); setLocation(`/licenses/${l.id}`); }}>
+                    <FileKey className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <span className="font-medium">{l.name}</span>
+                    {l.distributor && <span className="text-muted-foreground text-xs ml-2">{l.distributor}</span>}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {searchResults.series.length > 0 && (
+              <CommandGroup heading="Series">
+                {searchResults.series.map((s: any) => (
+                  <CommandItem key={s.id} onSelect={() => { setSearchOpen(false); setLocation(`/browse/${encodeURIComponent(s.title)}`); }}>
+                    <Film className="w-4 h-4 mr-2 text-muted-foreground" />
+                    <span className="font-medium">{s.title}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
         
         {filteredGroups.map((group) => (
           <SidebarGroup key={group.label}>
@@ -334,7 +445,7 @@ export function AppSidebar() {
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                         {(item as any).disabled && (
-                          <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                          <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                             Soon
                           </span>
                         )}
@@ -463,7 +574,7 @@ export function AppSidebar() {
                           </>
                         )}
                       </Button>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Supports JPG, PNG, GIF. Max 4.5MB for serverless.
                       </p>
                     </div>

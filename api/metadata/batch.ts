@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { batchCreateSchema } from "../_shared/schema.js";
+import { batchCreateSchema } from "../../shared/schema.js";
 
 export default apiHandler(
   requirePermission("metadata", "write")(async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -21,7 +21,7 @@ export default apiHandler(
 
       const files = await storage.createBatchMetadataFiles(
         validation.data,
-        req.permissions!,
+        req.userPermissions!,
       );
 
       res.json({

@@ -107,8 +107,7 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
 
   const unlinkMutation = useMutation({
     mutationFn: async (metadataIds: string[]) => {
-      // We use the same link endpoint but with null licenseId
-      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseId: null, metadataIds });
+      await apiRequest("PATCH", "/api/licenses/link-metadata", { licenseIdToRemove: licenseId, metadataIds });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Content unlinked from license." });
@@ -230,17 +229,15 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
                           {episodes.map(file => (
                             <div key={file.id} className="group flex items-center justify-between p-2 rounded bg-muted/50 text-xs border border-transparent hover:border-primary/20">
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-mono text-[10px] text-muted-foreground w-12 flex-shrink-0">{file.id}</span>
+                                <span className="font-mono text-xs text-muted-foreground w-12 flex-shrink-0">{file.id}</span>
                                 <span className="truncate" title={file.episodeTitle || file.title}>
                                   Ep {file.episode}: {file.episodeTitle || file.title}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Link href={`/view/${file.id}`}>
-                                  <a target="_blank" className="p-1 hover:text-primary">
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                </Link>
+                                <a href={`/view/${file.id}`} target="_blank" rel="noopener noreferrer" className="p-1 hover:text-primary">
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
                                 <button
                                   onClick={() => unlinkMutation.mutate([file.id])}
                                   className="p-1 hover:text-destructive"
@@ -312,6 +309,9 @@ export function LicenseContentManager({ licenseId }: LicenseContentManagerProps)
                       channel: "ONS",
                       draft: 1,
                       licenseId: licenseId,
+                      breakTimes: [],
+                      actors: [],
+                      genre: [],
                     })}
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add Another Batch

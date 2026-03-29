@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -54,6 +55,7 @@ export const users = pgTable("users", {
   canWriteTasks: integer("can_write_tasks").default(0).notNull(),
   canUseAI: integer("can_use_ai").default(0).notNull(),
   canUseAIChat: integer("can_use_ai_chat").default(0).notNull(),
+  canAccessContracts: integer("can_access_contracts").default(0).notNull(),
   fileVisibility: varchar("file_visibility", { length: 20 }).default("own").notNull(), // own, all, group
   groupIds: text("group_ids").array().default(sql`ARRAY[]::text[]`), // Array of group IDs user belongs to
   createdAt: timestamp("created_at").defaultNow(),
@@ -80,6 +82,9 @@ export const licenses = pgTable("licenses", {
   imdbLink: text("imdb_link"),
   googleDriveLink: text("google_drive_link"),
   notes: text("notes"),
+  productionYear: integer("production_year"),
+  subsFromDistributor: integer("subs_from_distributor").default(0),
+  season: text("season"), // e.g. "1" or "1, 2, 4"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -99,6 +104,9 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
   imdbLink: z.string().optional(),
   googleDriveLink: z.string().optional(),
   notes: z.string().optional(),
+  productionYear: z.number().int().optional(),
+  subsFromDistributor: z.number().int().min(0).max(1).optional(),
+  season: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -107,6 +115,34 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
 
 export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
+
+// Series table
+export const seriesTable = pgTable("series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull().unique(),
+  productionYear: integer("production_year"),
+  driveLinks: jsonb("drive_links").default(sql`'[]'::jsonb`).notNull(), // Array of { name: string, url: string }
+  websiteLink: text("website_link"),
+  subsFromDistributor: integer("subs_from_distributor").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SeriesItem = typeof seriesTable.$inferSelect;
+export type Series = SeriesItem;
+export type InsertSeries = typeof seriesTable.$inferInsert;
+
+// Join table for many-to-many Series-License relationship
+export const seriesToLicenses = pgTable("series_to_licenses", {
+  seriesId: varchar("series_id").notNull().references(() => seriesTable.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  seasonRange: text("season_range"), // E.G. "1-4"
+}, (t) => [
+  uniqueIndex("series_license_unique_idx").on(t.seriesId, t.licenseId),
+]);
+
+export type SeriesToLicense = typeof seriesToLicenses.$inferSelect;
+export type InsertSeriesToLicense = typeof seriesToLicenses.$inferInsert;
 
 // Metadata files table
 export const metadataFiles = pgTable("metadata_files", {
@@ -143,20 +179,30 @@ export const metadataFiles = pgTable("metadata_files", {
   subtitles: integer("subtitles"), // Subtitle availability (0 or 1 as boolean)
   subtitlesId: varchar("subtitles_id"), // Subtitle identifier
   googleDriveLink: text("google_drive_link"),
+  subsStatus: varchar("subs_status", { length: 50 }).default("Incomplete"),
+  metadataTimesStatus: varchar("metadata_times_status", { length: 50 }).default("Incomplete"),
+  seriesId: varchar("series_id").references(() => seriesTable.id, { onDelete: "set null" }),
   draft: integer("draft").default(0), // Draft status (0 = published, 1 = draft)
-  licenseId: varchar("license_id").references(() => licenses.id), // Legacy: Single link to license
+  licenseId: varchar("license_id").references(() => licenses.id, { onDelete: "set null" }), // Legacy: Single link to license
   createdBy: varchar("created_by").references(() => users.id),
   groupId: varchar("group_id").references(() => groups.id), // Group assignment for group-based visibility
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_metadata_created_by").on(table.createdBy),
+  index("idx_metadata_group_id").on(table.groupId),
+  index("idx_metadata_title").on(table.title),
+  index("idx_metadata_series_id").on(table.seriesId),
+  index("idx_metadata_created_at").on(table.createdAt),
+  index("idx_metadata_license_id").on(table.licenseId),
+]);
 
 // Join table for many-to-many Metadata-License relationship
 export const metadataToLicenses = pgTable("metadata_to_licenses", {
-  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
-  licenseId: varchar("license_id").notNull().references(() => licenses.id),
+  metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
 }, (t) => [
-  index("metadata_license_idx").on(t.metadataFileId, t.licenseId),
+  uniqueIndex("metadata_license_unique_idx").on(t.metadataFileId, t.licenseId),
 ]);
 
 export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
@@ -171,29 +217,31 @@ export const insertMetadataFileSchema = createInsertSchema(metadataFiles, {
   actors: z.array(z.string()).optional(),
   genre: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional().default([]),
-  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).optional(),
-  contentType: z.string().min(1, "Content Type is required"),
-  category: z.enum(["Series", "Movie", "Documentary"]).optional(),
-  // New field validations
-  channel: z.string().optional(),
-  audioId: z.string().optional(),
-  originalFilename: z.string().optional(),
-  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).optional(),
-  productionCountry: z.string().optional(),
-  seriesTitle: z.string().optional(),
-  yearOfProduction: z.number().int().positive().max(new Date().getFullYear(), "Year must be in the past or current year").optional(),
-  catchUp: z.number().int().min(0).max(1).optional(),
-  episodeCount: z.number().int().positive().optional(),
-  episodeTitle: z.string().optional(),
-  episodeDescription: z.string().optional(),
-  segmented: z.number().int().min(0).max(1).optional(),
-  dateStart: z.coerce.date().optional(),
-  dateEnd: z.coerce.date().optional(),
-  subtitles: z.number().int().min(0).max(1).optional(),
-  subtitlesId: z.string().optional(),
-  googleDriveLink: z.string().optional(),
-  draft: z.number().int().min(0).max(1).optional(),
-  licenseId: z.string().optional(),
+  seasonType: z.enum(["Winter", "Summer", "Autumn", "Spring"]).nullable().optional(),
+  contentType: z.string().nullable().optional(),
+  category: z.enum(["Series", "Movie", "Documentary"]).nullable().optional(),
+  channel: z.string().nullable().optional(),
+  audioId: z.string().nullable().optional(),
+  originalFilename: z.string().nullable().optional(),
+  programRating: z.enum(["AL", "6", "9", "12", "16", "18"]).nullable().optional(),
+  productionCountry: z.string().nullable().optional(),
+  seriesTitle: z.string().nullable().optional(),
+  yearOfProduction: z.number().int().positive().max(new Date().getFullYear()).nullable().optional(),
+  catchUp: z.number().int().min(0).max(1).nullable().optional(),
+  episodeCount: z.number().int().positive().nullable().optional(),
+  episodeTitle: z.string().nullable().optional(),
+  episodeDescription: z.string().nullable().optional(),
+  segmented: z.number().int().min(0).max(1).nullable().optional(),
+  dateStart: z.coerce.date().nullable().optional(),
+  dateEnd: z.coerce.date().nullable().optional(),
+  subtitles: z.number().int().min(0).max(1).nullable().optional(),
+  subtitlesId: z.string().nullable().optional(),
+  googleDriveLink: z.string().nullable().optional(),
+  subsStatus: z.string().nullable().optional(),
+  metadataTimesStatus: z.string().nullable().optional(),
+  seriesId: z.string().nullable().optional(),
+  draft: z.number().int().min(0).max(1).nullable().optional(),
+  licenseId: z.string().nullable().optional(),
 }).extend({
   licenseIds: z.array(z.string()).optional(), // Support for multiple licenses
 }).omit({
@@ -253,6 +301,7 @@ export const enhancedBatchCreateSchema = z.object({
   googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional().default(1),
   licenseId: z.string().optional(),
+  taskDescription: z.string().optional(),
 });
 
 export type EnhancedBatchCreate = z.infer<typeof enhancedBatchCreateSchema>;
@@ -293,6 +342,7 @@ export const batchCreateSchema = z.object({
   segmented: z.number().int().min(0).max(1).optional(),
   googleDriveLink: z.string().optional(),
   draft: z.number().int().min(0).max(1).optional(),
+  taskDescription: z.string().optional(),
 });
 
 export type BatchCreate = z.infer<typeof batchCreateSchema>;
@@ -329,16 +379,24 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   metadataFileId: varchar("metadata_file_id").notNull().references(() => metadataFiles.id),
   description: text("description").notNull(), // e.g., "heeft meta nodig"
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, completed
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, in_progress, completed
+  deadline: timestamp("deadline"), // Optional deadline for the task
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  priority: varchar("priority", { length: 10 }).default("medium").notNull(), // low, medium, high
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_tasks_metadata_file_id").on(table.metadataFileId),
+]);
 
 export const insertTaskSchema = createInsertSchema(tasks, {
   metadataFileId: z.string().min(1),
   description: z.string().min(1, "Description is required"),
-  status: z.enum(["pending", "completed"]).optional(),
+  status: z.enum(["pending", "in_progress", "completed"]).optional(),
+  deadline: z.coerce.date().optional(),
+  assignedTo: z.string().optional().nullable(),
+  priority: z.enum(["low", "medium", "high"]).optional(),
 }).omit({
   id: true,
   createdBy: true,
@@ -349,3 +407,71 @@ export const insertTaskSchema = createInsertSchema(tasks, {
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
 
+// Contracts table
+export const contracts = pgTable("contracts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  distributor: text("distributor").notNull(),
+  contractMode: varchar("contract_mode", { length: 20 }), // umbrella, split, mixed
+  status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, imported, verified, issue
+  description: text("description"),
+  notes: text("notes"),
+  totalFeeAmount: text("total_fee_amount"), // Total contract fee
+  totalFeeCurrency: varchar("total_fee_currency", { length: 10 }).default("EUR"),
+  sharedTerms: jsonb("shared_terms"), // Shared license terms (territory, rights, runs, etc.)
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_contracts_distributor").on(table.distributor),
+]);
+
+// Contract files — multiple files per contract (main, amendment, appendix, etc.)
+export const contractFiles = pgTable("contract_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileRole: varchar("file_role", { length: 20 }).default("main"), // main, amendment, appendix, schedule, duplicate
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Join table: contracts to licenses — with provenance tracking
+export const contractsToLicenses = pgTable("contracts_to_licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").default(0),
+  sourceTitle: text("source_title"), // Original programme title from contract
+  sourceTitles: jsonb("source_titles"), // Array of source programme titles if multiple
+  packageLabel: text("package_label"), // Package grouping label
+  sourceReference: text("source_reference"), // Page / appendix / row / article reference
+  notes: text("notes"), // Per-line extracted notes
+  sourceSnapshot: jsonb("source_snapshot"), // Full original data snapshot for provenance
+  mappingStatus: varchar("mapping_status", { length: 20 }).default("mapped"), // mapped, unverified, issue
+}, (t) => [
+  uniqueIndex("contract_license_unique_idx").on(t.contractId, t.licenseId),
+]);
+
+export const insertContractSchema = createInsertSchema(contracts, {
+  name: z.string().min(1, "Name is required"),
+  distributor: z.string().min(1, "Distributor is required"),
+  contractMode: z.string().optional(),
+  status: z.string().optional(),
+  description: z.string().optional(),
+  notes: z.string().optional(),
+  totalFeeAmount: z.string().optional(),
+  totalFeeCurrency: z.string().optional(),
+}).omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertContract = z.infer<typeof insertContractSchema>;
+export type Contract = typeof contracts.$inferSelect;
+export type ContractFile = typeof contractFiles.$inferSelect;
+export type ContractToLicense = typeof contractsToLicenses.$inferSelect;

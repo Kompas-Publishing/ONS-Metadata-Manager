@@ -9,3 +9,6 @@ vite.config.ts.*
 .env.production
 *.log
 logs
+.claude
+claude.md
+Code_Audit.md

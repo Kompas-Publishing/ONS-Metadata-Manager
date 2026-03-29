@@ -24,6 +24,8 @@ import Licenses from "@/pages/licenses";
 import CreateLicense from "@/pages/create-license";
 import ViewLicense from "@/pages/view-license";
 import EditLicense from "@/pages/edit-license";
+import Contracts from "@/pages/contracts";
+import ViewContract from "@/pages/view-contract";
 import Tasks from "@/pages/tasks";
 import AiUpload from "@/pages/ai-upload";
 import AiChat from "@/pages/ai-chat";
@@ -38,6 +40,7 @@ function Router() {
     canWriteTasks, 
     canUseAI,
     canUseAIChat,
+    canAccessContracts,
     isAdmin
   } = useAuth();
 
@@ -77,6 +80,16 @@ function Router() {
         </AuthenticatedRoute>
       </Route>
       
+      <Route path="/browse/:title">
+        <AuthenticatedRoute>
+          {canReadMetadata || canWriteMetadata ? (
+            <ProtectedLayout>
+              <Browse />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
+        </AuthenticatedRoute>
+      </Route>
+
       <Route path="/browse">
         <AuthenticatedRoute>
           {canReadMetadata || canWriteMetadata ? (
@@ -144,6 +157,26 @@ function Router() {
               <CreateLicense />
             </ProtectedLayout>
           ) : <Redirect to="/licenses" />}
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/contracts/:id">
+        <AuthenticatedRoute>
+          {canAccessContracts ? (
+            <ProtectedLayout>
+              <ViewContract />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
+        </AuthenticatedRoute>
+      </Route>
+
+      <Route path="/contracts">
+        <AuthenticatedRoute>
+          {canAccessContracts ? (
+            <ProtectedLayout>
+              <Contracts />
+            </ProtectedLayout>
+          ) : <Redirect to="/" />}
         </AuthenticatedRoute>
       </Route>
 

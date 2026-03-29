@@ -1,8 +1,8 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { insertLicenseSchema } from "../_shared/schema.js";
-import { getUserPermissions } from "../_server/permissions.js";
+import { insertLicenseSchema } from "../../shared/schema.js";
+import { getUserPermissions } from "../../shared/permissions.js";
 import { authenticate } from "../_lib/apiHandler.js";
 
 export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse) => {
@@ -20,7 +20,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   if (!permissions) return res.status(403).json({ message: "Unauthorized" });
 
   if (req.method === "GET") {
-    if (!permissions.permissions.licenses.read) {
+    if (!permissions.features.licenses.read) {
       return res.status(403).json({ message: "No read permission for licenses" });
     }
     try {
@@ -36,7 +36,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   }
 
   if (req.method === "PATCH") {
-    if (!permissions.permissions.licenses.write) {
+    if (!permissions.features.licenses.write) {
       return res.status(403).json({ message: "No write permission for licenses" });
     }
     try {
@@ -60,7 +60,7 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
   }
 
   if (req.method === "DELETE") {
-    if (!permissions.permissions.licenses.write) {
+    if (!permissions.features.licenses.write) {
       return res.status(403).json({ message: "No write permission for licenses" });
     }
     try {

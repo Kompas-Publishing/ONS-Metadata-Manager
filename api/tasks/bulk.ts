@@ -1,5 +1,5 @@
 import type { VercelResponse } from "@vercel/node";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import { apiHandler, requirePermission, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import { z } from "zod";
 
@@ -16,6 +16,9 @@ export default apiHandler(
       const bulkSchema = z.object({
         metadataFileIds: z.array(z.string()).min(1),
         description: z.string().min(1),
+        deadline: z.coerce.date().optional(),
+        assignedTo: z.string().optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
       });
 
       const validation = bulkSchema.safeParse(req.body);

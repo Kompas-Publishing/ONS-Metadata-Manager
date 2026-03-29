@@ -46,7 +46,7 @@ export default function AiUpload() {
       let blobUrl = "";
       if (file.size > MAX_BODY_SIZE) {
         // Upload to Vercel Blob first if it's too big for a standard POST body
-        const newBlob = await upload(file.name, file, {
+        const newBlob = await upload(`ai-uploader/${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),
@@ -92,7 +92,7 @@ export default function AiUpload() {
       if (file.size > MAX_BODY_SIZE) {
         // Reuse upload if needed, though usually refine happens after parse
         // For simplicity, we'll just upload again if needed or we could cache the blobUrl
-        const newBlob = await upload(file.name, file, {
+        const newBlob = await upload(`ai-uploader/${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/blob/upload',
           clientPayload: JSON.stringify({ type: 'ai-upload' }),
@@ -287,7 +287,7 @@ export default function AiUpload() {
             <Card className="p-12 text-center text-muted-foreground">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
               <p>No actionable data found in the uploaded file.</p>
-              <Button variant="link" onClick={() => setProposals(null)}>Try another file</Button>
+              <Button variant="ghost" onClick={() => setProposals(null)}>Try another file</Button>
             </Card>
           ) : (
             <ScrollArea className="h-[calc(100vh-250px)]">
@@ -418,7 +418,7 @@ export default function AiUpload() {
                             </CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-[10px] font-medium text-primary">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary">
                           <Bot className="w-3 h-3" />
                           <span>Gemini 3</span>
                         </div>
@@ -473,7 +473,7 @@ export default function AiUpload() {
                       
                       <div className="flex items-center gap-2 px-1 text-muted-foreground/60">
                         <Lightbulb className="w-3 h-3" />
-                        <span className="text-[10px] font-medium italic">
+                        <span className="text-xs font-medium italic">
                           Tip: Ask to recalculate fees, fix name casing, or merge duplicates.
                         </span>
                       </div>

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { apiHandler, requireAuth, type AuthenticatedRequest } from "../_lib/apiHandler.js";
-import { storage } from "../_server/storage.js";
+import { storage } from "../../shared/storage.js";
 import bcrypt from "bcryptjs";
 
 export default apiHandler(
@@ -8,7 +8,7 @@ export default apiHandler(
     if (req.method === "GET") {
       try {
         const user = req.user!;
-        const { password, ...userWithoutPassword } = user;
+        const { password: removedPassword, ...userWithoutPassword } = user;
         res.json(userWithoutPassword);
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -46,7 +46,7 @@ export default apiHandler(
         }
 
         const updatedUser = await storage.updateUserProfile(userId, updateData);
-        const { password, ...userWithoutPassword } = updatedUser as any;
+        const { password: removedPassword, ...userWithoutPassword } = updatedUser as any;
         res.json(userWithoutPassword);
       } catch (error) {
         console.error("Error updating profile:", error);

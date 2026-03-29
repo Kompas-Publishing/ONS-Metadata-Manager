@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { aiService } from "../_server/ai-service.js";
+import { aiService } from "../../shared/ai-service.js";
 import { withCors, requirePermission, isValidBlobUrl, type AuthenticatedRequest } from "../_lib/apiHandler.js";
 import multer from "multer";
 
@@ -29,7 +29,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
   try {
     let fileBuffer: Buffer;
     let mimeType: string;
-    let type: string;
+    let type: "license" | "metadata";
     let feedback: string;
     let previousProposals: any[];
 
@@ -86,7 +86,7 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       type,
       previousProposals,
       feedback,
-      req.permissions
+      req.userPermissions
     );
 
     return res.status(200).json({ proposals: result.proposals });

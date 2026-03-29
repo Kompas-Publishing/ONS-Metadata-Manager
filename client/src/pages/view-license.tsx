@@ -191,6 +191,10 @@ export default function ViewLicense() {
                 <p className="text-lg font-semibold">{license.distributor || "-"}</p>
               </div>
               <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Production Year (Productiejaar)</p>
+                <p className="text-lg font-semibold">{license.productionYear || "-"}</p>
+              </div>
+              <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">License Fee (Licentievergoeding)</p>
                 <div className="flex items-center gap-2">
                   <p className="text-lg font-semibold">{formatFee()}</p>
@@ -214,6 +218,18 @@ export default function ViewLicense() {
                     <Badge variant="outline" className="text-base px-3">{license.contentRating}</Badge>
                   ) : (
                     <p className="text-lg font-semibold">-</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Subtitles (Ondertiteling)</p>
+                <div>
+                  {license.subsFromDistributor === 1 ? (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200">
+                      From Distributor
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground">Own Creation</Badge>
                   )}
                 </div>
               </div>
@@ -315,7 +331,7 @@ export default function ViewLicense() {
             </CardContent>
           </Card>
           
-          <div className="px-4 text-[10px] text-muted-foreground uppercase font-mono">
+          <div className="px-4 text-xs text-muted-foreground uppercase font-mono">
             System ID: {license.id}
           </div>
         </div>
@@ -371,7 +387,7 @@ export default function ViewLicense() {
               <Layers className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground">No content linked to this license yet.</p>
               {canWriteLicenses && (
-                <Button variant="link" asChild>
+                <Button variant="ghost" asChild>
                   <Link href={`/licenses/${id}/edit`}>Add content now</Link>
                 </Button>
               )}

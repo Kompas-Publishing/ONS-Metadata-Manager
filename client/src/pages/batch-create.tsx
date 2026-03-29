@@ -17,7 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle2, Loader2, CalendarIcon, X, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Loader2, CalendarIcon, X, Plus, Trash2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -26,17 +26,6 @@ import { CountrySelect } from "@/components/country-select";
 import { TimeInput } from "@/components/time-input";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
-
-function parseFormattedId(formattedId: string): number {
-  return parseInt(formattedId.replace(/-/g, ''), 10);
-}
-
-function formatMetadataId(num: number): string {
-  const segment3 = String(num % 1000).padStart(3, '0');
-  const segment2 = String(Math.floor(num / 1000) % 1000).padStart(3, '0');
-  const segment1 = String(Math.floor(num / 1000000) % 1000).padStart(3, '0');
-  return `${segment1}-${segment2}-${segment3}`;
-}
 
 export default function BatchCreate() {
   const [, setLocation] = useLocation();
@@ -49,11 +38,6 @@ export default function BatchCreate() {
   useEffect(() => {
     document.title = "Batch Create | ONS Broadcast Portal";
   }, []);
-
-  const { data: nextId } = useQuery<string>({
-    queryKey: ["/api/metadata/next-id"],
-    enabled: canWriteMetadata,
-  });
 
   const form = useForm<EnhancedBatchCreate>({
     resolver: zodResolver(enhancedBatchCreateSchema),
@@ -81,6 +65,7 @@ export default function BatchCreate() {
       contentType: undefined,
       seasonType: undefined,
       draft: 1,
+      taskDescription: "",
     },
   });
 
@@ -112,7 +97,7 @@ export default function BatchCreate() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/login";
         }, 500);
         return;
       }
@@ -146,11 +131,16 @@ export default function BatchCreate() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold text-foreground">Batch Create Files</h1>
-        <p className="text-muted-foreground mt-2">
-          Create multiple metadata files with flexible season and episode definitions
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" type="button" onClick={() => setLocation("/browse")}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Batch Create Files</h1>
+          <p className="text-muted-foreground mt-2">
+            Create multiple metadata files with flexible season and episode definitions
+          </p>
+        </div>
       </div>
 
       <Card className="p-6">
@@ -318,6 +308,26 @@ export default function BatchCreate() {
                   </FormControl>
                   <FormDescription>
                     This description will be applied to all episodes
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="taskDescription"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Automatic Task Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. Needs metadata, Needs subtitles"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    If provided, a task will be automatically created for every episode in this batch
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -723,7 +733,7 @@ export default function BatchCreate() {
               </div>
             </div>
 
-            {nextId && totalEpisodes > 0 && (
+            {totalEpisodes > 0 && (
               <Card className="p-6 bg-muted/50">
                 <h3 className="text-sm font-medium mb-4">Batch Preview</h3>
                 <div className="space-y-3 text-sm">
@@ -732,8 +742,8 @@ export default function BatchCreate() {
                     <span className="font-medium">{totalEpisodes} files</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">ID range: </span>
-                    <span className="font-mono font-medium">{nextId} - {formatMetadataId(parseFormattedId(nextId) + totalEpisodes - 1)}</span>
+                    <span className="text-muted-foreground">IDs: </span>
+                    <span className="font-mono font-medium text-muted-foreground">Auto-generated</span>
                   </div>
                   
                   {form.watch("title") && (
