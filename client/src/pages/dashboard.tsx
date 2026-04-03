@@ -85,23 +85,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {statsLoading ? (
-          Array.from({ length: 7 }).map((_, i) => <StatCardSkeleton key={i} />)
-        ) : stats ? (
-          <>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold">{stats.totalFiles}</p><p className="text-xs text-muted-foreground uppercase">Total Files</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold">{stats.totalSeries}</p><p className="text-xs text-muted-foreground uppercase">Series</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-orange-600">{stats.drafts}</p><p className="text-xs text-muted-foreground uppercase">Drafts</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-destructive">{stats.incompleteMeta}</p><p className="text-xs text-muted-foreground uppercase">Incomplete</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-destructive">{stats.overdueTasks}</p><p className="text-xs text-muted-foreground uppercase">Overdue</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-orange-600">{stats.expiringLicenses}</p><p className="text-xs text-muted-foreground uppercase">Expiring</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-green-600">{stats.recentFiles}</p><p className="text-xs text-muted-foreground uppercase">Today</p></CardContent></Card>
-          </>
-        ) : null}
-      </div>
-
       {/* Alerts — inline text, not cards */}
       {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0) && (
         <Card className="border-destructive/20">
