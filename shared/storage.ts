@@ -1811,15 +1811,19 @@ export class DatabaseStorage {
   }
   // --- Contract Management ---
 
-  async listContracts(): Promise<(Contract & { licenseCount: number; totalCost: number })[]> {
+  async listContracts(): Promise<(Contract & { licenseCount: number; fileCount: number; totalCost: number })[]> {
     const allContracts = await db.select().from(contracts).orderBy(contracts.distributor, contracts.name);
 
     const results = [];
     for (const contract of allContracts) {
-      const links = await db
-        .select({ licenseId: contractsToLicenses.licenseId })
-        .from(contractsToLicenses)
-        .where(eq(contractsToLicenses.contractId, contract.id));
+      const [links, files] = await Promise.all([
+        db.select({ licenseId: contractsToLicenses.licenseId })
+          .from(contractsToLicenses)
+          .where(eq(contractsToLicenses.contractId, contract.id)),
+        db.select({ id: contractFiles.id })
+          .from(contractFiles)
+          .where(eq(contractFiles.contractId, contract.id))
+      ]);
 
       let totalCost = 0;
       if (links.length > 0) {
@@ -1827,17 +1831,31 @@ export class DatabaseStorage {
           .select({ amount: licenses.licenseFeeAmount })
           .from(licenses)
           .where(inArray(licenses.id, links.map(l => l.licenseId)));
-        totalCost = linkedLicenses.reduce((sum, l) => {
+
+        const sumLinked = linkedLicenses.reduce((sum, l) => {
           const amt = l.amount ? parseFloat(l.amount) : 0;
           return sum + (isNaN(amt) ? 0 : amt);
         }, 0);
+
+        // If a totalFeeAmount is explicitly set on the contract, use it as the base/fallback
+        // if the sum of linked licenses is 0 or less. Or just prefer contract total if it exists.
+        const contractTotal = contract.totalFeeAmount ? parseFloat(contract.totalFeeAmount) : 0;
+        totalCost = sumLinked > 0 ? sumLinked : (isNaN(contractTotal) ? 0 : contractTotal);
+      } else {
+        // No links, use contract's own total fee if available
+        const contractTotal = contract.totalFeeAmount ? parseFloat(contract.totalFeeAmount) : 0;
+        totalCost = isNaN(contractTotal) ? 0 : contractTotal;
       }
 
-      results.push({ ...contract, licenseCount: links.length, totalCost });
+      results.push({ 
+        ...contract, 
+        licenseCount: links.length, 
+        fileCount: files.length,
+        totalCost 
+      });
     }
     return results;
   }
-
   async getContract(id: string): Promise<(Contract & { files: ContractFile[]; licenseLinks: (ContractToLicense & { license: License })[] }) | undefined> {
     const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
     if (!contract) return undefined;

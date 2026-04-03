@@ -20,10 +20,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Download, Plus, Trash2, Pencil, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, Trash2, Pencil, Save, Loader2, Upload, FileText, X } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { upload } from "@vercel/blob/client";
 import type { License } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -74,9 +75,10 @@ export default function ViewContract() {
   });
 
   const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({ name: "", distributor: "", description: "", notes: "" });
+  const [editData, setEditData] = useState({ name: "", distributor: "", description: "", notes: "", totalFeeAmount: "" });
   const [linkOpen, setLinkOpen] = useState(false);
   const [selectedLicense, setSelectedLicense] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (contract) {
@@ -85,6 +87,7 @@ export default function ViewContract() {
         distributor: contract.distributor,
         description: contract.description || "",
         notes: contract.notes || "",
+        totalFeeAmount: contract.totalFeeAmount || "",
       });
     }
   }, [contract]);
@@ -101,6 +104,48 @@ export default function ViewContract() {
       toast({ title: "Contract updated" });
     },
   });
+
+  const addFileMutation = useMutation({
+    mutationFn: async (data: { fileUrl: string; fileName: string; fileRole?: string }) => {
+      await apiRequest("POST", `/api/contracts/${id}/files`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({ title: "File added" });
+    },
+  });
+
+  const removeFileMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      await apiRequest("DELETE", `/api/contracts/${id}/files`, { fileId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contracts/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({ title: "File removed" });
+    },
+  });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "pdf";
+      const randomName = `contracts/contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const blob = await upload(randomName, file, {
+        access: "private",
+        handleUploadUrl: "/api/blob/upload",
+        clientPayload: JSON.stringify({ type: "contract" }),
+      });
+      await addFileMutation.mutateAsync({ fileUrl: blob.url, fileName: file.name, fileRole: "appendix" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -161,10 +206,14 @@ export default function ViewContract() {
     );
   }
 
-  const totalCost = contract.totalFeeAmount ? parseFloat(contract.totalFeeAmount) : contract.licenseLinks.reduce((sum, link) => {
+  // Cost calculation: use explicitly set totalFeeAmount if available and > 0, else sum licenses
+  const explicitTotal = contract.totalFeeAmount ? parseFloat(contract.totalFeeAmount) : 0;
+  const sumLinked = contract.licenseLinks.reduce((sum, link) => {
     const amt = link.license.licenseFeeAmount ? parseFloat(link.license.licenseFeeAmount) : 0;
     return sum + (isNaN(amt) ? 0 : amt);
   }, 0);
+
+  const totalCost = sumLinked > 0 ? sumLinked : (isNaN(explicitTotal) ? 0 : explicitTotal);
 
   const totalLinkedContent = contract.licenseLinks.length;
   const existingLicenseIds = contract.licenseLinks.map(l => l.licenseId);
@@ -178,11 +227,14 @@ export default function ViewContract() {
           <Button variant="ghost" size="icon" onClick={() => setLocation("/contracts")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div>
+          <div className="flex-1 min-w-[300px]">
             {editing ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Input value={editData.name} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))} className="text-xl font-bold" />
-                <Input value={editData.distributor} onChange={e => setEditData(p => ({ ...p, distributor: e.target.value }))} placeholder="Distributor" />
+                <div className="flex gap-2">
+                  <Input value={editData.distributor} onChange={e => setEditData(p => ({ ...p, distributor: e.target.value }))} placeholder="Distributor" />
+                  <Input value={editData.totalFeeAmount} onChange={e => setEditData(p => ({ ...p, totalFeeAmount: e.target.value }))} placeholder="Total Fee Amount" className="w-[180px]" />
+                </div>
               </div>
             ) : (
               <>
@@ -285,17 +337,26 @@ export default function ViewContract() {
       )}
 
       {/* Contract files */}
-      {contract.files.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase">Contract Files ({contract.files.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase">Contract Files ({contract.files.length})</CardTitle>
+          <div>
+            <input type="file" accept=".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv" onChange={handleFileUpload} className="hidden" id="contract-file-upload" />
+            <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => document.getElementById("contract-file-upload")?.click()} disabled={uploading}>
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {uploading ? "Uploading..." : "Add File"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {contract.files.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2 italic">No files attached to this contract.</p>
+          ) : (
             <div className="space-y-1">
               {contract.files.map(file => (
-                <div key={file.id} className="flex items-center justify-between py-2 px-1 rounded hover:bg-muted/30">
+                <div key={file.id} className="group flex items-center justify-between py-2 px-1 rounded hover:bg-muted/30">
                   <div className="flex items-center gap-2 min-w-0">
-                    <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                     <a href={`/api/blob/view?url=${encodeURIComponent(file.fileUrl)}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate">
                       {file.fileName}
                     </a>
@@ -303,13 +364,23 @@ export default function ViewContract() {
                       <Badge variant="outline" className="text-xs shrink-0">{file.fileRole}</Badge>
                     )}
                   </div>
-                  {file.notes && <span className="text-xs text-muted-foreground ml-2 shrink-0">{file.notes}</span>}
+                  <div className="flex items-center gap-3">
+                    {file.notes && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{file.notes}</span>}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeFileMutation.mutate(file.id)}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Linked licenses table */}
       <Card>

@@ -38,11 +38,10 @@ interface ContractListItem {
   distributor: string;
   description: string | null;
   notes: string | null;
-  fileUrl: string | null;
-  fileName: string | null;
   sharedTerms: any;
   createdAt: string | null;
   licenseCount: number;
+  fileCount: number;
   totalCost: number;
 }
 
@@ -262,15 +261,13 @@ export default function Contracts() {
                     <TableCell>{contract.licenseCount}</TableCell>
                     <TableCell className="font-mono">{formatCurrency(contract.totalCost)}</TableCell>
                     <TableCell>
-                      {contract.fileUrl ? (
-                        <a href={`/api/blob/view?url=${encodeURIComponent(contract.fileUrl)}`} target="_blank" rel="noopener noreferrer">
-                          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
-                            <Download className="w-3.5 h-3.5" />
-                            {contract.fileName || "PDF"}
-                          </Button>
-                        </a>
+                      {contract.fileCount > 0 ? (
+                        <Link href={`/contracts/${contract.id}`} className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                          <FileText className="w-3.5 h-3.5" />
+                          {contract.fileCount} {contract.fileCount === 1 ? 'file' : 'files'}
+                        </Link>
                       ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-xs text-muted-foreground">No files</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

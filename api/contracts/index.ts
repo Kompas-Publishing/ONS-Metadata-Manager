@@ -31,6 +31,8 @@ export default apiHandler(
           totalFeeCurrency: z.string().optional(),
           sharedTerms: z.any().optional(),
           licenseIds: z.array(z.string()).optional(),
+          fileUrl: z.string().optional(),
+          fileName: z.string().optional(),
         });
 
         const validation = schema.safeParse(req.body);
@@ -38,13 +40,23 @@ export default apiHandler(
           return res.status(400).json({ message: "Validation failed", errors: validation.error.errors });
         }
 
-        const { licenseIds, ...contractData } = validation.data;
+        const { licenseIds, fileUrl, fileName, ...contractData } = validation.data;
         const contract = await storage.createContract({ ...contractData, createdBy: userId });
+
+        // Add file if provided
+        if (fileUrl && fileName) {
+          await storage.addContractFile({
+            contractId: contract.id,
+            fileUrl,
+            fileName,
+            fileRole: "main",
+          });
+        }
 
         // Link licenses if provided
         if (licenseIds && licenseIds.length > 0) {
           for (const licenseId of licenseIds) {
-            await storage.linkContractToLicense(contract.id, licenseId);
+            await storage.linkContractToLicense({ contractId: contract.id, licenseId });
           }
         }
 
