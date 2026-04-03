@@ -8,10 +8,14 @@ import { MetadataForm } from "@/components/metadata-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, ChevronLeft, Plus, Trash2, CheckSquare, CheckCircle2, Clock } from "lucide-react";
+import { Download, ChevronLeft, Plus, Trash2, CheckSquare, CheckCircle2, Clock, CalendarIcon } from "lucide-react";
 import type { MetadataFile, Task } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -72,18 +76,30 @@ export default function ViewFile() {
     enabled: !!params?.id && (canReadMetadata || canWriteMetadata),
   });
 
+  const [newTaskDeadline, setNewTaskDeadline] = useState<Date | undefined>(undefined);
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
+
+  const { data: usersData } = useQuery<{ users: { id: string; email: string; firstName: string | null; lastName: string | null }[] }>({
+    queryKey: ["/api/admin/users"],
+    enabled: canWriteMetadata,
+  });
+
   const addTaskMutation = useMutation({
-    mutationFn: async (description: string) => {
-      await apiRequest("POST", "/api/tasks", { 
+    mutationFn: async (data: { description: string; deadline?: Date; assignedTo?: string }) => {
+      await apiRequest("POST", "/api/tasks", {
         metadataFileId: params?.id,
-        description,
-        status: "pending"
+        description: data.description,
+        status: "pending",
+        deadline: data.deadline,
+        assignedTo: data.assignedTo || undefined,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       setNewTaskDesc("");
+      setNewTaskDeadline(undefined);
+      setNewTaskAssignee("");
       toast({ title: "Success", description: "Task added" });
     },
   });
@@ -338,26 +354,57 @@ export default function ViewFile() {
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
-            <Input
-              placeholder="Add a task…"
-              value={newTaskDesc}
-              onChange={(e) => setNewTaskDesc(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newTaskDesc.trim()) {
-                  addTaskMutation.mutate(newTaskDesc.trim());
-                }
-              }}
-            />
-            <Button
-              onClick={() => {
-                if (newTaskDesc.trim()) addTaskMutation.mutate(newTaskDesc.trim());
-              }}
-              disabled={!newTaskDesc.trim() || addTaskMutation.isPending}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add
-            </Button>
+          <div className="space-y-2 pt-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add a task…"
+                value={newTaskDesc}
+                onChange={(e) => setNewTaskDesc(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTaskDesc.trim()) {
+                    addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
+                  }
+                }}
+              />
+              <Button
+                onClick={() => {
+                  if (newTaskDesc.trim()) addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
+                }}
+                disabled={!newTaskDesc.trim() || addTaskMutation.isPending}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className={cn("gap-1.5 text-xs h-8", !newTaskDeadline && "text-muted-foreground")}>
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    {newTaskDeadline ? format(newTaskDeadline, "dd MMM yyyy") : "Deadline"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={newTaskDeadline} onSelect={setNewTaskDeadline} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                <SelectTrigger className="h-8 text-xs w-[180px]">
+                  <SelectValue placeholder="Assign to..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {usersData?.users?.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {newTaskDeadline && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setNewTaskDeadline(undefined)}>Clear date</Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
