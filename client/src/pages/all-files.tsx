@@ -31,6 +31,8 @@ import type { MetadataFile } from "@shared/schema";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
+import { CardListSkeleton } from "@/components/skeleton-loader";
+import { prefetchMetadata } from "@/lib/queryClient";
 
 export default function AllFiles() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +50,7 @@ export default function AllFiles() {
   const { data: files, isLoading, error } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata"],
     enabled: !authLoading && (canReadMetadata || canWriteMetadata),
+    staleTime: 60 * 1000, // 1 minute
   });
 
   // Move all hooks to the top before any conditional returns
@@ -55,17 +58,30 @@ export default function AllFiles() {
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/metadata/${id}`, undefined);
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/metadata"] });
+      const previousFiles = queryClient.getQueryData<MetadataFile[]>(["/api/metadata"]);
+      
+      if (previousFiles) {
+        queryClient.setQueryData<MetadataFile[]>(
+          ["/api/metadata"],
+          previousFiles.filter(f => f.id !== id)
+        );
+      }
+      return { previousFiles };
+    },
     onSuccess: () => {
       setDeleteId(null);
       toast({
         title: "Success",
         description: "File deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, id, context) => {
       setDeleteId(null);
+      if (context?.previousFiles) {
+        queryClient.setQueryData(["/api/metadata"], context.previousFiles);
+      }
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -82,6 +98,10 @@ export default function AllFiles() {
         description: error.message || "Failed to delete file",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
     },
   });
 
@@ -264,17 +284,7 @@ export default function AllFiles() {
 
       <Card className="p-6">
         {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-32" />
-                </div>
-                <Skeleton className="h-9 w-24" />
-              </div>
-            ))}
-          </div>
+          <CardListSkeleton count={5} />
         ) : filteredFiles.length > 0 ? (
           <div className="space-y-3">
             {filteredFiles.map((file) => (
@@ -373,7 +383,13 @@ export default function AllFiles() {
                     </Button>
                     {canReadMetadata && (
                       <Link href={`/view/${file.id}`}>
-                        <Button size="sm" variant="outline" data-testid={`button-view-file-${file.id}`} title="View File">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          data-testid={`button-view-file-${file.id}`} 
+                          title="View File"
+                          onMouseEnter={() => prefetchMetadata(file.id)}
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
                       </Link>

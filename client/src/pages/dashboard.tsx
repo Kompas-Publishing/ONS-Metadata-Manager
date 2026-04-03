@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCardSkeleton, TableRowSkeleton } from "@/components/skeleton-loader";
 import { Plus, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -9,6 +10,7 @@ import type { MetadataFile, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { prefetchMetadata, prefetchLicense } from "@/lib/queryClient";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -33,19 +35,21 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ["/api/stats"],
     enabled: canReadMetadata || canWriteMetadata,
+    staleTime: 60 * 1000, // 1 minute
   });
 
   const { data: recentFiles, isLoading: filesLoading } = useQuery<MetadataFile[]>({
     queryKey: ["/api/metadata/recent"],
     enabled: canReadMetadata || canWriteMetadata,
+    staleTime: 60 * 1000, // 1 minute
   });
 
-  const { data: licenses } = useQuery<License[]>({
+  const { data: licenses, isLoading: licensesLoading } = useQuery<License[]>({
     queryKey: ["/api/licenses"],
     enabled: !!canReadLicenses,
   });
 
-  const { data: tasks } = useQuery<(Task & { metadataFile: MetadataFile })[]>({
+  const { data: tasks, isLoading: tasksLoading } = useQuery<(Task & { metadataFile: MetadataFile })[]>({
     queryKey: ["/api/tasks", { status: "pending" }],
     enabled: !!canReadTasks,
   });
@@ -81,6 +85,23 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {statsLoading ? (
+          Array.from({ length: 7 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : stats ? (
+          <>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold">{stats.totalFiles}</p><p className="text-xs text-muted-foreground uppercase">Total Files</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold">{stats.totalSeries}</p><p className="text-xs text-muted-foreground uppercase">Series</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-orange-600">{stats.drafts}</p><p className="text-xs text-muted-foreground uppercase">Drafts</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-destructive">{stats.incompleteMeta}</p><p className="text-xs text-muted-foreground uppercase">Incomplete</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-destructive">{stats.overdueTasks}</p><p className="text-xs text-muted-foreground uppercase">Overdue</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-orange-600">{stats.expiringLicenses}</p><p className="text-xs text-muted-foreground uppercase">Expiring</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-2xl font-bold text-green-600">{stats.recentFiles}</p><p className="text-xs text-muted-foreground uppercase">Today</p></CardContent></Card>
+          </>
+        ) : null}
+      </div>
+
       {/* Alerts — inline text, not cards */}
       {!statsLoading && stats && (stats.overdueTasks > 0 || stats.expiringLicenses > 0 || stats.incompleteMeta > 0) && (
         <Card className="border-destructive/20">
@@ -110,9 +131,20 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="overflow-x-auto pt-0">
           {filesLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs">ID</TableHead>
+                  <TableHead className="text-xs">Title</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Episode</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Added</TableHead>
+                  <TableHead className="text-xs text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} columns={5} />)}
+              </TableBody>
+            </Table>
           ) : recentFiles && recentFiles.length > 0 ? (
             <Table>
               <TableHeader>
@@ -128,10 +160,22 @@ export default function Dashboard() {
                 {recentFiles.slice(0, 8).map(file => (
                   <TableRow key={file.id}>
                     <TableCell>
-                      <Link href={`/view/${file.id}`} className="font-mono text-xs text-primary hover:underline">{file.id}</Link>
+                      <Link 
+                        href={`/view/${file.id}`} 
+                        className="font-mono text-xs text-primary hover:underline"
+                        onMouseEnter={() => prefetchMetadata(file.id)}
+                      >
+                        {file.id}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/view/${file.id}`} className="hover:underline text-sm truncate block max-w-[250px]">{file.title}</Link>
+                      <Link 
+                        href={`/view/${file.id}`} 
+                        className="hover:underline text-sm truncate block max-w-[250px]"
+                        onMouseEnter={() => prefetchMetadata(file.id)}
+                      >
+                        {file.title}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">
                       {file.season ? `S${file.season}E${file.episode}` : "—"}
@@ -167,7 +211,13 @@ export default function Dashboard() {
             </Link>
           </CardHeader>
           <CardContent className="pt-0">
-            {tasks && tasks.length > 0 ? (
+            {tasksLoading ? (
+              <Table>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} columns={2} />)}
+                </TableBody>
+              </Table>
+            ) : tasks && tasks.length > 0 ? (
               <Table>
                 <TableBody>
                   {tasks.slice(0, 5).map(task => {
@@ -175,7 +225,11 @@ export default function Dashboard() {
                     return (
                       <TableRow key={task.id}>
                         <TableCell className="py-2">
-                          <Link href={`/view/${task.metadataFileId}`} className="text-sm hover:underline">
+                          <Link 
+                            href={`/view/${task.metadataFileId}`} 
+                            className="text-sm hover:underline"
+                            onMouseEnter={() => prefetchMetadata(task.metadataFileId)}
+                          >
                             {task.description}
                           </Link>
                           <span className="text-xs text-muted-foreground ml-2">{task.metadataFile?.title}</span>
@@ -209,7 +263,13 @@ export default function Dashboard() {
             </Link>
           </CardHeader>
           <CardContent className="pt-0">
-            {licenses && licenses.length > 0 ? (
+            {licensesLoading ? (
+              <Table>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} columns={2} />)}
+                </TableBody>
+              </Table>
+            ) : licenses && licenses.length > 0 ? (
               <Table>
                 <TableBody>
                   {licenses.slice(0, 5).map(license => {
@@ -218,7 +278,13 @@ export default function Dashboard() {
                     return (
                       <TableRow key={license.id}>
                         <TableCell className="py-2">
-                          <Link href={`/licenses/${license.id}`} className="text-sm hover:underline">{license.name}</Link>
+                          <Link 
+                            href={`/licenses/${license.id}`} 
+                            className="text-sm hover:underline"
+                            onMouseEnter={() => prefetchLicense(license.id)}
+                          >
+                            {license.name}
+                          </Link>
                           {license.season && <span className="text-xs text-muted-foreground ml-2">S{license.season}</span>}
                         </TableCell>
                         <TableCell className="text-right py-2">

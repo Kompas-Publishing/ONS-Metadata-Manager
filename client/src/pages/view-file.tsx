@@ -8,6 +8,7 @@ import { MetadataForm } from "@/components/metadata-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DetailSkeleton } from "@/components/skeleton-loader";
 import { Download, ChevronLeft, Plus, Trash2, CheckSquare, CheckCircle2, Clock, CalendarIcon } from "lucide-react";
 import type { MetadataFile, Task } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -86,20 +87,52 @@ export default function ViewFile() {
 
   const addTaskMutation = useMutation({
     mutationFn: async (data: { description: string; deadline?: Date; assignedTo?: string }) => {
-      await apiRequest("POST", "/api/tasks", {
+      const res = await apiRequest("POST", "/api/tasks", {
         metadataFileId: params?.id,
         description: data.description,
         status: "pending",
         deadline: data.deadline,
         assignedTo: data.assignedTo || undefined,
       });
+      return res.json();
     },
-    onSuccess: () => {
+    onMutate: async (newTask) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
+      const previousTasks = queryClient.getQueryData<Task[]>(["/api/metadata", params?.id, "tasks"]);
+      
+      if (previousTasks) {
+        queryClient.setQueryData<Task[]>(["/api/metadata", params?.id, "tasks"], [
+          ...previousTasks,
+          { 
+            id: Math.random(), // Temporary ID
+            metadataFileId: params?.id as string,
+            description: newTask.description,
+            status: "pending",
+            deadline: newTask.deadline?.toISOString() || null,
+            assignedTo: newTask.assignedTo || null,
+            priority: "medium",
+            createdBy: "me",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          } as Task
+        ]);
+      }
+      return { previousTasks };
+    },
+    onError: (err, newTask, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["/api/metadata", params?.id, "tasks"], context.previousTasks);
+      }
+      toast({ title: "Error", description: "Failed to add task", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       setNewTaskDesc("");
       setNewTaskDeadline(undefined);
       setNewTaskAssignee("");
+    },
+    onSuccess: () => {
       toast({ title: "Success", description: "Task added" });
     },
   });
@@ -108,7 +141,25 @@ export default function ViewFile() {
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
       await apiRequest("PATCH", `/api/tasks/${id}`, { status });
     },
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
+      const previousTasks = queryClient.getQueryData<Task[]>(["/api/metadata", params?.id, "tasks"]);
+      
+      if (previousTasks) {
+        queryClient.setQueryData<Task[]>(
+          ["/api/metadata", params?.id, "tasks"],
+          previousTasks.map(t => t.id === id ? { ...t, status } : t)
+        );
+      }
+      return { previousTasks };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["/api/metadata", params?.id, "tasks"], context.previousTasks);
+      }
+      toast({ title: "Error", description: "Failed to update task", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
     },
@@ -118,9 +169,29 @@ export default function ViewFile() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/tasks/${id}`);
     },
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
+      const previousTasks = queryClient.getQueryData<Task[]>(["/api/metadata", params?.id, "tasks"]);
+      
+      if (previousTasks) {
+        queryClient.setQueryData<Task[]>(
+          ["/api/metadata", params?.id, "tasks"],
+          previousTasks.filter(t => t.id !== id)
+        );
+      }
+      return { previousTasks };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(["/api/metadata", params?.id, "tasks"], context.previousTasks);
+      }
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/metadata", params?.id, "tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    },
+    onSuccess: () => {
       toast({ title: "Success", description: "Task deleted" });
     },
   });
@@ -158,16 +229,8 @@ export default function ViewFile() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-8">
-        <Skeleton className="h-10 w-64" />
-        <Card className="p-6">
-          <div className="space-y-6">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-32 w-full" />
-          </div>
-        </Card>
+      <div className="max-w-4xl mx-auto">
+        <DetailSkeleton />
       </div>
     );
   }

@@ -95,7 +95,7 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchOnWindowFocus: true,
-      staleTime: 30 * 1000, // 30 seconds
+      staleTime: 30 * 1000, // Default 30 seconds
       retry: false,
     },
     mutations: {
@@ -103,3 +103,40 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+/**
+ * Prefetches metadata file details and tasks.
+ * Useful for hover-based predictive prefetching.
+ */
+export async function prefetchMetadata(id: string) {
+  const metadataKey = ["/api/metadata", id];
+  const tasksKey = ["/api/metadata", id, "tasks"];
+
+  // Only prefetch if not already in cache or stale
+  if (!queryClient.getQueryData(metadataKey)) {
+    queryClient.prefetchQuery({
+      queryKey: metadataKey,
+      staleTime: 60 * 1000,
+    });
+  }
+
+  if (!queryClient.getQueryData(tasksKey)) {
+    queryClient.prefetchQuery({
+      queryKey: tasksKey,
+      staleTime: 60 * 1000,
+    });
+  }
+}
+
+/**
+ * Prefetches license details.
+ */
+export async function prefetchLicense(id: string) {
+  const key = ["/api/licenses", id];
+  if (!queryClient.getQueryData(key)) {
+    queryClient.prefetchQuery({
+      queryKey: key,
+      staleTime: 60 * 1000,
+    });
+  }
+}
