@@ -1003,15 +1003,13 @@ export default function Browse() {
                 <Card className="overflow-hidden border-primary/5">
                   <div className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => toggleSeason(parseInt(seasonNum))}>
                     <div className="flex items-center gap-3">
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="p-0 h-8 w-8">
-                          {openSeasons[parseInt(seasonNum)] ?? true ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
+                      <Button variant="ghost" size="sm" className="p-0 h-8 w-8" onClick={(e) => { e.stopPropagation(); toggleSeason(parseInt(seasonNum)); }}>
+                        {openSeasons[parseInt(seasonNum)] ?? true ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
                       <h3 className="text-xl font-semibold">
                         Season {seasonNum === "0" ? "Unknown" : seasonNum}
                       </h3>
