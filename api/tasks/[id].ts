@@ -25,7 +25,12 @@ export default apiHandler(async (req: AuthenticatedRequest, res: VercelResponse)
           });
         }
 
-        const updated = await storage.updateTask(taskId, validation.data);
+        const taskData = { ...validation.data };
+        if (taskData.assignedTo === "unassigned" || taskData.assignedTo === "") {
+          taskData.assignedTo = null;
+        }
+
+        const updated = await storage.updateTask(taskId, taskData);
         if (!updated) return res.status(404).json({ message: "Task not found" });
         return res.json(updated);
       } catch (error) {

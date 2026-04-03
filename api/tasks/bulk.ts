@@ -29,8 +29,13 @@ export default apiHandler(
         });
       }
 
+      const taskData = { ...validation.data };
+      if (taskData.assignedTo === "unassigned" || taskData.assignedTo === "") {
+        taskData.assignedTo = undefined;
+      }
+
       const tasks = await storage.bulkCreateTasks({
-        ...validation.data,
+        ...taskData,
         createdBy: userId,
       });
       return res.json(tasks);

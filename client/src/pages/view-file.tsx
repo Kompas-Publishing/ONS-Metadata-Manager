@@ -35,7 +35,15 @@ export default function ViewFile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isAuthenticated, isLoading: authLoading, canReadMetadata, canWriteMetadata } = useAuth();
+  const { 
+    isAuthenticated, 
+    isLoading: authLoading, 
+    canReadMetadata, 
+    canWriteMetadata,
+    canReadTasks,
+    canWriteTasks,
+    isAdmin
+  } = useAuth();
   const [newTaskDesc, setNewTaskDesc] = useState("");
 
   useEffect(() => {
@@ -73,7 +81,7 @@ export default function ViewFile() {
 
   const { data: tasks, isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/metadata", params?.id, "tasks"],
-    enabled: !!params?.id && (canReadMetadata || canWriteMetadata),
+    enabled: !!params?.id && (canReadTasks || canWriteTasks),
   });
 
   const [newTaskDeadline, setNewTaskDeadline] = useState<Date | undefined>(undefined);
@@ -81,7 +89,7 @@ export default function ViewFile() {
 
   const { data: usersData } = useQuery<{ users: { id: string; email: string; firstName: string | null; lastName: string | null }[] }>({
     queryKey: ["/api/admin/users"],
-    enabled: canWriteMetadata,
+    enabled: isAdmin || canWriteTasks,
   });
 
   const addTaskMutation = useMutation({
@@ -91,7 +99,7 @@ export default function ViewFile() {
         description: data.description,
         status: "pending",
         deadline: data.deadline,
-        assignedTo: data.assignedTo || undefined,
+        assignedTo: data.assignedTo && data.assignedTo !== "unassigned" ? data.assignedTo : null,
       });
     },
     onSuccess: () => {
@@ -299,6 +307,7 @@ export default function ViewFile() {
                   >
                     <Checkbox
                       checked={isDone}
+                      disabled={!canWriteTasks}
                       onCheckedChange={(checked) =>
                         toggleTaskMutation.mutate({
                           id: task.id,
@@ -317,34 +326,36 @@ export default function ViewFile() {
                       )}
                       {isDone ? "Done" : "Pending"}
                     </Badge>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="shrink-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Task</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteTaskMutation.mutate(task.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    {canWriteTasks && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 text-destructive hover:text-destructive"
                           >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteTaskMutation.mutate(task.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 );
               })}
@@ -354,58 +365,60 @@ export default function ViewFile() {
             </div>
           )}
 
-          <div className="space-y-2 pt-2">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add a task…"
-                value={newTaskDesc}
-                onChange={(e) => setNewTaskDesc(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newTaskDesc.trim()) {
-                    addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
-                  }
-                }}
-              />
-              <Button
-                onClick={() => {
-                  if (newTaskDesc.trim()) addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
-                }}
-                disabled={!newTaskDesc.trim() || addTaskMutation.isPending}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add
-              </Button>
+          {canWriteTasks && (
+            <div className="space-y-2 pt-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add a task…"
+                  value={newTaskDesc}
+                  onChange={(e) => setNewTaskDesc(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newTaskDesc.trim()) {
+                      addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => {
+                    if (newTaskDesc.trim()) addTaskMutation.mutate({ description: newTaskDesc.trim(), deadline: newTaskDeadline, assignedTo: newTaskAssignee || undefined });
+                  }}
+                  disabled={!newTaskDesc.trim() || addTaskMutation.isPending}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("gap-1.5 text-xs h-8", !newTaskDeadline && "text-muted-foreground")}>
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      {newTaskDeadline ? format(newTaskDeadline, "dd MMM yyyy") : "Deadline"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={newTaskDeadline} onSelect={setNewTaskDeadline} initialFocus />
+                  </PopoverContent>
+                </Popover>
+                <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+                  <SelectTrigger className="h-8 text-xs w-[180px]">
+                    <SelectValue placeholder="Assign to..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {usersData?.users?.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {newTaskDeadline && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setNewTaskDeadline(undefined)}>Clear date</Button>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("gap-1.5 text-xs h-8", !newTaskDeadline && "text-muted-foreground")}>
-                    <CalendarIcon className="w-3.5 h-3.5" />
-                    {newTaskDeadline ? format(newTaskDeadline, "dd MMM yyyy") : "Deadline"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={newTaskDeadline} onSelect={setNewTaskDeadline} initialFocus />
-                </PopoverContent>
-              </Popover>
-              <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
-                <SelectTrigger className="h-8 text-xs w-[180px]">
-                  <SelectValue placeholder="Assign to..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {usersData?.users?.map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {newTaskDeadline && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setNewTaskDeadline(undefined)}>Clear date</Button>
-              )}
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
