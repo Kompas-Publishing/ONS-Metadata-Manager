@@ -9,12 +9,13 @@ import {
   Search, Film, ChevronRight, Calendar, Tv, Download, Edit, Eye, 
   LayoutGrid, List, ArrowUpDown, Trash2, AlertCircle, Upload, Loader2,
   ExternalLink, Globe, FolderOpen, CheckCircle2, ChevronDown, ChevronUp,
-  Link2, Info, ShieldCheck, X
+  Link2, Info, ShieldCheck, X, Sparkles
 } from "lucide-react";
 import { Link, useLocation, useRoute } from "wouter";
 import { format } from "date-fns";
 import type { MetadataFile, SeriesItem, License, Task } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import MetadataAiUploadDialog from "@/components/metadata-ai-upload-dialog";
 import { computeMetadataStatus, STATUS_CONFIG } from "@/lib/metadata-status";
 import { useEffect } from "react";
 import { apiRequest } from "@/lib/queryClient";
@@ -98,6 +99,7 @@ export default function Browse() {
 
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[]; formData: FormData } | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [aiUploadOpen, setAiUploadOpen] = useState(false);
 
   const importXlsxMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -415,20 +417,30 @@ export default function Browse() {
         {!selectedSeries && (
           <div className="flex items-center gap-2 w-full md:w-auto">
             {canWriteMetadata && (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleImportClick}
-                disabled={importXlsxMutation.isPending || importLoading}
-                data-testid="button-import-xlsx"
-              >
-                {(importXlsxMutation.isPending || importLoading) ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4" />
-                )}
-                Import XLSX
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setAiUploadOpen(true)}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Upload
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleImportClick}
+                  disabled={importXlsxMutation.isPending || importLoading}
+                  data-testid="button-import-xlsx"
+                >
+                  {(importXlsxMutation.isPending || importLoading) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  Import XLSX
+                </Button>
+              </>
             )}
             <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
               <SelectTrigger className="w-full md:w-[200px]">
@@ -945,6 +957,15 @@ export default function Browse() {
                       variant="outline"
                       size="sm"
                       className="gap-2"
+                      onClick={() => setAiUploadOpen(true)}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      AI Upload
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
                       onClick={handleImportClick}
                       disabled={importXlsxMutation.isPending || importLoading}
                     >
@@ -1443,6 +1464,9 @@ export default function Browse() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Upload Dialog */}
+      <MetadataAiUploadDialog open={aiUploadOpen} onOpenChange={setAiUploadOpen} />
     </div>
   );
 }
