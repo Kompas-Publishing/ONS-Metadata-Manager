@@ -60,6 +60,13 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
           }
         }
 
+        if (uploadType === "contract") {
+          const { allowed } = await checkPermission(user.id, "contracts");
+          if (!allowed) {
+            throw new Error("You do not have permission to upload contracts.");
+          }
+        }
+
         const imageTypes = [
           "image/jpeg",
           "image/png",
@@ -95,6 +102,19 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
           "application/yaml",
         ];
 
+        const contractTypes = [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/msword",
+          "application/rtf",
+          "text/plain",
+          "text/csv",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+          "application/vnd.oasis.opendocument.text",
+          ...imageTypes, // For scanned contracts
+        ];
+
         return {
           allowedContentTypes:
             uploadType === "avatar"
@@ -103,7 +123,9 @@ export default async function handler(req: AuthenticatedRequest, res: VercelResp
                 ? aiChatTypes
                 : uploadType === "ai-upload"
                   ? aiUploadTypes
-                  : imageTypes,
+                  : uploadType === "contract"
+                    ? contractTypes
+                    : imageTypes,
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             userId: user.id,

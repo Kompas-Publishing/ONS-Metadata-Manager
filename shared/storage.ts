@@ -1926,6 +1926,70 @@ export class DatabaseStorage {
       and(eq(contractsToLicenses.contractId, contractId), eq(contractsToLicenses.licenseId, licenseId))
     );
   }
+
+  // --- Contract Ingest Helpers ---
+
+  /** Find a matching license by normalized name + distributor + season + overlapping dates */
+  async findMatchingLicense(params: {
+    name: string;
+    distributor: string;
+    season?: string;
+    licenseStart?: Date;
+    licenseEnd?: Date;
+  }): Promise<License | undefined> {
+    const normalizedName = params.name.trim().toLowerCase();
+    const normalizedDistributor = params.distributor.trim().toLowerCase();
+
+    const allLicenses = await db.select().from(licenses);
+
+    // Score-based matching: exact name+distributor+season is best
+    for (const lic of allLicenses) {
+      const nameMatch = lic.name.trim().toLowerCase() === normalizedName;
+      const distMatch = lic.distributor?.trim().toLowerCase() === normalizedDistributor;
+      const seasonMatch = !params.season || lic.season === params.season;
+
+      if (nameMatch && distMatch && seasonMatch) {
+        // Check date overlap if dates provided
+        if (params.licenseStart && params.licenseEnd && lic.licenseStart && lic.licenseEnd) {
+          const overlap = lic.licenseStart <= params.licenseEnd && lic.licenseEnd >= params.licenseStart;
+          if (overlap) return lic;
+        } else {
+          return lic;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /** Find existing contract by name + distributor (dedup) */
+  async findContractByNameAndDistributor(name: string, distributor: string): Promise<Contract | undefined> {
+    const [existing] = await db.select().from(contracts).where(
+      and(
+        sql`lower(${contracts.name}) = lower(${name.trim()})`,
+        sql`lower(${contracts.distributor}) = lower(${distributor.trim()})`,
+      )
+    );
+    return existing;
+  }
+
+  /** Find series by title (case-insensitive) */
+  async findSeriesByTitleFuzzy(title: string): Promise<Series | undefined> {
+    const [item] = await db.select().from(seriesTable).where(
+      sql`lower(${seriesTable.title}) = lower(${title.trim()})`
+    );
+    return item;
+  }
+
+  /** Find metadata files matching a series title and optional season */
+  async findMetadataBySeriesAndSeason(seriesTitle: string, season?: number): Promise<MetadataFile[]> {
+    const conditions = [
+      sql`lower(${metadataFiles.title}) = lower(${seriesTitle.trim()})`,
+    ];
+    if (season != null) {
+      conditions.push(eq(metadataFiles.season, season));
+    }
+    return await db.select().from(metadataFiles).where(and(...conditions));
+  }
 }
 
 export const storage = new DatabaseStorage();

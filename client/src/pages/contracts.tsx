@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { upload } from "@vercel/blob/client";
 import type { License } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import ContractIngestDialog from "@/components/contract-ingest-dialog";
 
 interface ContractListItem {
   id: string;
@@ -56,6 +57,7 @@ export default function Contracts() {
   const [distributorFilter, setDistributorFilter] = useState<string>("all");
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "distributor", direction: "asc" });
   const [createOpen, setCreateOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
 
   useEffect(() => {
     document.title = "Contracts | ONS Broadcast Portal";
@@ -177,10 +179,16 @@ export default function Contracts() {
             Manage distributor contracts and linked licenses
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Contract
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIngestOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Contract
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Contract
+          </Button>
+        </div>
       </div>
 
       {/* Filters — matches License Manager */}
@@ -301,6 +309,9 @@ export default function Contracts() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Ingest Dialog */}
+      <ContractIngestDialog open={ingestOpen} onOpenChange={setIngestOpen} />
 
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

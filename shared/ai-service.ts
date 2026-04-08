@@ -10,6 +10,46 @@ import { type UserPermissions } from "./permissions.js";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 
+export interface ContractIngestLicense {
+  action: "create" | "update";
+  existingLicenseId: string | null;
+  explanation: string;
+  name: string;
+  distributor: string;
+  contentTitle: string;
+  season: string;
+  licenseFeeAmount: string | null;
+  licenseFeeCurrency: string;
+  licenseFeePaid: number;
+  licenseStart: string | null;
+  licenseEnd: string | null;
+  allowedRuns: string | null;
+  productionYear: number | null;
+  subsFromDistributor: number;
+  description: string | null;
+  notes: string | null;
+  contentItems: Array<{
+    title: string;
+    season: number;
+    episodes: number;
+    matchedSeriesId: string | null;
+  }>;
+}
+
+export interface ContractIngestResult {
+  classification: string;
+  contractName: string;
+  distributor: string;
+  totalFee: string | null;
+  currency: string;
+  notes: string;
+  contractMode: string | null;
+  sharedTerms?: Record<string, string | null> | null;
+  licenses: ContractIngestLicense[];
+  warnings: string[];
+  rawExtraction: any;
+}
+
 function parseAiJson(raw: string): any {
   const cleaned = raw.replace(/```json|```/g, "").trim();
   try {
@@ -336,6 +376,205 @@ Only return the JSON object. Do not include markdown formatting.`;
     }
 
     return resultJson;
+  }
+
+  /**
+   * Full contract ingest parsing — classifies the contract, extracts license structures,
+   * derives content items, and returns a structured ingest plan.
+   */
+  async parseContractForIngest(fileBuffer: Buffer, mimeType: string): Promise<ContractIngestResult> {
+    await this.initialize();
+    if (!this.genAI) throw new Error("AI not initialized");
+
+    const model = this.genAI.getGenerativeModel({ model: this.model });
+    const isPdf = mimeType === "application/pdf";
+    const extractedText = isPdf ? "" : await this.extractTextFromBuffer(fileBuffer, mimeType);
+
+    // Phase 1: Classification + basic extraction
+    const classifyPrompt = `Role: Expert Legal Contract Analyst for a broadcast television company (ONS).
+Task: Classify and extract basic info from this contract document.
+
+Return ONLY a JSON object with these fields:
+{
+  "classification": "inbound_license" | "amendment" | "outbound" | "invoice" | "issue",
+  "contractName": "string — a descriptive name for the contract (e.g. 'BBC Nature Package 2025')",
+  "distributor": "string — normalized short name (e.g. 'BBC' not 'BBC Studios Distribution Limited')",
+  "totalFee": "string — total fee amount if found, or null",
+  "currency": "EUR" | "USD" | "GBP",
+  "notes": "string — brief summary of what this contract covers",
+  "titles": ["array of content/programme titles mentioned"]
+}
+
+Classification rules:
+- "inbound_license": ONS is acquiring/licensing broadcast rights FROM a distributor
+- "amendment": Modification to an existing contract (extension, fee change, additional titles)
+- "outbound": ONS is licensing or sublicensing rights TO another party
+- "invoice": A payment invoice, not a license agreement
+- "issue": Cannot determine type, or contract is incomplete/missing appendix
+
+${!isPdf ? `Document content:\n\n${extractedText}` : ""}`;
+
+    const phase1Content: any[] = [classifyPrompt];
+    if (isPdf) phase1Content.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const phase1Result = await model.generateContent(phase1Content);
+    const classification = parseAiJson(phase1Result.response.text());
+
+    // If not ingestible, return early
+    if (classification.classification !== "inbound_license" && classification.classification !== "amendment") {
+      return {
+        classification: classification.classification,
+        contractName: classification.contractName || "Unknown Contract",
+        distributor: classification.distributor || "Unknown",
+        totalFee: classification.totalFee,
+        currency: classification.currency || "EUR",
+        notes: classification.notes || "",
+        contractMode: null,
+        licenses: [],
+        warnings: [`Contract classified as "${classification.classification}" — not ingested as inbound rights.`],
+        rawExtraction: classification,
+      };
+    }
+
+    // Phase 2: Search for existing licenses and series
+    const allLicenses = await storage.listLicenses();
+    const candidates = allLicenses.filter(l => {
+      const distMatch = l.distributor?.toLowerCase().includes(classification.distributor?.toLowerCase() || "");
+      const titleMatch = (classification.titles || []).some((t: string) =>
+        l.name.toLowerCase().includes(t.toLowerCase()) ||
+        l.contentTitle?.toLowerCase().includes(t.toLowerCase())
+      );
+      return distMatch || titleMatch;
+    }).slice(0, 20);
+
+    const allSeries = await storage.getAllSeries();
+    const seriesCandidates = allSeries.filter(s =>
+      (classification.titles || []).some((t: string) =>
+        s.title.toLowerCase().includes(t.toLowerCase()) ||
+        t.toLowerCase().includes(s.title.toLowerCase())
+      )
+    ).slice(0, 20);
+
+    // Phase 3: Full extraction with detailed license derivation
+    const fullPrompt = `Role: Expert Legal Content Analyst for broadcast television company ONS.
+Task: Extract detailed license structure from this contract and compare against existing database records to prevent duplicates.
+
+EXISTING LICENSE CANDIDATES (for deduplication):
+${JSON.stringify(candidates.map(c => ({
+  id: c.id, name: c.name, distributor: c.distributor, contentTitle: c.contentTitle,
+  season: c.season, licenseFeeAmount: c.licenseFeeAmount,
+  licenseStart: c.licenseStart, licenseEnd: c.licenseEnd, allowedRuns: c.allowedRuns,
+})), null, 2)}
+
+EXISTING SERIES IN DATABASE:
+${JSON.stringify(seriesCandidates.map(s => ({ id: s.id, title: s.title })), null, 2)}
+
+CRITICAL BUSINESS RULES:
+
+1. CONTRACT MODE DETECTION:
+   - "umbrella": ALL titles share the EXACT same material terms (same start/end dates, same runs, one flat fee). Create ONE license.
+   - "split": Different titles have DIFFERENT terms (different dates, different fees, different runs). Create SEPARATE licenses per title/block.
+   - "mixed": Some titles share terms but at least one block differs. Group shared titles, separate differing ones.
+
+2. LICENSE NAMING:
+   - Use PLAIN content names only. Example: "Dr. Quinn Medicine Woman", NOT "Dr. Quinn Medicine Woman (Season 1)".
+   - Store season info in the "season" field, NOT in the name.
+   - Keep names simple: "Ballykissangel", not "BBC - Ballykissangel License Agreement".
+
+3. RUNS & FEES:
+   - If contract says "unlimited" / "onbeperkt" / "no limit", set allowedRuns to null and note in notes field.
+   - licenseFeeAmount must be a number string (e.g. "8375.00"). If one fee covers multiple titles, divide proportionally OR keep on the umbrella license.
+   - licenseFeePaid: set to 1 if this is a signed/executed contract with confirmed fees.
+
+4. DEDUPLICATION:
+   - If a CANDIDATE matches by name + distributor + overlapping dates, propose action "update" with the candidate's ID.
+   - If dates are significantly different (new term), propose "create" even if name matches.
+
+5. CONTENT ITEMS:
+   - For each license, list the content items: { title, season, episodes }
+   - If season is 0 or missing, set to 1.
+   - episodes: number of episodes if known, 0 if unknown.
+
+6. SERIES MATCHING:
+   - For each content title, check if it matches an EXISTING SERIES by title.
+   - If matched, include seriesId. If not matched, set seriesId to null (we'll create it).
+
+Return ONLY this JSON:
+{
+  "contractMode": "umbrella" | "split" | "mixed",
+  "sharedTerms": {
+    "territory": "string or null",
+    "rights": "string or null",
+    "exclusivity": "string or null"
+  },
+  "licenses": [
+    {
+      "action": "create" | "update",
+      "existingLicenseId": "string or null (ID from candidates if updating)",
+      "explanation": "why create or update",
+      "name": "plain content name",
+      "distributor": "normalized short name",
+      "contentTitle": "same as name",
+      "season": "string (e.g. '1' or '1, 2, 3')",
+      "licenseFeeAmount": "string number",
+      "licenseFeeCurrency": "EUR|USD|GBP",
+      "licenseFeePaid": 0 | 1,
+      "licenseStart": "YYYY-MM-DD or null",
+      "licenseEnd": "YYYY-MM-DD or null",
+      "allowedRuns": "string number or null for unlimited",
+      "productionYear": "number or null",
+      "subsFromDistributor": 0 | 1,
+      "description": "string or null",
+      "notes": "legal context, exceptions, unlimited runs note, etc.",
+      "contentItems": [
+        {
+          "title": "string",
+          "season": number,
+          "episodes": number,
+          "matchedSeriesId": "string or null"
+        }
+      ]
+    }
+  ],
+  "warnings": ["array of any issues, ambiguities, or missing information"]
+}
+
+${!isPdf ? `Document content:\n\n${extractedText}` : ""}
+
+Only return the JSON object. No markdown formatting.`;
+
+    const fullContent: any[] = [fullPrompt];
+    if (isPdf) fullContent.push({ inlineData: { data: fileBuffer.toString("base64"), mimeType } });
+
+    const fullResult = await model.generateContent(fullContent);
+    const extraction = parseAiJson(fullResult.response.text());
+
+    // Normalize
+    for (const lic of extraction.licenses || []) {
+      if (lic.contentItems) {
+        for (const item of lic.contentItems) {
+          if (!item.season || item.season === 0) item.season = 1;
+        }
+      }
+      // Normalize season field
+      if (lic.season === "0" || !lic.season) lic.season = "1";
+    }
+
+    return {
+      classification: classification.classification,
+      contractName: classification.contractName || "Unknown Contract",
+      distributor: classification.distributor || "Unknown",
+      totalFee: classification.totalFee,
+      currency: classification.currency || "EUR",
+      notes: classification.notes || "",
+      contractMode: extraction.contractMode || null,
+      sharedTerms: extraction.sharedTerms || null,
+      licenses: extraction.licenses || [],
+      warnings: [
+        ...(extraction.warnings || []),
+      ],
+      rawExtraction: { classification, extraction },
+    };
   }
 
   async generateText(prompt: string): Promise<string> {
