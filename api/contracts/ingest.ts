@@ -374,6 +374,13 @@ async function processLicense(
               episodesPerSeason: item.episodes,
             }, userId);
             newContent += drafts.length;
+
+            // Link the newly created drafts to the license via the join table
+            if (drafts.length > 0) {
+              const draftIds = drafts.map(d => d.id);
+              const linked = await storage.linkMetadataToLicense(licenseId, draftIds);
+              metadataLinks += linked;
+            }
           }
         }
       }
