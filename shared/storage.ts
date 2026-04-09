@@ -58,6 +58,9 @@ import {
   type InsertContract,
   type ContractFile,
   type ContractToLicense,
+  licensePaymentTerms,
+  type InsertLicensePaymentTerm,
+  type LicensePaymentTerm,
 } from "./schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -1809,6 +1812,23 @@ export class DatabaseStorage {
     if (keys.length === 0) return [];
     return await db.select().from(settings).where(inArray(settings.key, keys));
   }
+  async searchContracts(keyword: string): Promise<Contract[]> {
+    const trimmed = keyword.trim();
+    if (!trimmed) return [];
+    const pattern = `%${escapeLike(trimmed)}%`;
+    return await db
+      .select()
+      .from(contracts)
+      .where(
+        or(
+          sql`LOWER(${contracts.name}) LIKE LOWER(${pattern}) ESCAPE '\\'`,
+          sql`LOWER(${contracts.distributor}) LIKE LOWER(${pattern}) ESCAPE '\\'`
+        )
+      )
+      .orderBy(desc(contracts.createdAt))
+      .limit(50);
+  }
+
   // --- Contract Management ---
 
   async listContracts(): Promise<(Contract & { licenseCount: number; fileCount: number; totalCost: number })[]> {
@@ -1925,6 +1945,69 @@ export class DatabaseStorage {
     await db.update(contractsToLicenses).set(data).where(
       and(eq(contractsToLicenses.contractId, contractId), eq(contractsToLicenses.licenseId, licenseId))
     );
+  }
+
+  // --- License Payment Terms ---
+
+  async getPaymentTermsForLicense(licenseId: string): Promise<LicensePaymentTerm[]> {
+    return await db.select().from(licensePaymentTerms)
+      .where(eq(licensePaymentTerms.licenseId, licenseId))
+      .orderBy(licensePaymentTerms.year);
+  }
+
+  async addPaymentTerm(data: InsertLicensePaymentTerm): Promise<LicensePaymentTerm> {
+    const [created] = await db.insert(licensePaymentTerms).values(data).returning();
+    return created;
+  }
+
+  async deletePaymentTermsForLicense(licenseId: string): Promise<void> {
+    await db.delete(licensePaymentTerms).where(eq(licensePaymentTerms.licenseId, licenseId));
+  }
+
+  async getPaymentTermsByYear(year: number): Promise<(LicensePaymentTerm & { license: License })[]> {
+    const results = await db
+      .select({ term: licensePaymentTerms, license: licenses })
+      .from(licensePaymentTerms)
+      .innerJoin(licenses, eq(licensePaymentTerms.licenseId, licenses.id))
+      .where(eq(licensePaymentTerms.year, year))
+      .orderBy(licenses.distributor, licenses.name);
+    return results.map(r => ({ ...r.term, license: r.license }));
+  }
+
+  async getFinancialSummaryByYear(year: number): Promise<{
+    year: number;
+    totalSpend: number;
+    byDistributor: { distributor: string; amount: number }[];
+    terms: (LicensePaymentTerm & { licenseName: string; distributor: string | null })[];
+  }> {
+    const results = await db
+      .select({
+        term: licensePaymentTerms,
+        licenseName: licenses.name,
+        distributor: licenses.distributor,
+      })
+      .from(licensePaymentTerms)
+      .innerJoin(licenses, eq(licensePaymentTerms.licenseId, licenses.id))
+      .where(eq(licensePaymentTerms.year, year))
+      .orderBy(licenses.distributor, licenses.name);
+
+    let totalSpend = 0;
+    const distributorMap = new Map<string, number>();
+    const terms: (LicensePaymentTerm & { licenseName: string; distributor: string | null })[] = [];
+
+    for (const r of results) {
+      const amt = parseFloat(r.term.amount) || 0;
+      totalSpend += amt;
+      const dist = r.distributor || "Unknown";
+      distributorMap.set(dist, (distributorMap.get(dist) || 0) + amt);
+      terms.push({ ...r.term, licenseName: r.licenseName, distributor: r.distributor });
+    }
+
+    const byDistributor = Array.from(distributorMap.entries())
+      .map(([distributor, amount]) => ({ distributor, amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    return { year, totalSpend, byDistributor, terms };
   }
 
   // --- Contract Ingest Helpers ---

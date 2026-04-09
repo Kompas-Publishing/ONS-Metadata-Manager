@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Search, FileText, Download, Trash2, ArrowUpDown, ArrowUp, ArrowDown,
-  Upload, Loader2, Filter, ArrowLeft,
+  Upload, Loader2, Filter, ArrowLeft, TrendingUp, ChevronDown, ChevronUp, Euro,
 } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { upload } from "@vercel/blob/client";
 import type { License } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import ContractIngestDialog from "@/components/contract-ingest-dialog";
 
 interface ContractListItem {
@@ -58,6 +59,8 @@ export default function Contracts() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "distributor", direction: "asc" });
   const [createOpen, setCreateOpen] = useState(false);
   const [ingestOpen, setIngestOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
+  const [financeYear, setFinanceYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     document.title = "Contracts | ONS Broadcast Portal";
@@ -66,6 +69,18 @@ export default function Contracts() {
   const { data: contractsList, isLoading } = useQuery<ContractListItem[]>({
     queryKey: ["/api/contracts"],
     enabled: !!canAccessContracts,
+  });
+
+  interface FinancialSummary {
+    year: number;
+    totalSpend: number;
+    byDistributor: { distributor: string; amount: number }[];
+    terms: { id: string; licenseId: string; year: number; amount: string; currency: string | null; dueDate: string | null; notes: string | null; licenseName: string; distributor: string | null }[];
+  }
+
+  const { data: financialData, isLoading: isFinanceLoading } = useQuery<FinancialSummary>({
+    queryKey: ["/api/contracts/financial-summary", { year: financeYear }],
+    enabled: !!canAccessContracts && financeOpen,
   });
 
   const distributors = useMemo(() => {
@@ -217,6 +232,127 @@ export default function Contracts() {
           </Select>
         </div>
       </div>
+
+      {/* Financial Overview */}
+      <Collapsible open={financeOpen} onOpenChange={setFinanceOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Euro className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">Financial Overview</CardTitle>
+                </div>
+                {financeOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              {/* Year selector */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">Fiscal Year:</span>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setFinanceYear(y => y - 1)}>
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-lg font-bold w-16 text-center">{financeYear}</span>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setFinanceYear(y => y + 1)}>
+                    <ArrowLeft className="h-3.5 w-3.5 rotate-180" />
+                  </Button>
+                </div>
+              </div>
+
+              {isFinanceLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : financialData ? (
+                <>
+                  {/* Total spend */}
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10">
+                    <TrendingUp className="h-8 w-8 text-primary" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total License Spend {financeYear}</p>
+                      <p className="text-2xl font-bold">{formatCurrency(financialData.totalSpend)}</p>
+                    </div>
+                  </div>
+
+                  {/* By distributor */}
+                  {financialData.byDistributor.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">By Distributor</p>
+                      <div className="space-y-1.5">
+                        {financialData.byDistributor.map(d => {
+                          const pct = financialData.totalSpend > 0 ? (d.amount / financialData.totalSpend) * 100 : 0;
+                          return (
+                            <div key={d.distributor} className="flex items-center gap-3">
+                              <span className="text-sm w-32 truncate">{d.distributor}</span>
+                              <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary/70 rounded-full transition-all"
+                                  style={{ width: `${Math.max(pct, 2)}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-mono w-28 text-right">{formatCurrency(d.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment terms detail */}
+                  {financialData.terms.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Payment Terms ({financialData.terms.length})</p>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead>License</TableHead>
+                              <TableHead>Distributor</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                              <TableHead>Due Date</TableHead>
+                              <TableHead>Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {financialData.terms.map(t => (
+                              <TableRow key={t.id}>
+                                <TableCell className="font-medium">{t.licenseName}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="font-normal">{t.distributor || "—"}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {new Intl.NumberFormat("de-DE", { style: "currency", currency: t.currency || "EUR" }).format(parseFloat(t.amount) || 0)}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {t.dueDate ? format(new Date(t.dueDate), "dd-MM-yyyy") : "—"}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                                  {t.notes || "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {financialData.totalSpend === 0 && financialData.terms.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No payment terms found for {financeYear}. Payment terms are extracted automatically when contracts are uploaded via AI ingest.
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Table — matches License Manager */}
       <Card>

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Sparkles, Loader2, Check, X, Info, Paperclip } from "lucide-react";
+import { Send, Sparkles, Loader2, Check, X, Info, Paperclip, MessageSquarePlus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { upload } from "@vercel/blob/client";
@@ -33,13 +33,49 @@ type Message = {
 export default function AiChat() {
   const { canUseAIChat } = useAuth();
   const { toast } = useToast();
+  const CACHE_KEY = "ons_ai_chat_session";
+  const CACHE_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+  // Load cached messages on mount
+  const loadCachedMessages = (): Message[] => {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return [];
+      const cached = JSON.parse(raw);
+      if (!cached.timestamp || Date.now() - cached.timestamp > CACHE_EXPIRY_MS) {
+        localStorage.removeItem(CACHE_KEY);
+        return [];
+      }
+      return cached.messages || [];
+    } catch {
+      return [];
+    }
+  };
+
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadCachedMessages);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [hasCachedSession, setHasCachedSession] = useState(() => loadCachedMessages().length > 0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ messages, timestamp: Date.now() }));
+      setHasCachedSession(true);
+    }
+  }, [messages]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setInput("");
+    setAttachment(null);
+    localStorage.removeItem(CACHE_KEY);
+    setHasCachedSession(false);
+  };
 
   useEffect(() => {
     document.title = "AI Chat | ONS Broadcast Portal";
@@ -242,6 +278,8 @@ export default function AiChat() {
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/metadata"] });
       queryClient.invalidateQueries({ queryKey: ["/api/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -334,14 +372,22 @@ export default function AiChat() {
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="shrink-0">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <h1 className="text-2xl font-semibold text-foreground">AI Chat</h1>
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">AI Chat</h1>
+          {hasCachedSession && (
+            <Button variant="outline" size="sm" onClick={handleNewChat} className="gap-2">
+              <MessageSquarePlus className="w-4 h-4" />
+              New Chat
+            </Button>
+          )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Ask questions about metadata, licenses, and tasks.
+          Ask questions about metadata, licenses, contracts, tasks, and series.
         </p>
       </div>
 

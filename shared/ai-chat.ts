@@ -314,6 +314,56 @@ async function getModel(systemPrompt: string, modelOverride?: string) {
             },
             required: ["action", "data", "explanation"]
           }
+        },
+        {
+          name: "searchContracts",
+          description: "Search the contracts database by keyword. Returns contract name, distributor, status, mode, and total cost.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "The keyword to search for (e.g. distributor name, contract name)" }
+            },
+            required: ["query"]
+          }
+        },
+        {
+          name: "searchTasks",
+          description: "Search tasks by keyword. Returns tasks with their linked metadata file. Only returns data if user has read permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "The keyword to search for (e.g. task description, series title)" }
+            },
+            required: ["query"]
+          }
+        },
+        {
+          name: "searchSeries",
+          description: "Search series by title keyword. Returns series with their titles and production year.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              query: { type: "STRING", description: "The keyword to search for (e.g. series title)" }
+            },
+            required: ["query"]
+          }
+        },
+        {
+          name: "proposeTaskChange",
+          description: "Propose creating or updating a task linked to a metadata file. The user must approve. Only works if user has task write permissions.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              action: { type: "STRING", enum: ["create", "update"] },
+              id: { type: "STRING", description: "The task ID (required for action='update')" },
+              data: {
+                type: "OBJECT",
+                description: "Task fields: 'metadataFileId' (required for create), 'description', 'status' (pending/in_progress/completed), 'priority' (low/medium/high), 'deadline' (ISO date), 'assignedTo' (user ID)."
+              },
+              explanation: { type: "STRING", description: "Explain why you are proposing this task change." }
+            },
+            required: ["action", "data", "explanation"]
+          }
         }
       ]
     }
@@ -396,15 +446,23 @@ export async function runAiChat(
   permissions: UserPermissions,
   options?: { debug?: boolean; attachment?: ChatAttachment }
 ) {
+  const now = new Date();
+  const dateTimeStr = now.toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Europe/Amsterdam" });
+
   const systemPrompt = `You are the ONS Broadcast Portal Assistant.
-You help users manage metadata, licenses, and tasks.
+You help users manage metadata, licenses, contracts, tasks, and series.
 You have access to tools to search the database and propose changes.
+
+CURRENT DATE & TIME: ${dateTimeStr} (Amsterdam timezone)
 
 PERMISSION RULES:
 - Metadata Read: ${permissions.features.metadata.read ? "ALLOWED" : "DENIED"}
 - Metadata Write: ${permissions.features.metadata.write ? "ALLOWED" : "DENIED"}
 - License Read: ${permissions.features.licenses.read ? "ALLOWED" : "DENIED"}
 - License Write: ${permissions.features.licenses.write ? "ALLOWED" : "DENIED"}
+- Tasks Read: ${permissions.features.tasks.read ? "ALLOWED" : "DENIED"}
+- Tasks Write: ${permissions.features.tasks.write ? "ALLOWED" : "DENIED"}
+- Contracts: ${permissions.features.contracts ? "ALLOWED" : "DENIED"}
 
 LANGUAGE RULES:
 - IMPORTANT: All descriptions (description, episodeDescription) MUST be in Dutch (Nederlands).
@@ -417,11 +475,13 @@ DATA TYPE RULES:
 
 TOOL USAGE RULES:
 - If a user asks to "fix", "update", "add", or "change" something, YOU MUST USE THE PROPOSAL TOOLS.
-- DO NOT just say "I have updated it" or "I will do it". You MUST call the 'proposeMetadataChange' or 'proposeLicenseChange' tool for EACH item you intend to change.
+- DO NOT just say "I have updated it" or "I will do it". You MUST call the appropriate proposal tool for EACH item you intend to change.
 - If updating multiple episodes, call the tool multiple times (once for each episode).
 - After calling a tool, summarize what you've done and inform the user you have created a proposal for them to review.
 - If you cannot find information on IMDb or elsewhere, tell the user exactly what you searched for.
 - If the user asks for up-to-date information or anything outside the database, use the 'searchWeb' tool and reference its sources.
+- For tasks: use 'proposeTaskChange' to create or update tasks linked to metadata files.
+- For contracts: use 'searchContracts' to look up contracts. Contracts cannot be created via chat — direct users to the Contracts page.
 
 GENERAL RULES:
 - IMPORTANT: You MUST generate a text response AFTER calling tools. Never leave the final response blank.
@@ -563,6 +623,47 @@ Always be professional and helpful.`;
             }
             break;
 
+          case "searchContracts":
+            if (!permissions.features.contracts) {
+              result = { error: "Permission denied: Cannot access contracts." };
+            } else {
+              result = await storage.searchContracts(call.args.query as string);
+            }
+            break;
+
+          case "searchTasks":
+            if (!permissions.features.tasks.read) {
+              result = { error: "Permission denied: Cannot read tasks." };
+            } else {
+              result = await storage.searchTasks(call.args.query as string, permissions);
+            }
+            break;
+
+          case "searchSeries":
+            if (!permissions.features.metadata.read) {
+              result = { error: "Permission denied: Cannot read metadata/series." };
+            } else {
+              const allSeries = await storage.getAllSeries();
+              const q = (call.args.query as string).toLowerCase();
+              result = allSeries.filter(s => s.title.toLowerCase().includes(q)).slice(0, 30);
+            }
+            break;
+
+          case "proposeTaskChange":
+            if (!permissions.features.tasks.write) {
+              result = { error: "Permission denied: Cannot write tasks." };
+            } else {
+              proposals.push({
+                type: "task",
+                action: call.args.action as "create" | "update",
+                id: call.args.id as string,
+                data: call.args.data as Record<string, any>,
+                explanation: call.args.explanation as string
+              });
+              result = { status: "Task proposal recorded. Inform the user." };
+            }
+            break;
+
           default:
             result = { error: "Unknown tool." };
         }
@@ -656,6 +757,19 @@ export async function executeChatProposal(
     } else {
       if (!proposal.id) throw new Error("ID required for update action.");
       return await storage.updateLicense(proposal.id, proposal.data);
+    }
+  } else if (proposal.type === "task") {
+    if (!permissions.features.tasks.write) throw new Error("Permission denied: Cannot write tasks.");
+
+    if (proposal.action === "create") {
+      const validation = insertTaskSchema.safeParse(proposal.data);
+      if (!validation.success) throw new Error("Validation failed: " + JSON.stringify(validation.error.errors));
+      return await storage.createTask({ ...validation.data, createdBy: userId });
+    } else {
+      if (!proposal.id) throw new Error("ID required for update action.");
+      const taskId = parseInt(proposal.id, 10);
+      if (isNaN(taskId)) throw new Error("Invalid task ID.");
+      return await storage.updateTask(taskId, proposal.data);
     }
   }
 

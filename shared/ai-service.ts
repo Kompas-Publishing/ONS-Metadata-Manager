@@ -34,6 +34,13 @@ export interface ContractIngestLicense {
     episodes: number;
     matchedSeriesId: string | null;
   }>;
+  paymentTerms?: Array<{
+    year: number;
+    amount: string;
+    currency?: string;
+    dueDate?: string | null;
+    notes?: string | null;
+  }>;
 }
 
 export interface ContractIngestResult {
@@ -533,11 +540,27 @@ Return ONLY this JSON:
           "episodes": number,
           "matchedSeriesId": "string or null"
         }
+      ],
+      "paymentTerms": [
+        {
+          "year": number,
+          "amount": "string number — the fee for this specific year",
+          "currency": "EUR|USD|GBP",
+          "dueDate": "YYYY-MM-DD or null",
+          "notes": "e.g. 'year 1 of 3', 'on signing', 'Q2 installment'"
+        }
       ]
     }
   ],
   "warnings": ["array of any issues, ambiguities, or missing information"]
 }
+
+PAYMENT TERMS RULES:
+- If the contract specifies a payment schedule (e.g. split over multiple years, installments), extract each installment as a separate paymentTerms entry.
+- If there is only one lump-sum fee with no yearly breakdown, create a single paymentTerms entry for the year the contract starts.
+- The "year" field is the calendar/fiscal year (e.g. 2025, 2026).
+- If the contract says "€30,000 over 3 years (2025-2027)", create 3 entries: {year: 2025, amount: "10000.00"}, {year: 2026, amount: "10000.00"}, {year: 2027, amount: "10000.00"}.
+- Only extract payment terms that are explicitly stated or clearly derivable from the contract. Do not guess.
 
 ${!isPdf ? `Document content:\n\n${extractedText}` : ""}
 

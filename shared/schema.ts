@@ -116,6 +116,36 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
 export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
 
+// License payment terms — per-year/installment fee breakdown
+export const licensePaymentTerms = pgTable("license_payment_terms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  year: integer("year").notNull(),
+  amount: text("amount").notNull(), // e.g. "10000.00"
+  currency: varchar("currency", { length: 10 }).default("EUR"),
+  dueDate: timestamp("due_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_license_payment_terms_license").on(table.licenseId),
+  index("idx_license_payment_terms_year").on(table.year),
+]);
+
+export const insertLicensePaymentTermSchema = createInsertSchema(licensePaymentTerms, {
+  licenseId: z.string().min(1),
+  year: z.number().int().min(1900).max(2100),
+  amount: z.string().min(1),
+  currency: z.string().optional(),
+  dueDate: z.coerce.date().optional(),
+  notes: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLicensePaymentTerm = z.infer<typeof insertLicensePaymentTermSchema>;
+export type LicensePaymentTerm = typeof licensePaymentTerms.$inferSelect;
+
 // Series table
 export const seriesTable = pgTable("series", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
