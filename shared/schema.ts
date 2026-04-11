@@ -116,25 +116,25 @@ export const insertLicenseSchema = createInsertSchema(licenses, {
 export type InsertLicense = z.infer<typeof insertLicenseSchema>;
 export type License = typeof licenses.$inferSelect;
 
-// License payment terms — per-year/installment fee breakdown
-export const licensePaymentTerms = pgTable("license_payment_terms", {
+// Contract payment terms — per-year/installment fee breakdown at contract level
+export const contractPaymentTerms = pgTable("contract_payment_terms", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  licenseId: varchar("license_id").notNull().references(() => licenses.id, { onDelete: "cascade" }),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id, { onDelete: "cascade" }),
   year: integer("year").notNull(),
-  amount: text("amount").notNull(), // e.g. "10000.00"
+  amount: integer("amount").notNull(), // cents (e.g. 1000000 = €10,000.00)
   currency: varchar("currency", { length: 10 }).default("EUR"),
   dueDate: timestamp("due_date"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("idx_license_payment_terms_license").on(table.licenseId),
-  index("idx_license_payment_terms_year").on(table.year),
+  index("idx_contract_payment_terms_contract").on(table.contractId),
+  index("idx_contract_payment_terms_year").on(table.year),
 ]);
 
-export const insertLicensePaymentTermSchema = createInsertSchema(licensePaymentTerms, {
-  licenseId: z.string().min(1),
+export const insertContractPaymentTermSchema = createInsertSchema(contractPaymentTerms, {
+  contractId: z.string().min(1),
   year: z.number().int().min(1900).max(2100),
-  amount: z.string().min(1),
+  amount: z.number().int().min(0),
   currency: z.string().optional(),
   dueDate: z.coerce.date().optional(),
   notes: z.string().optional(),
@@ -143,8 +143,8 @@ export const insertLicensePaymentTermSchema = createInsertSchema(licensePaymentT
   createdAt: true,
 });
 
-export type InsertLicensePaymentTerm = z.infer<typeof insertLicensePaymentTermSchema>;
-export type LicensePaymentTerm = typeof licensePaymentTerms.$inferSelect;
+export type InsertContractPaymentTerm = z.infer<typeof insertContractPaymentTermSchema>;
+export type ContractPaymentTerm = typeof contractPaymentTerms.$inferSelect;
 
 // Series table
 export const seriesTable = pgTable("series", {

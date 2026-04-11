@@ -58,9 +58,9 @@ import {
   type InsertContract,
   type ContractFile,
   type ContractToLicense,
-  licensePaymentTerms,
-  type InsertLicensePaymentTerm,
-  type LicensePaymentTerm,
+  contractPaymentTerms,
+  type InsertContractPaymentTerm,
+  type ContractPaymentTerm,
 } from "./schema.js";
 import { db } from "./db.js";
 import { eq, desc, sql, gte, and, inArray, or } from "drizzle-orm";
@@ -1947,60 +1947,50 @@ export class DatabaseStorage {
     );
   }
 
-  // --- License Payment Terms ---
+  // --- Contract Payment Terms ---
 
-  async getPaymentTermsForLicense(licenseId: string): Promise<LicensePaymentTerm[]> {
-    return await db.select().from(licensePaymentTerms)
-      .where(eq(licensePaymentTerms.licenseId, licenseId))
-      .orderBy(licensePaymentTerms.year);
+  async getPaymentTermsForContract(contractId: string): Promise<ContractPaymentTerm[]> {
+    return await db.select().from(contractPaymentTerms)
+      .where(eq(contractPaymentTerms.contractId, contractId))
+      .orderBy(contractPaymentTerms.year);
   }
 
-  async addPaymentTerm(data: InsertLicensePaymentTerm): Promise<LicensePaymentTerm> {
-    const [created] = await db.insert(licensePaymentTerms).values(data).returning();
+  async addContractPaymentTerm(data: InsertContractPaymentTerm): Promise<ContractPaymentTerm> {
+    const [created] = await db.insert(contractPaymentTerms).values(data).returning();
     return created;
   }
 
-  async deletePaymentTermsForLicense(licenseId: string): Promise<void> {
-    await db.delete(licensePaymentTerms).where(eq(licensePaymentTerms.licenseId, licenseId));
-  }
-
-  async getPaymentTermsByYear(year: number): Promise<(LicensePaymentTerm & { license: License })[]> {
-    const results = await db
-      .select({ term: licensePaymentTerms, license: licenses })
-      .from(licensePaymentTerms)
-      .innerJoin(licenses, eq(licensePaymentTerms.licenseId, licenses.id))
-      .where(eq(licensePaymentTerms.year, year))
-      .orderBy(licenses.distributor, licenses.name);
-    return results.map(r => ({ ...r.term, license: r.license }));
+  async deletePaymentTermsForContract(contractId: string): Promise<void> {
+    await db.delete(contractPaymentTerms).where(eq(contractPaymentTerms.contractId, contractId));
   }
 
   async getFinancialSummaryByYear(year: number): Promise<{
     year: number;
     totalSpend: number;
     byDistributor: { distributor: string; amount: number }[];
-    terms: (LicensePaymentTerm & { licenseName: string; distributor: string | null })[];
+    terms: (ContractPaymentTerm & { contractName: string; distributor: string })[];
   }> {
     const results = await db
       .select({
-        term: licensePaymentTerms,
-        licenseName: licenses.name,
-        distributor: licenses.distributor,
+        term: contractPaymentTerms,
+        contractName: contracts.name,
+        distributor: contracts.distributor,
       })
-      .from(licensePaymentTerms)
-      .innerJoin(licenses, eq(licensePaymentTerms.licenseId, licenses.id))
-      .where(eq(licensePaymentTerms.year, year))
-      .orderBy(licenses.distributor, licenses.name);
+      .from(contractPaymentTerms)
+      .innerJoin(contracts, eq(contractPaymentTerms.contractId, contracts.id))
+      .where(eq(contractPaymentTerms.year, year))
+      .orderBy(contracts.distributor, contracts.name);
 
     let totalSpend = 0;
     const distributorMap = new Map<string, number>();
-    const terms: (LicensePaymentTerm & { licenseName: string; distributor: string | null })[] = [];
+    const terms: (ContractPaymentTerm & { contractName: string; distributor: string })[] = [];
 
     for (const r of results) {
-      const amt = parseFloat(r.term.amount) || 0;
+      const amt = r.term.amount; // already integer cents
       totalSpend += amt;
-      const dist = r.distributor || "Unknown";
+      const dist = r.distributor;
       distributorMap.set(dist, (distributorMap.get(dist) || 0) + amt);
-      terms.push({ ...r.term, licenseName: r.licenseName, distributor: r.distributor });
+      terms.push({ ...r.term, contractName: r.contractName, distributor: r.distributor });
     }
 
     const byDistributor = Array.from(distributorMap.entries())

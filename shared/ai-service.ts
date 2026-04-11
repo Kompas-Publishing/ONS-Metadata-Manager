@@ -34,13 +34,14 @@ export interface ContractIngestLicense {
     episodes: number;
     matchedSeriesId: string | null;
   }>;
-  paymentTerms?: Array<{
-    year: number;
-    amount: string;
-    currency?: string;
-    dueDate?: string | null;
-    notes?: string | null;
-  }>;
+}
+
+export interface ContractPaymentTermEntry {
+  year: number;
+  amountCents: number;
+  currency?: string;
+  dueDate?: string | null;
+  notes?: string | null;
 }
 
 export interface ContractIngestResult {
@@ -53,6 +54,7 @@ export interface ContractIngestResult {
   contractMode: string | null;
   sharedTerms?: Record<string, string | null> | null;
   licenses: ContractIngestLicense[];
+  paymentTerms?: ContractPaymentTermEntry[];
   warnings: string[];
   rawExtraction: any;
 }
@@ -540,26 +542,29 @@ Return ONLY this JSON:
           "episodes": number,
           "matchedSeriesId": "string or null"
         }
-      ],
-      "paymentTerms": [
-        {
-          "year": number,
-          "amount": "string number — the fee for this specific year",
-          "currency": "EUR|USD|GBP",
-          "dueDate": "YYYY-MM-DD or null",
-          "notes": "e.g. 'year 1 of 3', 'on signing', 'Q2 installment'"
-        }
       ]
+    }
+  ],
+  "paymentTerms": [
+    {
+      "year": number,
+      "amountCents": integer — "the fee in CENTS for this specific year (e.g. 1000000 = €10,000.00)",
+      "currency": "EUR|USD|GBP",
+      "dueDate": "YYYY-MM-DD or null",
+      "notes": "e.g. 'year 1 of 3', 'on signing', 'Q2 installment'"
     }
   ],
   "warnings": ["array of any issues, ambiguities, or missing information"]
 }
 
 PAYMENT TERMS RULES:
+- Payment terms are at CONTRACT level, NOT per-license. Extract the total contract payment schedule.
 - If the contract specifies a payment schedule (e.g. split over multiple years, installments), extract each installment as a separate paymentTerms entry.
 - If there is only one lump-sum fee with no yearly breakdown, create a single paymentTerms entry for the year the contract starts.
 - The "year" field is the calendar/fiscal year (e.g. 2025, 2026).
-- If the contract says "€30,000 over 3 years (2025-2027)", create 3 entries: {year: 2025, amount: "10000.00"}, {year: 2026, amount: "10000.00"}, {year: 2027, amount: "10000.00"}.
+- The "amountCents" field is an INTEGER in cents. €10,000.00 = 1000000. €8,375.50 = 837550.
+- If the contract says "€30,000 over 3 years (2025-2027)", create 3 entries: {year: 2025, amountCents: 1000000}, {year: 2026, amountCents: 1000000}, {year: 2027, amountCents: 1000000}.
+- Do NOT duplicate the fee across licenses. One contract = one set of payment terms.
 - Only extract payment terms that are explicitly stated or clearly derivable from the contract. Do not guess.
 
 ${!isPdf ? `Document content:\n\n${extractedText}` : ""}
@@ -593,6 +598,7 @@ Only return the JSON object. No markdown formatting.`;
       contractMode: extraction.contractMode || null,
       sharedTerms: extraction.sharedTerms || null,
       licenses: extraction.licenses || [],
+      paymentTerms: extraction.paymentTerms || [],
       warnings: [
         ...(extraction.warnings || []),
       ],

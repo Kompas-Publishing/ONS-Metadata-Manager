@@ -181,7 +181,26 @@ async function handler(req: AuthenticatedRequest, res: VercelResponse) {
       });
     }
 
-    // --- 4. Process Licenses ---
+    // --- 4. Payment Terms (contract-level) ---
+    if (ingestResult.paymentTerms && ingestResult.paymentTerms.length > 0) {
+      await storage.deletePaymentTermsForContract(contract.id);
+      for (const term of ingestResult.paymentTerms) {
+        try {
+          await storage.addContractPaymentTerm({
+            contractId: contract.id,
+            year: term.year,
+            amount: term.amountCents,
+            currency: term.currency || ingestResult.currency || "EUR",
+            dueDate: term.dueDate ? new Date(term.dueDate) : undefined,
+            notes: term.notes || undefined,
+          });
+        } catch (err: any) {
+          warnings.push(`Payment term for year ${term.year}: ${err.message}`);
+        }
+      }
+    }
+
+    // --- 5. Process Licenses ---
     let licensesCreated = 0;
     let licensesUpdated = 0;
     let seriesLinksCreated = 0;
@@ -321,26 +340,6 @@ async function processLicense(
     mappingStatus: "mapped",
     notes: spec.explanation,
   });
-
-  // --- Payment Terms ---
-  if (spec.paymentTerms && spec.paymentTerms.length > 0) {
-    // Clear existing terms for this license (in case of re-upload) then add new ones
-    await storage.deletePaymentTermsForLicense(licenseId);
-    for (const term of spec.paymentTerms) {
-      try {
-        await storage.addPaymentTerm({
-          licenseId,
-          year: term.year,
-          amount: term.amount,
-          currency: term.currency || spec.licenseFeeCurrency || "EUR",
-          dueDate: term.dueDate ? new Date(term.dueDate) : undefined,
-          notes: term.notes || undefined,
-        });
-      } catch (err: any) {
-        warnings.push(`Payment term for year ${term.year}: ${err.message}`);
-      }
-    }
-  }
 
   // --- Content Linking ---
   for (const item of spec.contentItems || []) {

@@ -73,9 +73,9 @@ export default function Contracts() {
 
   interface FinancialSummary {
     year: number;
-    totalSpend: number;
-    byDistributor: { distributor: string; amount: number }[];
-    terms: { id: string; licenseId: string; year: number; amount: string; currency: string | null; dueDate: string | null; notes: string | null; licenseName: string; distributor: string | null }[];
+    totalSpend: number; // cents
+    byDistributor: { distributor: string; amount: number }[]; // cents
+    terms: { id: string; contractId: string; year: number; amount: number; currency: string | null; dueDate: string | null; notes: string | null; contractName: string; distributor: string }[];
   }
 
   const { data: financialData, isLoading: isFinanceLoading } = useQuery<FinancialSummary>({
@@ -274,8 +274,8 @@ export default function Contracts() {
                   <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10">
                     <TrendingUp className="h-8 w-8 text-primary" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Total License Spend {financeYear}</p>
-                      <p className="text-2xl font-bold">{formatCurrency(financialData.totalSpend)}</p>
+                      <p className="text-sm text-muted-foreground">Total Contract Spend {financeYear}</p>
+                      <p className="text-2xl font-bold">{formatCurrency(financialData.totalSpend / 100)}</p>
                     </div>
                   </div>
 
@@ -295,7 +295,7 @@ export default function Contracts() {
                                   style={{ width: `${Math.max(pct, 2)}%` }}
                                 />
                               </div>
-                              <span className="text-sm font-mono w-28 text-right">{formatCurrency(d.amount)}</span>
+                              <span className="text-sm font-mono w-28 text-right">{formatCurrency(d.amount / 100)}</span>
                             </div>
                           );
                         })}
@@ -311,7 +311,7 @@ export default function Contracts() {
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
-                              <TableHead>License</TableHead>
+                              <TableHead>Contract</TableHead>
                               <TableHead>Distributor</TableHead>
                               <TableHead className="text-right">Amount</TableHead>
                               <TableHead>Due Date</TableHead>
@@ -321,12 +321,12 @@ export default function Contracts() {
                           <TableBody>
                             {financialData.terms.map(t => (
                               <TableRow key={t.id}>
-                                <TableCell className="font-medium">{t.licenseName}</TableCell>
+                                <TableCell className="font-medium">{t.contractName}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className="font-normal">{t.distributor || "—"}</Badge>
+                                  <Badge variant="outline" className="font-normal">{t.distributor}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {new Intl.NumberFormat("de-DE", { style: "currency", currency: t.currency || "EUR" }).format(parseFloat(t.amount) || 0)}
+                                  {new Intl.NumberFormat("de-DE", { style: "currency", currency: t.currency || "EUR" }).format(t.amount / 100)}
                                 </TableCell>
                                 <TableCell className="text-sm">
                                   {t.dueDate ? format(new Date(t.dueDate), "dd-MM-yyyy") : "—"}
