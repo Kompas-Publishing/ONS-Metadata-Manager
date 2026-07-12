@@ -26,11 +26,11 @@ export default apiHandler(
         const schema = z.object({
           name: z.string().optional(),
           distributor: z.string().optional(),
-          description: z.string().optional().nullable(),
-          contractMode: z.string().optional().nullable(),
+          description: z.string().optional(),
+          contractMode: z.string().optional(),
           status: z.string().optional(),
-          notes: z.string().optional().nullable(),
-          totalFeeAmount: z.string().optional().nullable(),
+          notes: z.string().optional(),
+          totalFeeAmount: z.string().optional(),
           totalFeeCurrency: z.string().optional(),
           sharedTerms: z.any().optional(),
         });

@@ -114,7 +114,7 @@ export default function ViewFile() {
             createdBy: "me",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
-          } as Task
+          } as unknown as Task
         ]);
       }
       return { previousTasks };
